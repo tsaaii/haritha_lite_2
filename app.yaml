@@ -1,0 +1,28 @@
+runtime: python311
+
+entrypoint: gunicorn -b :$PORT main:app
+
+instance_class: F2
+
+env_variables:
+  USE_LOCAL_CSV: "0"
+  GCS_BUCKET: "advitia-weighbridge-data"
+  SITES_MASTER_PATH: "dashboard_config/sites_master.csv"
+  OVERRIDES_PATH: "dashboard_config/overrides.csv"
+  RECORDS_API_BASE: "https://your-fastapi-host.example.com"
+  CACHE_TTL_SECONDS: "1800"
+  PROJECT_DEADLINE: "2026-05-31"
+  ROTATION_INTERVAL_MS: "12000"
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 4
+  target_cpu_utilization: 0.65
+
+handlers:
+  - url: /static
+    static_dir: static
+    secure: always
+  - url: /.*
+    script: auto
+    secure: always

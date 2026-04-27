@@ -1,0 +1,56 @@
+<article class="main-card main-card--{{ card.kind }}">
+  <header class="main-card__header">
+    <span class="main-card__icon" aria-hidden="true">{{ card.icon }}</span>
+    <div class="main-card__titles">
+      <h3 class="main-card__title">{{ card.title }}</h3>
+      {% if card.subtitle %}
+        <p class="main-card__subtitle">{{ card.subtitle }}</p>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="main-card__body">
+    {# ----- progress / timeline kind: big number + rows ----- #}
+    {% if card.kind in ['progress', 'timeline'] %}
+      <div class="main-card__primary" style="color: {{ card.primary_color or 'var(--brand-primary)' }};">
+        {{ card.primary_value }}
+      </div>
+      <ul class="main-card__rows">
+        {% for row in card.rows %}
+          <li class="main-card__row">
+            <span class="main-card__row-label">{{ row.label }}</span>
+            <span class="main-card__row-value">{{ row.value }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+
+    {# ----- tri_metric kind: 3 numbers side-by-side ----- #}
+    {% elif card.kind == 'tri_metric' %}
+      <div class="main-card__tri">
+        {% for m in card.metrics %}
+          <div class="main-card__tri-cell">
+            <div class="main-card__tri-value" style="color: {{ m.color or 'var(--brand-primary)' }};">{{ m.value }}</div>
+            <div class="main-card__tri-label">{{ m.label }}</div>
+          </div>
+          {% if not loop.last %}<span class="main-card__tri-sep" aria-hidden="true"></span>{% endif %}
+        {% endfor %}
+      </div>
+
+    {# ----- list kind: vertical list of label/value rows ----- #}
+    {% elif card.kind == 'list' %}
+      {% if card.entries %}
+        <ul class="main-card__list">
+          {% for it in card.entries %}
+            <li class="main-card__list-item">
+              <span class="main-card__list-label">{{ it.label }}</span>
+              <span class="main-card__list-value"
+                    {% if it.color %}style="color: {{ it.color }};"{% endif %}>{{ it.value }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="main-card__empty">{{ card.empty_text or '—' }}</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</article>

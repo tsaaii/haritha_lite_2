@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Haritha — Overview{% endblock %}
+
+{% block content %}
+  {# ---------- Project overview strip ---------- #}
+  <section class="project-overview" aria-label="Project overview">
+    <div class="po-stat">
+      <span class="po-stat-label">Sites</span>
+      <span class="po-stat-value">{{ overview.active_sites }} / {{ overview.total_sites }}</span>
+    </div>
+    <div class="po-stat">
+      <span class="po-stat-label">Agencies</span>
+      <span class="po-stat-value">{{ overview.total_agencies }}</span>
+    </div>
+    <div class="po-stat">
+      <span class="po-stat-label">Clusters</span>
+      <span class="po-stat-value">{{ overview.total_clusters }}</span>
+    </div>
+    <div class="po-stat po-stat--accent">
+      <span class="po-stat-label">Days remaining</span>
+      <span class="po-stat-value">{{ overview.days_remaining }}</span>
+    </div>
+  </section>
+
+  {# ---------- 1×4 Header cards ---------- #}
+  <section class="header-cards-grid" aria-label="Project totals">
+    {% for card in header_cards %}
+      {% include "partials/header_card.html" %}
+    {% endfor %}
+  </section>
+
+  {# ---------- Rotating agency header ---------- #}
+  {% include "partials/agency_header.html" %}
+
+  {# ---------- 2×4 Main cards (one slide per agency) ---------- #}
+  <section class="main-cards-stage" aria-label="Agency details">
+    {% for agency in agencies %}
+      <div class="agency-slide{% if loop.first %} is-active{% endif %}"
+           data-agency="{{ agency.name }}"
+           data-index="{{ loop.index0 }}">
+        <div class="main-cards-grid">
+          {% for card in agency.main_cards %}
+            {% include "partials/main_card.html" %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    window.HARITHA_ROTATION_MS = {{ rotation_interval_ms }};
+  </script>
+  <script src="{{ url_for('static', filename='js/rotation.js') }}" defer></script>
+{% endblock %}

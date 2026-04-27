@@ -1,0 +1,9 @@
+site_name,api_site_names,agency_name,cluster,target_mt,deadline_date,status,reclamation_status,start_date
+Bheemavaram,,Tharuni Associates,Nellore,125000.00,2026-05-31,active,in_progress,2025-08-01
+Kadapa,Kadapa|Kadapa2,Zigma Global Enviro,Kadapa,210000.00,2026-05-31,active,in_progress,2025-09-10
+Allipuram,,Zigma Global Enviro,GVMC,98000.00,2026-06-30,active,reclaimed,2025-06-15
+Eluru,,Tharuni Associates,Eluru,87000.00,2026-05-31,active,in_progress,2025-07-20
+Hindupur,,Tharuni Associates,Hindupur,49020.00,2026-05-31,active,not_started,2025-10-05
+Bethamcherla,,Saurashtra Enviro Projects,Nandyal,32000.00,2026-04-30,active,in_progress,2025-09-01
+Yemmiganur,,Saurashtra Enviro Projects,Kurnool,28500.00,2026-04-30,active,in_progress,2025-09-15
+Madanapalle,,Zigma Global Enviro,Chittoor,45000.00,2026-05-31,active,in_progress,2025-08-10

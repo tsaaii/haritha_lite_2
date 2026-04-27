@@ -1,0 +1,32 @@
+<section class="agency-header" aria-live="polite" aria-label="Current agency">
+  {% for agency in agencies %}
+    <div class="agency-header__slide{% if loop.first %} is-active{% endif %}"
+         data-agency="{{ agency.name }}"
+         data-index="{{ loop.index0 }}">
+      <div class="agency-header__inner">
+        <span class="agency-header__eyebrow">Agency</span>
+        <h2 class="agency-header__name">{{ agency.display_name }}</h2>
+        <p class="agency-header__meta">
+          <span>{{ agency.site_count }} site{{ '' if agency.site_count == 1 else 's' }}</span>
+          {% if agency.cluster_summary %}
+            <span class="agency-header__sep">·</span>
+            <span>{{ agency.cluster_summary }}</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+  {% endfor %}
+
+  {% if agencies|length > 1 %}
+    <div class="agency-header__dots" role="tablist" aria-label="Agency selector">
+      {% for agency in agencies %}
+        <button type="button"
+                class="agency-header__dot{% if loop.first %} is-active{% endif %}"
+                data-target-index="{{ loop.index0 }}"
+                role="tab"
+                aria-selected="{% if loop.first %}true{% else %}false{% endif %}"
+                aria-label="Show {{ agency.display_name }}"></button>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>

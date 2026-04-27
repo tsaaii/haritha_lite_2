@@ -1,0 +1,10 @@
+<article class="header-card">
+  <div class="header-card__top">
+    <span class="header-card__icon" aria-hidden="true">{{ card.icon }}</span>
+    <h3 class="header-card__label">{{ card.label }}</h3>
+  </div>
+  <div class="header-card__value" style="color: {{ card.color }};">{{ card.value }}</div>
+  {% if card.sub %}
+    <div class="header-card__sub">{{ card.sub }}</div>
+  {% endif %}
+</article>
