@@ -13,15 +13,6 @@ API contract (matches the FastAPI in /records):
          "pagination": {"page": 1, "limit": ..., "total": N, "pages": ...},
          ...
        }
-
-Note on api_site_names: the spine can list pipe-separated names, e.g.
-"Kadapa|Kadapa2". The API uses a CASE-INSENSITIVE SUBSTRING match on
-site_name, so querying "Kadapa" already returns records from both
-"Kadapa" and "Kadapa2". To avoid double-counting we dedupe by ticket_no
-across all per-name responses.
-
-If the API is unreachable we return zeros for that site rather than crash —
-the dashboard should degrade gracefully, not 500.
 """
 from __future__ import annotations
 
@@ -66,7 +57,6 @@ def _fetch_records_for_api_name(api_name: str, start: date, end: date) -> list[d
         "site_name": api_name,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
-        # no `limit` -> the API returns all matching records
     }
     try:
         r = requests.get(url, params=params, timeout=config.RECORDS_API_TIMEOUT_S)
@@ -96,9 +86,7 @@ def _aggregate_records(site: Site, raw_per_name: list[list[dict]]) -> SiteRecord
                 if ticket_no in seen_tickets:
                     continue
                 seen_tickets.add(ticket_no)
-            # If a record has no ticket_no it can still count, but won't dedupe.
             trips += 1
-            # Prefer net_weight_calculated if present and non-zero, else net_weight.
             nw_calc = _safe_float(rec.get("net_weight_calculated"))
             nw = _safe_float(rec.get("net_weight"))
             weight_kg += nw_calc if nw_calc > 0 else nw

@@ -25,11 +25,6 @@ LOCAL_OVERRIDES = os.environ.get("LOCAL_OVERRIDES", "overrides.csv")
 
 
 # ---- Weighbridge / Records API ----
-# Matches the FastAPI /records endpoint shape:
-#   GET {RECORDS_API_BASE}/records?site_name=X&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
-# Response: {"records": [{ticket_no, net_weight, ...}, ...], "pagination": {...}, ...}
-# The client sums `net_weight` (preferring `net_weight_calculated` when present)
-# across the returned records, deduping by `ticket_no`.
 RECORDS_API_BASE = os.environ.get(
     "RECORDS_API_BASE",
     "https://api.example.com",
@@ -42,14 +37,10 @@ CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", str(30 * 60)))  # 30
 
 
 # ---- Project ----
-# Hard project deadline used by "days remaining" calculations as a fallback
-# when a site has no per-site deadline_date. Override via env.
 PROJECT_DEADLINE = os.environ.get("PROJECT_DEADLINE", "2026-05-31")
 
 
 # ---- Display / branding ----
-# Map raw agency_name (from spine) -> friendly display name.
-# Anything not listed is shown as-is.
 AGENCY_DISPLAY_NAMES = {
     "Tharuni Associates": "Tharuni Associates",
     "Zigma Global Enviro": "Zigma Global Enviro",
@@ -72,9 +63,6 @@ def project_deadline_date() -> date:
 
 
 # ---- "Today" canonical (IST) ----
-# Per dashboard spec: "today" is calendar day in Asia/Kolkata. App Engine and
-# Cloud Run default to UTC, which would otherwise shift today's-MT numbers
-# by ~5.5 hours (and roll over at the wrong moment).
 IST = ZoneInfo("Asia/Kolkata")
 
 

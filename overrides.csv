@@ -3,3 +3,7 @@ metric_name,value
 # project.total_target_mt,1500000
 # project.total_remediated_mt,425000
 # project.days_remaining,400
+
+# RDF disposal numbers (Card 2 — RDF Disposal Status)
+project.rdf_disposed_mt,12500
+project.rdf_expected_mt,45000

@@ -91,7 +91,6 @@ def _row_to_site(row: dict) -> Optional[Site]:
 
 def _read_text_from_gcs() -> str:
     """Read the sites_master.csv from GCS. Raises on any failure."""
-    # Imported lazily so local dev without google-cloud-storage installed still works.
     from google.cloud import storage  # type: ignore
 
     client = storage.Client()

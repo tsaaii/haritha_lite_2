@@ -8,7 +8,7 @@
   <div class="ov-card__body">
     {% for stat in card.stats %}
       <div class="ov-card__stat">
-        <div class="ov-card__stat-value" style="color: {{ stat.color }};">{{ stat.value }}</div>
+        <div class="ov-card__stat-value {{ stat.size_class or '' }}" style="color: {{ stat.color }};">{{ stat.value }}</div>
         <div class="ov-card__stat-label">{{ stat.label }}</div>
       </div>
       {% if not loop.last %}<span class="ov-card__divider" aria-hidden="true"></span>{% endif %}

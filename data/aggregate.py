@@ -7,6 +7,8 @@ Naming convention for override keys (case-insensitive):
     project.total_remediated_mt
     project.overall_completion_pct
     project.days_remaining
+    project.rdf_disposed_mt
+    project.rdf_expected_mt
 
     agency.<agency>.target_mt
     agency.<agency>.remediated_mt
@@ -70,6 +72,15 @@ def fmt_pct(value: float, decimals: int = 1) -> str:
     return f"{value:.{decimals}f}%"
 
 
+def _size_class(s: str) -> str:
+    """Pick a font-size class based on rendered length so values fit the card."""
+    n = len(str(s))
+    if n <= 5:  return "is-lg"
+    if n <= 8:  return "is-md"
+    if n <= 11: return "is-sm"
+    return "is-xs"
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -126,6 +137,13 @@ class ProjectOverview:
     reclaimed_sites: int                # status='reclaimed' OR completion >= 100%
     in_progress_sites: int              # active sites that aren't reclaimed yet
     not_started_sites: int
+    # NEW: RDF disposal numerics + per-site reclamation buckets
+    rdf_disposed_mt: float = 0.0
+    rdf_expected_mt: float = 0.0
+    recl_100: int = 0          # sites at >= 100% completion
+    recl_75_99: int = 0        # 75 <= pct < 100
+    recl_50_75: int = 0        # 50 <= pct < 75
+    recl_below_50: int = 0     # pct < 50
 
 
 def project_overview(
@@ -167,6 +185,23 @@ def project_overview(
         else:
             not_started += 1
 
+    # NEW: per-site reclamation % buckets (remediated / target)
+    recl_100 = recl_75_99 = recl_50_75 = recl_below_50 = 0
+    for s in active:
+        site_pct = _site_completion(s, records.get(s.site_name))
+        if site_pct >= 100:
+            recl_100 += 1
+        elif site_pct >= 75:
+            recl_75_99 += 1
+        elif site_pct >= 50:
+            recl_50_75 += 1
+        else:
+            recl_below_50 += 1
+
+    # NEW: RDF disposal (overrides for now; wire to a real source later)
+    rdf_disposed = float(overrides.apply("project.rdf_disposed_mt", 0) or 0)
+    rdf_expected = float(overrides.apply("project.rdf_expected_mt", 0) or 0)
+
     # Apply overrides
     total_target = overrides.apply("project.total_target_mt", total_target)
     total_remediated = overrides.apply("project.total_remediated_mt", total_remediated)
@@ -194,24 +229,42 @@ def project_overview(
         reclaimed_sites=reclaimed,
         in_progress_sites=in_progress,
         not_started_sites=not_started,
+        rdf_disposed_mt=rdf_disposed,
+        rdf_expected_mt=rdf_expected,
+        recl_100=recl_100,
+        recl_75_99=recl_75_99,
+        recl_50_75=recl_50_75,
+        recl_below_50=recl_below_50,
     )
 
 
 def overview_cards(overview: ProjectOverview) -> list[dict]:
-    """The 4 top cards (Project Overview / Site Status / Required Performance /
-    Reclamation Status). Each dict matches the overview_card.html partial.
+    """The 4 top cards. Each dict matches the overview_card.html partial.
 
-    layout='stacked'    => two stat rows stacked vertically with a divider
+    layout='stacked'    => stats stacked vertically; value & label sit on the
+                           same row (inline) inside each stat
     layout='horizontal' => two stats side-by-side with a vertical divider
+    layout='grid_2x2'   => 4 stats in a 2×2 grid (used by reclamation buckets)
     """
-    # --- Card 3 maths: today vs required today ---
+    # Card 3 maths: today vs required today
     if overview.required_today_mt > 0:
         perf_pct = (overview.today_mt / overview.required_today_mt) * 100
     else:
         perf_pct = 0.0
 
+    # Card 2 maths: disposed vs expected
+    rdf_pct = _completion_pct(overview.rdf_disposed_mt, overview.rdf_expected_mt)
+
+    # Today value: keep one decimal when small, integer otherwise
+    today_str = (f"{overview.today_mt:.1f}" if overview.today_mt < 1000
+                 else fmt_int_indian(int(overview.today_mt)))
+
+    def stat(value, label, color):
+        v = str(value)
+        return {"value": v, "label": label, "color": color, "size_class": _size_class(v)}
+
     return [
-        # ── Card 1: Project Overview (stacked: remediated over required) ──
+        # ── Card 1: Project Overview (stacked, inline labels) ──
         {
             "icon": "📋",
             "title": "Project Overview",
@@ -219,41 +272,29 @@ def overview_cards(overview: ProjectOverview) -> list[dict]:
             "badge_variant": "orange",
             "layout": "stacked",
             "stats": [
-                {
-                    "value": fmt_int_indian(int(overview.total_remediated_mt)),
-                    "label": "TOTAL REMEDIATED (MT)",
-                    "color": "var(--success, #38A169)",
-                },
-                {
-                    "value": fmt_int_indian(int(overview.total_target_mt)),
-                    "label": "TOTAL REQUIRED (MT)",
-                    "color": "var(--brand-primary)",
-                },
+                stat(fmt_int_indian(int(overview.total_remediated_mt)),
+                     "TOTAL REMEDIATED (MT)", "var(--success, #38A169)"),
+                stat(fmt_int_indian(int(overview.total_target_mt)),
+                     "TOTAL REQUIRED (MT)", "var(--brand-primary)"),
             ],
         },
 
-        # ── Card 2: Site Status (horizontal: active | inactive) ──
+        # ── Card 2: RDF Disposal Status (stacked, same shape as Card 1) ──
         {
-            "icon": "📊",
-            "title": "Site Status",
-            "badge_text": f"{overview.total_sites} Sites",
+            "icon": "♻️",
+            "title": "RDF Disposal Status",
+            "badge_text": fmt_pct(rdf_pct),
             "badge_variant": "green",
-            "layout": "horizontal",
+            "layout": "stacked",
             "stats": [
-                {
-                    "value": str(overview.active_sites),
-                    "label": "ACTIVE SITES",
-                    "color": "var(--success, #38A169)",
-                },
-                {
-                    "value": str(overview.inactive_sites),
-                    "label": "INACTIVE SITES",
-                    "color": "var(--error, #E53E3E)",
-                },
+                stat(fmt_int_indian(int(overview.rdf_disposed_mt)),
+                     "DISPOSED (MT)", "var(--success, #38A169)"),
+                stat(fmt_int_indian(int(overview.rdf_expected_mt)),
+                     "EXPECTED RDF (MT)", "var(--brand-primary)"),
             ],
         },
 
-        # ── Card 3: Required Performance (stacked: today over required) ──
+        # ── Card 3: Required Performance (stacked, inline labels) ──
         {
             "icon": "⚡",
             "title": "Required Performance",
@@ -261,38 +302,24 @@ def overview_cards(overview: ProjectOverview) -> list[dict]:
             "badge_variant": "orange",
             "layout": "stacked",
             "stats": [
-                {
-                    "value": fmt_int_indian(round(overview.today_mt, 1)) if overview.today_mt < 1000
-                             else fmt_int_indian(int(overview.today_mt)),
-                    "label": "TODAY (MT)",
-                    "color": "var(--brand-primary)",
-                },
-                {
-                    "value": fmt_int_indian(int(overview.required_today_mt)),
-                    "label": "REQUIRED (MT)",
-                    "color": "var(--error, #E53E3E)",
-                },
+                stat(today_str, "TODAY (MT)", "var(--brand-primary)"),
+                stat(fmt_int_indian(int(overview.required_today_mt)),
+                     "REQUIRED (MT)", "var(--error, #E53E3E)"),
             ],
         },
 
-        # ── Card 4: Reclamation Status (horizontal: reclaimed | in progress) ──
+        # ── Card 4: Site Reclamation Status (2×2 grid) ──
         {
             "icon": "🏭",
-            "title": "Reclamation Status",
-            "badge_text": f"{overview.total_sites} Sites",
+            "title": "Site Reclamation Status",
+            "badge_text": f"{overview.active_sites} Sites",
             "badge_variant": "orange",
-            "layout": "horizontal",
+            "layout": "grid_2x2",
             "stats": [
-                {
-                    "value": str(overview.reclaimed_sites),
-                    "label": "RECLAIMED SITES",
-                    "color": "var(--success, #38A169)",
-                },
-                {
-                    "value": str(overview.in_progress_sites),
-                    "label": "IN PROGRESS SITES",
-                    "color": "var(--warning, #DD6B20)",
-                },
+                stat(overview.recl_100,      "100% COMPLETE", "var(--success, #38A169)"),
+                stat(overview.recl_75_99,    "75–99%",        "var(--info, #3182CE)"),
+                stat(overview.recl_50_75,    "50–75%",        "var(--warning, #DD6B20)"),
+                stat(overview.recl_below_50, "BELOW 50%",     "var(--error, #E53E3E)"),
             ],
         },
     ]
@@ -360,11 +387,6 @@ def agency_metrics(
     days_left_to_earliest = _days_remaining(earliest, today)
 
     # ---- Required-today rate: SUM of per-site requirements ----
-    # Per-site rule (from prior chat spec):
-    #   0 if today > deadline_date,
-    #   else max(0, target - remediated) / max(1, days_remaining_for_THIS_site)
-    # Aggregating per-site is more accurate than using one project-wide deadline:
-    # sites that finished early or have later deadlines don't inflate the rate.
     daily_required = 0.0
     for s in active:
         if s.deadline_date is not None and today > s.deadline_date:
@@ -374,7 +396,6 @@ def agency_metrics(
         site_remaining = max(0.0, s.target_mt - site_remediated)
         site_days = _days_remaining(s.deadline_date, today)
         if site_days <= 0:
-            # No deadline, or deadline today: avoid div-by-zero, use 1
             site_days = 1
         daily_required += site_remaining / site_days
 
@@ -460,8 +481,7 @@ def agency_metrics(
 
 
 def main_cards(am: AgencyMetrics) -> list[dict]:
-    """The 8 main cards (2×4 grid) — agency-specific. Each dict matches
-    main_card.html. Card 'kind' selects the partial sub-template."""
+    """The 8 main cards (2×4 grid) — agency-specific."""
 
     # Card 1 — Agency Progress (target vs remediated)
     progress_subtitle = f"{am.display_name} cumulative"
