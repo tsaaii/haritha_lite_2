@@ -114,13 +114,18 @@ def _completion_color(pct: float) -> str:
 class ProjectOverview:
     total_sites: int
     active_sites: int
+    inactive_sites: int
     total_agencies: int
     total_clusters: int
     total_target_mt: float
     total_remediated_mt: float
     today_mt: float                     # MT remediated *today* (IST), all active sites
+    required_today_mt: float            # MT required *today* to finish on time (per-site sum)
     overall_completion_pct: float
     days_remaining: int
+    reclaimed_sites: int                # status='reclaimed' OR completion >= 100%
+    in_progress_sites: int              # active sites that aren't reclaimed yet
+    not_started_sites: int
 
 
 def project_overview(
@@ -137,10 +142,36 @@ def project_overview(
     today_mt = sum(records_today[s.site_name].total_weight_mt
                    for s in active if s.site_name in records_today)
 
+    # Required today (project-wide): sum of per-site requirements,
+    # zero if site is past deadline (matches the agency-metrics rule).
+    required_today = 0.0
+    for s in active:
+        if s.deadline_date is not None and today > s.deadline_date:
+            continue
+        site_remediated = (records[s.site_name].total_weight_mt
+                           if s.site_name in records else 0.0)
+        site_remaining = max(0.0, s.target_mt - site_remediated)
+        site_days = _days_remaining(s.deadline_date, today)
+        required_today += site_remaining / max(1, site_days)
+
+    # Reclamation buckets — same rule as agency_metrics for consistency.
+    reclaimed = 0
+    in_progress = 0
+    not_started = 0
+    for s in active:
+        site_pct = _site_completion(s, records.get(s.site_name))
+        if site_pct >= 100 or s.is_reclaimed:
+            reclaimed += 1
+        elif site_pct > 0 or s.reclamation_status.lower() == "in_progress":
+            in_progress += 1
+        else:
+            not_started += 1
+
     # Apply overrides
     total_target = overrides.apply("project.total_target_mt", total_target)
     total_remediated = overrides.apply("project.total_remediated_mt", total_remediated)
     today_mt = overrides.apply("project.today_mt", today_mt)
+    required_today = overrides.apply("project.required_today_mt", required_today)
 
     pct = _completion_pct(total_remediated, total_target)
     pct = overrides.apply("project.overall_completion_pct", pct)
@@ -151,56 +182,125 @@ def project_overview(
     return ProjectOverview(
         total_sites=len(sites),
         active_sites=len(active),
+        inactive_sites=len(sites) - len(active),
         total_agencies=len({s.agency_name for s in sites if s.agency_name}),
         total_clusters=len({s.cluster for s in sites if s.cluster}),
         total_target_mt=total_target,
         total_remediated_mt=total_remediated,
         today_mt=today_mt,
+        required_today_mt=required_today,
         overall_completion_pct=pct,
         days_remaining=days,
+        reclaimed_sites=reclaimed,
+        in_progress_sites=in_progress,
+        not_started_sites=not_started,
     )
 
 
-def header_cards(overview: ProjectOverview) -> list[dict]:
-    """The 1×4 project-wide header cards. Each dict matches header_card.html."""
-    remediated_sub = f"across {overview.total_agencies} agencies"
-    if overview.today_mt > 0:
-        remediated_sub = f"+{fmt_mt(overview.today_mt, 1)} today  ·  {overview.total_agencies} agencies"
+def overview_cards(overview: ProjectOverview) -> list[dict]:
+    """The 4 top cards (Project Overview / Site Status / Required Performance /
+    Reclamation Status). Each dict matches the overview_card.html partial.
+
+    layout='stacked'    => two stat rows stacked vertically with a divider
+    layout='horizontal' => two stats side-by-side with a vertical divider
+    """
+    # --- Card 3 maths: today vs required today ---
+    if overview.required_today_mt > 0:
+        perf_pct = (overview.today_mt / overview.required_today_mt) * 100
+    else:
+        perf_pct = 0.0
 
     return [
+        # ── Card 1: Project Overview (stacked: remediated over required) ──
         {
-            "icon": "🎯",
-            "label": "Total Target",
-            "value": fmt_mt(overview.total_target_mt),
-            "sub": f"{overview.active_sites} active sites",
-            "color": "var(--brand-primary)",
+            "icon": "📋",
+            "title": "Project Overview",
+            "badge_text": fmt_pct(overview.overall_completion_pct),
+            "badge_variant": "orange",
+            "layout": "stacked",
+            "stats": [
+                {
+                    "value": fmt_int_indian(int(overview.total_remediated_mt)),
+                    "label": "TOTAL REMEDIATED (MT)",
+                    "color": "var(--success, #38A169)",
+                },
+                {
+                    "value": fmt_int_indian(int(overview.total_target_mt)),
+                    "label": "TOTAL REQUIRED (MT)",
+                    "color": "var(--brand-primary)",
+                },
+            ],
         },
+
+        # ── Card 2: Site Status (horizontal: active | inactive) ──
         {
-            "icon": "♻️",
-            "label": "Total Remediated",
-            "value": fmt_mt(overview.total_remediated_mt),
-            "sub": remediated_sub,
-            "color": "var(--success, #38A169)",
+            "icon": "📊",
+            "title": "Site Status",
+            "badge_text": f"{overview.total_sites} Sites",
+            "badge_variant": "green",
+            "layout": "horizontal",
+            "stats": [
+                {
+                    "value": str(overview.active_sites),
+                    "label": "ACTIVE SITES",
+                    "color": "var(--success, #38A169)",
+                },
+                {
+                    "value": str(overview.inactive_sites),
+                    "label": "INACTIVE SITES",
+                    "color": "var(--error, #E53E3E)",
+                },
+            ],
         },
+
+        # ── Card 3: Required Performance (stacked: today over required) ──
         {
-            "icon": "📈",
-            "label": "Overall Progress",
-            "value": fmt_pct(overview.overall_completion_pct),
-            "sub": f"{fmt_mt(overview.total_remediated_mt)} of {fmt_mt(overview.total_target_mt)}",
-            "color": _completion_color(overview.overall_completion_pct),
+            "icon": "⚡",
+            "title": "Required Performance",
+            "badge_text": fmt_pct(perf_pct),
+            "badge_variant": "orange",
+            "layout": "stacked",
+            "stats": [
+                {
+                    "value": fmt_int_indian(round(overview.today_mt, 1)) if overview.today_mt < 1000
+                             else fmt_int_indian(int(overview.today_mt)),
+                    "label": "TODAY (MT)",
+                    "color": "var(--brand-primary)",
+                },
+                {
+                    "value": fmt_int_indian(int(overview.required_today_mt)),
+                    "label": "REQUIRED (MT)",
+                    "color": "var(--error, #E53E3E)",
+                },
+            ],
         },
+
+        # ── Card 4: Reclamation Status (horizontal: reclaimed | in progress) ──
         {
-            "icon": "⏳",
-            "label": "Days Remaining",
-            "value": fmt_int_indian(overview.days_remaining),
-            "sub": f"deadline {config.project_deadline_date().isoformat()}",
-            "color": (
-                "var(--error, #E53E3E)" if overview.days_remaining <= 30
-                else "var(--warning, #DD6B20)" if overview.days_remaining <= 90
-                else "var(--info, #3182CE)"
-            ),
+            "icon": "🏭",
+            "title": "Reclamation Status",
+            "badge_text": f"{overview.total_sites} Sites",
+            "badge_variant": "orange",
+            "layout": "horizontal",
+            "stats": [
+                {
+                    "value": str(overview.reclaimed_sites),
+                    "label": "RECLAIMED SITES",
+                    "color": "var(--success, #38A169)",
+                },
+                {
+                    "value": str(overview.in_progress_sites),
+                    "label": "IN PROGRESS SITES",
+                    "color": "var(--warning, #DD6B20)",
+                },
+            ],
         },
     ]
+
+
+# Keep `header_cards` as an alias for backwards-compat (older tests may import it).
+def header_cards(overview: ProjectOverview) -> list[dict]:
+    return overview_cards(overview)
 
 
 # ---------------------------------------------------------------------------

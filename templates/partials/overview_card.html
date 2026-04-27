@@ -1,0 +1,17 @@
+<article class="ov-card ov-card--{{ card.layout }}">
+  <header class="ov-card__head">
+    <span class="ov-card__icon" aria-hidden="true">{{ card.icon }}</span>
+    <h3 class="ov-card__title">{{ card.title }}</h3>
+    <span class="ov-card__badge ov-card__badge--{{ card.badge_variant }}">{{ card.badge_text }}</span>
+  </header>
+
+  <div class="ov-card__body">
+    {% for stat in card.stats %}
+      <div class="ov-card__stat">
+        <div class="ov-card__stat-value" style="color: {{ stat.color }};">{{ stat.value }}</div>
+        <div class="ov-card__stat-label">{{ stat.label }}</div>
+      </div>
+      {% if not loop.last %}<span class="ov-card__divider" aria-hidden="true"></span>{% endif %}
+    {% endfor %}
+  </div>
+</article>

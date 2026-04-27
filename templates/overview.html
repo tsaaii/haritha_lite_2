@@ -3,31 +3,17 @@
 {% block title %}Haritha — Overview{% endblock %}
 
 {% block content %}
-  {# ---------- Project overview strip ---------- #}
-  <section class="project-overview" aria-label="Project overview">
-    <div class="po-stat">
-      <span class="po-stat-label">Sites</span>
-      <span class="po-stat-value">{{ overview.active_sites }} / {{ overview.total_sites }}</span>
-    </div>
-    <div class="po-stat">
-      <span class="po-stat-label">Agencies</span>
-      <span class="po-stat-value">{{ overview.total_agencies }}</span>
-    </div>
-    <div class="po-stat">
-      <span class="po-stat-label">Clusters</span>
-      <span class="po-stat-value">{{ overview.total_clusters }}</span>
-    </div>
-    <div class="po-stat po-stat--accent">
-      <span class="po-stat-label">Days remaining</span>
-      <span class="po-stat-value">{{ overview.days_remaining }}</span>
-    </div>
-  </section>
+  {# ---------- Top: Overall Project Overview ---------- #}
+  <section class="overview-section" aria-label="Overall project overview">
+    <h2 class="overview-section__title">
+      Overall Project Overview in Real Time as of {{ overview_date_str }}
+    </h2>
 
-  {# ---------- 1×4 Header cards ---------- #}
-  <section class="header-cards-grid" aria-label="Project totals">
-    {% for card in header_cards %}
-      {% include "partials/header_card.html" %}
-    {% endfor %}
+    <div class="overview-cards">
+      {% for card in overview_cards %}
+        {% include "partials/overview_card.html" %}
+      {% endfor %}
+    </div>
   </section>
 
   {# ---------- Rotating agency header ---------- #}

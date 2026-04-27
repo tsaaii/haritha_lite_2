@@ -17,8 +17,8 @@ import config
 from data import master, overrides, records
 from data.aggregate import (
     agency_metrics,
-    header_cards,
     main_cards,
+    overview_cards,
     project_overview,
 )
 
@@ -64,7 +64,8 @@ def create_app() -> Flask:
         return render_template(
             "overview.html",
             overview=overview_data,
-            header_cards=header_cards(overview_data),
+            overview_cards=overview_cards(overview_data),
+            overview_date_str=today.strftime("%B %d, %Y"),
             agencies=agency_views,
             rotation_interval_ms=config.ROTATION_INTERVAL_MS,
             updated_at=datetime.now(config.IST).strftime("%Y-%m-%d %H:%M IST"),
