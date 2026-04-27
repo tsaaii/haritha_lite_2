@@ -56,7 +56,8 @@ def create_app() -> Flask:
                 "name": ag,
                 "display_name": am.display_name,
                 "cluster_summary": ", ".join(am.clusters[:3])
-                                   + (f" +{len(am.clusters) - 3}" if len(am.clusters) > 3 else ""),
+                                + (f" +{len(am.clusters) - 3}" if len(am.clusters) > 3 else ""),
+                "cluster_count": len(am.clusters),
                 "site_count": am.total_sites,
                 "main_cards": main_cards(am),
             })

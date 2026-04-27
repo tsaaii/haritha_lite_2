@@ -1,7 +1,7 @@
 /**
  * Agency rotation — pure vanilla JS.
  * Cycles the .agency-header__slide AND .agency-slide elements in lockstep.
- * Pauses on hover. Click a dot to jump.
+ * Pauses on hover. Click ‹ / › arrows to skip.
  */
 (function () {
   'use strict';
@@ -10,10 +10,16 @@
 
   const headerSlides = Array.from(document.querySelectorAll('.agency-header__slide'));
   const stageSlides  = Array.from(document.querySelectorAll('.agency-slide'));
-  const dots         = Array.from(document.querySelectorAll('.agency-header__dot'));
+  const prevBtn      = document.querySelector('.agency-header__nav--prev');
+  const nextBtn      = document.querySelector('.agency-header__nav--next');
 
   const total = Math.max(headerSlides.length, stageSlides.length);
-  if (total <= 1) return; // Nothing to rotate
+  if (total <= 1) {
+    // Hide the arrows if there's nothing to rotate to
+    if (prevBtn) prevBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'none';
+    return;
+  }
 
   let currentIndex = 0;
   let timer = null;
@@ -28,14 +34,10 @@
     stageSlides.forEach((el, i) => {
       el.classList.toggle('is-active', i === currentIndex);
     });
-    dots.forEach((el, i) => {
-      const active = i === currentIndex;
-      el.classList.toggle('is-active', active);
-      el.setAttribute('aria-selected', active ? 'true' : 'false');
-    });
   }
 
   function next() { show(currentIndex + 1); }
+  function prev() { show(currentIndex - 1); }
 
   function start() {
     stop();
@@ -50,7 +52,7 @@
     }
   }
 
-  // Pause when the user hovers over the agency block or main cards.
+  // Pause when the user hovers the agency block or main cards.
   const pauseTargets = [
     document.querySelector('.agency-header'),
     document.querySelector('.main-cards-stage'),
@@ -61,15 +63,9 @@
     el.addEventListener('mouseleave', () => { paused = false; start(); });
   });
 
-  // Click dots to jump
-  dots.forEach((dot) => {
-    dot.addEventListener('click', () => {
-      const target = parseInt(dot.dataset.targetIndex || '0', 10);
-      show(target);
-      // Reset the timer so the user gets a full slot on the chosen slide.
-      start();
-    });
-  });
+  // Arrow buttons — skip + reset the timer so the user gets a full slot
+  if (prevBtn) prevBtn.addEventListener('click', () => { prev(); start(); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { next(); start(); });
 
   // Pause when tab hidden — saves cycles
   document.addEventListener('visibilitychange', () => {
@@ -80,8 +76,8 @@
   // Keyboard support: ← / →
   document.addEventListener('keydown', (e) => {
     if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-    if (e.key === 'ArrowRight') { show(currentIndex + 1); start(); }
-    else if (e.key === 'ArrowLeft') { show(currentIndex - 1); start(); }
+    if (e.key === 'ArrowRight') { next(); start(); }
+    else if (e.key === 'ArrowLeft') { prev(); start(); }
   });
 
   show(0);
