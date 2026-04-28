@@ -2,25 +2,33 @@
 Pure aggregation. Takes spine sites + records + overrides and produces the
 exact dicts the templates render. No I/O here, no Flask, no globals.
 
-Naming convention for override keys (case-insensitive):
+Override keys (case-insensitive):
     project.total_target_mt
     project.total_remediated_mt
     project.overall_completion_pct
-    project.days_remaining
     project.rdf_disposed_mt
     project.rdf_expected_mt
 
     agency.<agency>.target_mt
     agency.<agency>.remediated_mt
+    agency.<agency>.today_mt
     agency.<agency>.completion_pct
     agency.<agency>.daily_rate_required
     agency.<agency>.daily_rate_current
+    agency.<agency>.rdf_disposed_mt
+    agency.<agency>.rdf_expected_mt
+    agency.<agency>.disposal_soil_mt
+    agency.<agency>.disposal_rdf_mt
+    agency.<agency>.disposal_cnd_mt
+    agency.<agency>.disposal_inert_mt
+    agency.<agency>.land_reclaimed_acres
+    agency.<agency>.land_to_reclaim_acres
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, timedelta
-from typing import Optional
+from dataclasses import dataclass, field
+from datetime import date
+from typing import Iterable, Optional
 
 import config
 from data import overrides
@@ -28,12 +36,12 @@ from data.master import Site
 from data.records import SiteRecords
 
 
-# ---------------------------------------------------------------------------
-# Number formatting (Indian-style for big numbers, e.g. 12,34,567)
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Number formatting
+# ===========================================================================
 
 def fmt_int_indian(n: float) -> str:
-    """Format a number with Indian thousand separators (lakh/crore)."""
+    """Indian thousand-separator format: 1,23,45,678."""
     if n is None:
         return "—"
     try:
@@ -47,7 +55,6 @@ def fmt_int_indian(n: float) -> str:
     if len(s) <= 3:
         return sign + s
     head, tail = s[:-3], s[-3:]
-    # group head in pairs from the right
     pieces: list[str] = []
     while len(head) > 2:
         pieces.append(head[-2:])
@@ -58,7 +65,6 @@ def fmt_int_indian(n: float) -> str:
 
 
 def fmt_mt(value: float, decimals: int = 0) -> str:
-    """Format an MT value: 1,23,456 MT or 1,23,456.7 MT."""
     if value is None:
         return "—"
     if decimals == 0:
@@ -73,7 +79,6 @@ def fmt_pct(value: float, decimals: int = 1) -> str:
 
 
 def _size_class(s: str) -> str:
-    """Pick a font-size class based on rendered length so values fit the card."""
     n = len(str(s))
     if n <= 5:  return "is-lg"
     if n <= 8:  return "is-md"
@@ -81,18 +86,62 @@ def _size_class(s: str) -> str:
     return "is-xs"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def _stat(value, label: str, color: str) -> dict:
+    v = str(value)
+    return {"value": v, "label": label, "color": color, "size_class": _size_class(v)}
+
+
+# ===========================================================================
+# Math + spine helpers
+# ===========================================================================
 
 def _safe_div(num: float, den: float) -> float:
-    if not den:
+    return num / den if den else 0.0
+
+
+def _completion_pct(numer: float, denom: float, *, cap: bool = True) -> float:
+    raw = _safe_div(numer, denom) * 100.0
+    raw = max(0.0, raw)
+    return min(100.0, raw) if cap else raw
+
+
+def _site_completion(site: Site, rec: Optional[SiteRecords]) -> float:
+    if rec is None:
         return 0.0
-    return num / den
+    return _completion_pct(rec.total_weight_mt, site.target_mt)
 
 
-def _completion_pct(remediated_mt: float, target_mt: float) -> float:
-    return min(100.0, max(0.0, _safe_div(remediated_mt, target_mt) * 100.0))
+def _completion_buckets(
+    sites: Iterable[Site],
+    records: dict[str, SiteRecords],
+) -> tuple[int, int, int, int]:
+    """Return (>=100%, 75–99%, 50–74%, <50%) site counts."""
+    b100 = b75 = b50 = below = 0
+    for s in sites:
+        pct = _site_completion(s, records.get(s.site_name))
+        if pct >= 100:    b100 += 1
+        elif pct >= 75:   b75  += 1
+        elif pct >= 50:   b50  += 1
+        else:             below += 1
+    return b100, b75, b50, below
+
+
+def _required_today_for_sites(
+    sites: Iterable[Site],
+    records: dict[str, SiteRecords],
+    today: date,
+) -> float:
+    """Sum of per-site MT/day required to finish each on time."""
+    total = 0.0
+    for s in sites:
+        if s.deadline_date is not None and today > s.deadline_date:
+            continue
+        already = (records[s.site_name].total_weight_mt
+                   if s.site_name in records else 0.0)
+        remaining = max(0.0, s.target_mt - already)
+        days = max(1, _days_remaining(s.deadline_date, today))
+        total += remaining / days
+    return total
 
 
 def _days_remaining(deadline: Optional[date], today: Optional[date] = None) -> int:
@@ -101,49 +150,105 @@ def _days_remaining(deadline: Optional[date], today: Optional[date] = None) -> i
     return max(0, (deadline - today).days)
 
 
-def _earliest_deadline(sites: list[Site]) -> Optional[date]:
-    deadlines = [s.deadline_date for s in sites if s.deadline_date]
-    return min(deadlines) if deadlines else None
-
-
 def _completion_color(pct: float) -> str:
-    """Match the original CSS variable names for performance-tinted text."""
-    if pct >= 100:
-        return "var(--success, #38A169)"
-    if pct >= 80:
-        return "var(--info, #3182CE)"
-    if pct >= 50:
-        return "var(--warning, #DD6B20)"
+    if pct >= 100: return "var(--success, #38A169)"
+    if pct >= 80:  return "var(--info, #3182CE)"
+    if pct >= 50:  return "var(--warning, #DD6B20)"
     return "var(--error, #E53E3E)"
 
 
-# ---------------------------------------------------------------------------
+def _ovr_float(key: str) -> float:
+    return float(overrides.apply(key, 0) or 0)
+
+
+def _today_str(value: float) -> str:
+    """1-decimal for small values, integer with Indian commas otherwise."""
+    return f"{value:.1f}" if value < 1000 else fmt_int_indian(int(value))
+
+
+# ===========================================================================
+# Card builders — one helper per layout, reused everywhere
+# ===========================================================================
+
+def _ratio_card(*,
+                icon: str, title: str,
+                num: float, num_label: str, num_color: str,
+                den: float, den_label: str, den_color: str,
+                badge_variant: str = "orange",
+                num_str: Optional[str] = None,
+                den_str: Optional[str] = None,
+                cap_pct: bool = True) -> dict:
+    """Stacked card: numerator over denominator with a % badge.
+
+    Used by Project Overview / RDF Disposal / Required Performance / Agency
+    Progress / Agency RDF / Agency Performance / Land Reclaimed — 7 cards.
+    """
+    return {
+        "icon": icon,
+        "title": title,
+        "badge_text": fmt_pct(_completion_pct(num, den, cap=cap_pct)),
+        "badge_variant": badge_variant,
+        "layout": "stacked",
+        "stats": [
+            _stat(num_str if num_str is not None else fmt_int_indian(int(num)),
+                  num_label, num_color),
+            _stat(den_str if den_str is not None else fmt_int_indian(int(den)),
+                  den_label, den_color),
+        ],
+    }
+
+
+def _grid_2x2_card(*,
+                   icon: str, title: str,
+                   badge_text: str,
+                   stats: list[dict],
+                   badge_variant: str = "orange") -> dict:
+    """Card 4 / Card 8 / Card 11 — 2×2 quadrant grid."""
+    return {
+        "icon": icon, "title": title,
+        "badge_text": badge_text, "badge_variant": badge_variant,
+        "layout": "grid_2x2", "stats": stats,
+    }
+
+
+def _list_card(*,
+               icon: str, title: str,
+               entries: list[dict],
+               subtitle: Optional[str] = None,
+               badge_text: Optional[str] = None,
+               badge_variant: str = "orange",
+               empty_text: str = "—") -> dict:
+    """Vertical list of label/value rows. Used by Outward & Lagging Sites."""
+    card = {
+        "icon": icon, "title": title,
+        "layout": "list",
+        "entries": entries, "empty_text": empty_text,
+    }
+    if subtitle:    card["subtitle"]      = subtitle
+    if badge_text:  card["badge_text"]    = badge_text
+    if badge_text:  card["badge_variant"] = badge_variant
+    return card
+
+
+# ===========================================================================
 # Project-level aggregation (the 1×4 header row)
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 @dataclass
 class ProjectOverview:
     total_sites: int
     active_sites: int
-    inactive_sites: int
-    total_agencies: int
-    total_clusters: int
     total_target_mt: float
     total_remediated_mt: float
-    today_mt: float                     # MT remediated *today* (IST), all active sites
-    required_today_mt: float            # MT required *today* to finish on time (per-site sum)
+    today_mt: float
+    required_today_mt: float
     overall_completion_pct: float
-    days_remaining: int
-    reclaimed_sites: int                # status='reclaimed' OR completion >= 100%
-    in_progress_sites: int              # active sites that aren't reclaimed yet
-    not_started_sites: int
-    # NEW: RDF disposal numerics + per-site reclamation buckets
     rdf_disposed_mt: float = 0.0
     rdf_expected_mt: float = 0.0
-    recl_100: int = 0          # sites at >= 100% completion
-    recl_75_99: int = 0        # 75 <= pct < 100
-    recl_50_75: int = 0        # 50 <= pct < 75
-    recl_below_50: int = 0     # pct < 50
+    recl_100: int = 0
+    recl_75_99: int = 0
+    recl_50_75: int = 0
+    recl_below_50: int = 0
 
 
 def project_overview(
@@ -154,185 +259,89 @@ def project_overview(
 ) -> ProjectOverview:
     today = today or config.today_ist()
     active = [s for s in sites if s.is_active]
+
     total_target = sum(s.target_mt for s in active)
     total_remediated = sum(records[s.site_name].total_weight_mt
                            for s in active if s.site_name in records)
     today_mt = sum(records_today[s.site_name].total_weight_mt
                    for s in active if s.site_name in records_today)
+    required_today = _required_today_for_sites(active, records, today)
+    b100, b75, b50, below = _completion_buckets(active, records)
 
-    # Required today (project-wide): sum of per-site requirements,
-    # zero if site is past deadline (matches the agency-metrics rule).
-    required_today = 0.0
-    for s in active:
-        if s.deadline_date is not None and today > s.deadline_date:
-            continue
-        site_remediated = (records[s.site_name].total_weight_mt
-                           if s.site_name in records else 0.0)
-        site_remaining = max(0.0, s.target_mt - site_remediated)
-        site_days = _days_remaining(s.deadline_date, today)
-        required_today += site_remaining / max(1, site_days)
+    rdf_disposed = _ovr_float("project.rdf_disposed_mt")
+    rdf_expected = _ovr_float("project.rdf_expected_mt")
 
-    # Reclamation buckets — same rule as agency_metrics for consistency.
-    reclaimed = 0
-    in_progress = 0
-    not_started = 0
-    for s in active:
-        site_pct = _site_completion(s, records.get(s.site_name))
-        if site_pct >= 100 or s.is_reclaimed:
-            reclaimed += 1
-        elif site_pct > 0 or s.reclamation_status.lower() == "in_progress":
-            in_progress += 1
-        else:
-            not_started += 1
-
-    # NEW: per-site reclamation % buckets (remediated / target)
-    recl_100 = recl_75_99 = recl_50_75 = recl_below_50 = 0
-    for s in active:
-        site_pct = _site_completion(s, records.get(s.site_name))
-        if site_pct >= 100:
-            recl_100 += 1
-        elif site_pct >= 75:
-            recl_75_99 += 1
-        elif site_pct >= 50:
-            recl_50_75 += 1
-        else:
-            recl_below_50 += 1
-
-    # NEW: RDF disposal (overrides for now; wire to a real source later)
-    rdf_disposed = float(overrides.apply("project.rdf_disposed_mt", 0) or 0)
-    rdf_expected = float(overrides.apply("project.rdf_expected_mt", 0) or 0)
-
-    # Apply overrides
-    total_target = overrides.apply("project.total_target_mt", total_target)
+    total_target     = overrides.apply("project.total_target_mt", total_target)
     total_remediated = overrides.apply("project.total_remediated_mt", total_remediated)
-    today_mt = overrides.apply("project.today_mt", today_mt)
-    required_today = overrides.apply("project.required_today_mt", required_today)
-
-    pct = _completion_pct(total_remediated, total_target)
-    pct = overrides.apply("project.overall_completion_pct", pct)
-
-    days = _days_remaining(config.project_deadline_date(), today)
-    days = overrides.apply("project.days_remaining", days)
+    today_mt         = overrides.apply("project.today_mt", today_mt)
+    required_today   = overrides.apply("project.required_today_mt", required_today)
+    pct = overrides.apply("project.overall_completion_pct",
+                          _completion_pct(total_remediated, total_target))
 
     return ProjectOverview(
         total_sites=len(sites),
         active_sites=len(active),
-        inactive_sites=len(sites) - len(active),
-        total_agencies=len({s.agency_name for s in sites if s.agency_name}),
-        total_clusters=len({s.cluster for s in sites if s.cluster}),
         total_target_mt=total_target,
         total_remediated_mt=total_remediated,
         today_mt=today_mt,
         required_today_mt=required_today,
         overall_completion_pct=pct,
-        days_remaining=days,
-        reclaimed_sites=reclaimed,
-        in_progress_sites=in_progress,
-        not_started_sites=not_started,
         rdf_disposed_mt=rdf_disposed,
         rdf_expected_mt=rdf_expected,
-        recl_100=recl_100,
-        recl_75_99=recl_75_99,
-        recl_50_75=recl_50_75,
-        recl_below_50=recl_below_50,
+        recl_100=b100, recl_75_99=b75, recl_50_75=b50, recl_below_50=below,
     )
 
 
-def overview_cards(overview: ProjectOverview) -> list[dict]:
-    """The 4 top cards. Each dict matches the overview_card.html partial.
-
-    layout='stacked'    => stats stacked vertically; value & label sit on the
-                           same row (inline) inside each stat
-    layout='horizontal' => two stats side-by-side with a vertical divider
-    layout='grid_2x2'   => 4 stats in a 2×2 grid (used by reclamation buckets)
-    """
-    # Card 3 maths: today vs required today
-    if overview.required_today_mt > 0:
-        perf_pct = (overview.today_mt / overview.required_today_mt) * 100
-    else:
-        perf_pct = 0.0
-
-    # Card 2 maths: disposed vs expected
-    rdf_pct = _completion_pct(overview.rdf_disposed_mt, overview.rdf_expected_mt)
-
-    # Today value: keep one decimal when small, integer otherwise
-    today_str = (f"{overview.today_mt:.1f}" if overview.today_mt < 1000
-                 else fmt_int_indian(int(overview.today_mt)))
-
-    def stat(value, label, color):
-        v = str(value)
-        return {"value": v, "label": label, "color": color, "size_class": _size_class(v)}
-
+def overview_cards(o: ProjectOverview) -> list[dict]:
+    """The 4 top cards — built from shared helpers."""
     return [
-        # ── Card 1: Project Overview (stacked, inline labels) ──
-        {
-            "icon": "📋",
-            "title": "Project Overview",
-            "badge_text": fmt_pct(overview.overall_completion_pct),
-            "badge_variant": "orange",
-            "layout": "stacked",
-            "stats": [
-                stat(fmt_int_indian(int(overview.total_remediated_mt)),
-                     "TOTAL REMEDIATED (MT)", "var(--success, #38A169)"),
-                stat(fmt_int_indian(int(overview.total_target_mt)),
-                     "TOTAL REQUIRED (MT)", "var(--brand-primary)"),
+        _ratio_card(
+            icon="📋", title="Project Overview",
+            num=o.total_remediated_mt, num_label="TOTAL REMEDIATED (MT)",
+            num_color="var(--success, #38A169)",
+            den=o.total_target_mt,     den_label="TOTAL REQUIRED (MT)",
+            den_color="var(--brand-primary)",
+            badge_variant="orange",
+        ),
+        _ratio_card(
+            icon="♻️", title="RDF Disposal Status",
+            num=o.rdf_disposed_mt, num_label="DISPOSED (MT)",
+            num_color="var(--success, #38A169)",
+            den=o.rdf_expected_mt, den_label="EXPECTED RDF (MT)",
+            den_color="var(--brand-primary)",
+            badge_variant="green",
+        ),
+        _ratio_card(
+            icon="⚡", title="Required Performance",
+            num=o.today_mt,           num_label="TODAY (MT)",
+            num_color="var(--brand-primary)",
+            den=o.required_today_mt,  den_label="REQUIRED (MT)",
+            den_color="var(--error, #E53E3E)",
+            num_str=_today_str(o.today_mt),
+            badge_variant="orange",
+            cap_pct=False,    # performance can exceed 100%
+        ),
+        _grid_2x2_card(
+            icon="🏭", title="Site Reclamation Status",
+            badge_text=f"{o.active_sites} Sites",
+            stats=[
+                _stat(o.recl_100,      "100% COMPLETE", "var(--success, #38A169)"),
+                _stat(o.recl_75_99,    "75–99%",        "var(--info, #3182CE)"),
+                _stat(o.recl_50_75,    "50–75%",        "var(--warning, #DD6B20)"),
+                _stat(o.recl_below_50, "BELOW 50%",     "var(--error, #E53E3E)"),
             ],
-        },
-
-        # ── Card 2: RDF Disposal Status (stacked, same shape as Card 1) ──
-        {
-            "icon": "♻️",
-            "title": "RDF Disposal Status",
-            "badge_text": fmt_pct(rdf_pct),
-            "badge_variant": "green",
-            "layout": "stacked",
-            "stats": [
-                stat(fmt_int_indian(int(overview.rdf_disposed_mt)),
-                     "DISPOSED (MT)", "var(--success, #38A169)"),
-                stat(fmt_int_indian(int(overview.rdf_expected_mt)),
-                     "EXPECTED RDF (MT)", "var(--brand-primary)"),
-            ],
-        },
-
-        # ── Card 3: Required Performance (stacked, inline labels) ──
-        {
-            "icon": "⚡",
-            "title": "Required Performance",
-            "badge_text": fmt_pct(perf_pct),
-            "badge_variant": "orange",
-            "layout": "stacked",
-            "stats": [
-                stat(today_str, "TODAY (MT)", "var(--brand-primary)"),
-                stat(fmt_int_indian(int(overview.required_today_mt)),
-                     "REQUIRED (MT)", "var(--error, #E53E3E)"),
-            ],
-        },
-
-        # ── Card 4: Site Reclamation Status (2×2 grid) ──
-        {
-            "icon": "🏭",
-            "title": "Site Reclamation Status",
-            "badge_text": f"{overview.active_sites} Sites",
-            "badge_variant": "orange",
-            "layout": "grid_2x2",
-            "stats": [
-                stat(overview.recl_100,      "100% COMPLETE", "var(--success, #38A169)"),
-                stat(overview.recl_75_99,    "75–99%",        "var(--info, #3182CE)"),
-                stat(overview.recl_50_75,    "50–75%",        "var(--warning, #DD6B20)"),
-                stat(overview.recl_below_50, "BELOW 50%",     "var(--error, #E53E3E)"),
-            ],
-        },
+        ),
     ]
 
 
-# Keep `header_cards` as an alias for backwards-compat (older tests may import it).
+# Backwards-compat alias
 def header_cards(overview: ProjectOverview) -> list[dict]:
     return overview_cards(overview)
 
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
 # Agency-level aggregation (the rotating 2×4 main grid)
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 @dataclass
 class AgencyMetrics:
@@ -345,31 +354,35 @@ class AgencyMetrics:
     clusters: list[str]
     target_mt: float
     remediated_mt: float
-    today_mt: float                      # MT remediated today (IST), this agency
+    today_mt: float
     completion_pct: float
-    earliest_deadline: Optional[date]
-    days_remaining: int
-    reclaimed_count: int
-    in_progress_count: int
-    not_started_count: int
-    daily_rate_required: float       # MT/day to finish on time, summed per-site
-    daily_rate_current: float        # estimated MT/day (last 7d)
-    site_rankings: list[dict]        # [{site, cluster, completion_pct, ...}]
-    critical_sites: list[dict]       # behind-schedule sites
-
-
-def _site_completion(site: Site, rec: Optional[SiteRecords]) -> float:
-    if rec is None:
-        return 0.0
-    return _completion_pct(rec.total_weight_mt, site.target_mt)
+    daily_rate_required: float
+    daily_rate_current: float
+    site_rankings: list[dict]
+    # Per-site % buckets
+    recl_100: int = 0
+    recl_75_99: int = 0
+    recl_50_75: int = 0
+    recl_below_50: int = 0
+    # Override-driven
+    rdf_disposed_mt: float = 0.0
+    rdf_expected_mt: float = 0.0
+    disposal_soil_mt: float = 0.0
+    disposal_rdf_mt: float = 0.0
+    disposal_cnd_mt: float = 0.0
+    disposal_inert_mt: float = 0.0
+    land_reclaimed_acres: float = 0.0
+    land_to_reclaim_acres: float = 0.0
+    # Card 9 — sites where every record is still raw Legacy/MSW
+    no_outward_sites: list[dict] = field(default_factory=list)
 
 
 def agency_metrics(
     agency: str,
     sites: list[Site],
     records: dict[str, SiteRecords],
-    records_recent: dict[str, SiteRecords],   # last 7d only
-    records_today: dict[str, SiteRecords],    # today only (IST)
+    records_recent: dict[str, SiteRecords],   # last 7d
+    records_today: dict[str, SiteRecords],    # today (IST)
     today: Optional[date] = None,
 ) -> AgencyMetrics:
     today = today or config.today_ist()
@@ -383,42 +396,14 @@ def agency_metrics(
                    for s in active if s.site_name in records_today)
     pct = _completion_pct(remediated, target)
 
-    earliest = _earliest_deadline(active)
-    days_left_to_earliest = _days_remaining(earliest, today)
-
-    # ---- Required-today rate: SUM of per-site requirements ----
-    daily_required = 0.0
-    for s in active:
-        if s.deadline_date is not None and today > s.deadline_date:
-            continue   # deadline passed; site contributes 0
-        site_remediated = (records[s.site_name].total_weight_mt
-                           if s.site_name in records else 0.0)
-        site_remaining = max(0.0, s.target_mt - site_remediated)
-        site_days = _days_remaining(s.deadline_date, today)
-        if site_days <= 0:
-            site_days = 1
-        daily_required += site_remaining / site_days
-
-    # Current rate: rolling 7d average
+    daily_required = _required_today_for_sites(active, records, today)
     weight_last_7d = sum(records_recent[s.site_name].total_weight_mt
                          for s in active if s.site_name in records_recent)
     daily_current = weight_last_7d / 7.0
 
-    # Reclamation buckets — use spine status, but a site at >=100% is also
-    # reclaimed even if the spine hasn't been updated.
-    reclaimed = 0
-    in_progress = 0
-    not_started = 0
-    for s in active:
-        site_pct = _site_completion(s, records.get(s.site_name))
-        if site_pct >= 100 or s.is_reclaimed:
-            reclaimed += 1
-        elif site_pct > 0 or s.reclamation_status.lower() == "in_progress":
-            in_progress += 1
-        else:
-            not_started += 1
+    b100, b75, b50, below = _completion_buckets(active, records)
 
-    # Per-site rankings
+    # Per-site rankings (used by Lagging Sites)
     rankings: list[dict] = []
     for s in active:
         rec = records.get(s.site_name)
@@ -428,33 +413,39 @@ def agency_metrics(
             "target_mt": s.target_mt,
             "remediated_mt": rec.total_weight_mt if rec else 0.0,
             "completion_pct": _site_completion(s, rec),
-            "deadline_date": s.deadline_date.isoformat() if s.deadline_date else None,
         })
     rankings.sort(key=lambda r: r["completion_pct"], reverse=True)
 
-    # Critical = behind schedule. Behind = elapsed_pct - completion_pct > 15
-    critical: list[dict] = []
-    for r in rankings:
-        site_obj = next((s for s in active if s.site_name == r["site_name"]), None)
-        if site_obj is None or site_obj.start_date is None or site_obj.deadline_date is None:
-            continue
-        total_days = (site_obj.deadline_date - site_obj.start_date).days
-        if total_days <= 0:
-            continue
-        elapsed_days = max(0, (today - site_obj.start_date).days)
-        elapsed_pct = min(100.0, 100.0 * elapsed_days / total_days)
-        if elapsed_pct - r["completion_pct"] > 15:
-            critical.append({**r, "elapsed_pct": elapsed_pct,
-                             "behind_by_pts": elapsed_pct - r["completion_pct"]})
-    critical.sort(key=lambda r: r["behind_by_pts"], reverse=True)
+    # Sites where every record is still raw Legacy/MSW (no outward yet)
+    no_outward: list[dict] = []
+    for s in active:
+        rec = records.get(s.site_name)
+        if rec is None or not rec.has_outward:
+            no_outward.append({
+                "site_name": s.site_name,
+                "cluster": s.cluster,
+                "total_weight_mt": rec.total_weight_mt if rec else 0.0,
+            })
+    # Largest pending tonnage first (most actionable)
+    no_outward.sort(key=lambda x: x["total_weight_mt"], reverse=True)
 
-    # Apply overrides
-    target = overrides.apply(f"agency.{agency}.target_mt", target)
-    remediated = overrides.apply(f"agency.{agency}.remediated_mt", remediated)
-    today_mt = overrides.apply(f"agency.{agency}.today_mt", today_mt)
-    pct = overrides.apply(f"agency.{agency}.completion_pct", pct)
+    # Override-driven figures
+    rdf_disposed_a = _ovr_float(f"agency.{agency}.rdf_disposed_mt")
+    rdf_expected_a = _ovr_float(f"agency.{agency}.rdf_expected_mt")
+    disp_soil      = _ovr_float(f"agency.{agency}.disposal_soil_mt")
+    disp_rdf       = _ovr_float(f"agency.{agency}.disposal_rdf_mt")
+    disp_cnd       = _ovr_float(f"agency.{agency}.disposal_cnd_mt")
+    disp_inert     = _ovr_float(f"agency.{agency}.disposal_inert_mt")
+    land_done      = _ovr_float(f"agency.{agency}.land_reclaimed_acres")
+    land_target    = _ovr_float(f"agency.{agency}.land_to_reclaim_acres")
+
+    # Apply scalar overrides
+    target         = overrides.apply(f"agency.{agency}.target_mt", target)
+    remediated     = overrides.apply(f"agency.{agency}.remediated_mt", remediated)
+    today_mt       = overrides.apply(f"agency.{agency}.today_mt", today_mt)
+    pct            = overrides.apply(f"agency.{agency}.completion_pct", pct)
     daily_required = overrides.apply(f"agency.{agency}.daily_rate_required", daily_required)
-    daily_current = overrides.apply(f"agency.{agency}.daily_rate_current", daily_current)
+    daily_current  = overrides.apply(f"agency.{agency}.daily_rate_current", daily_current)
 
     return AgencyMetrics(
         agency_name=agency,
@@ -468,135 +459,109 @@ def agency_metrics(
         remediated_mt=remediated,
         today_mt=today_mt,
         completion_pct=pct,
-        earliest_deadline=earliest,
-        days_remaining=days_left_to_earliest,
-        reclaimed_count=reclaimed,
-        in_progress_count=in_progress,
-        not_started_count=not_started,
         daily_rate_required=daily_required,
         daily_rate_current=daily_current,
         site_rankings=rankings,
-        critical_sites=critical,
+        recl_100=b100, recl_75_99=b75, recl_50_75=b50, recl_below_50=below,
+        rdf_disposed_mt=rdf_disposed_a, rdf_expected_mt=rdf_expected_a,
+        disposal_soil_mt=disp_soil,   disposal_rdf_mt=disp_rdf,
+        disposal_cnd_mt=disp_cnd,     disposal_inert_mt=disp_inert,
+        land_reclaimed_acres=land_done, land_to_reclaim_acres=land_target,
+        no_outward_sites=no_outward,
     )
 
 
 def main_cards(am: AgencyMetrics) -> list[dict]:
-    """The 8 main cards (2×4 grid) — agency-specific."""
+    """The 8 main agency cards (2×4 grid).
 
-    # Card 1 — Agency Progress (target vs remediated)
-    progress_subtitle = f"{am.display_name} cumulative"
-    if am.today_mt > 0:
-        progress_subtitle = f"+{fmt_mt(am.today_mt, 1)} today  ·  cumulative"
-    progress_card = {
-        "kind": "progress",
-        "icon": "🎯",
-        "title": "Agency Progress",
-        "subtitle": progress_subtitle,
-        "primary_value": fmt_pct(am.completion_pct),
-        "primary_color": _completion_color(am.completion_pct),
-        "rows": [
-            {"label": "Target", "value": fmt_mt(am.target_mt)},
-            {"label": "Remediated", "value": fmt_mt(am.remediated_mt)},
-            {"label": "Remaining", "value": fmt_mt(max(0, am.target_mt - am.remediated_mt))},
-        ],
-    }
+    Row 1 (cards 5-8 serially) mirrors the top 4 cards.
+    Row 2 (cards 9-12 serially):
+        9  Outward Performance     (list — sites with no outward yet)
+        10 Lagging Sites           (list — ascending completion %)
+        11 Disposal Statistics     (grid_2x2 — Soil/RDF/C&D/Inert)
+        12 Land Reclaimed          (stacked — reclaimed/target acres)
+    """
 
-    # Card 2 — Sites Status (active / inactive)
-    sites_card = {
-        "kind": "tri_metric",
-        "icon": "📍",
-        "title": "Sites",
-        "subtitle": f"{am.total_sites} total",
-        "metrics": [
-            {"label": "Active",   "value": am.active_sites,   "color": "var(--success, #38A169)"},
-            {"label": "Inactive", "value": am.inactive_sites, "color": "var(--text-secondary)"},
-            {"label": "Clusters", "value": len(am.clusters),  "color": "var(--info, #3182CE)"},
-        ],
-    }
-
-    # Card 3 — Reclaimed Sites tri-metric
-    reclaimed_card = {
-        "kind": "tri_metric",
-        "icon": "✅",
-        "title": "Reclamation Status",
-        "subtitle": "by reclamation_status",
-        "metrics": [
-            {"label": "Reclaimed",   "value": am.reclaimed_count,   "color": "var(--success, #38A169)"},
-            {"label": "In Progress", "value": am.in_progress_count, "color": "var(--warning, #DD6B20)"},
-            {"label": "Not Started", "value": am.not_started_count, "color": "var(--error, #E53E3E)"},
-        ],
-    }
-
-    # Card 4 — Timeline / Days remaining
-    timeline_card = {
-        "kind": "timeline",
-        "icon": "⏳",
-        "title": "Timeline",
-        "subtitle": "to earliest deadline",
-        "primary_value": fmt_int_indian(am.days_remaining) + " days",
-        "primary_color": (
-            "var(--error, #E53E3E)" if am.days_remaining <= 30
-            else "var(--warning, #DD6B20)" if am.days_remaining <= 90
-            else "var(--info, #3182CE)"
+    # --------- Row 1 ---------
+    row1 = [
+        _ratio_card(
+            icon="📋", title="Agency Progress",
+            num=am.remediated_mt, num_label="TOTAL REMEDIATED (MT)",
+            num_color="var(--success, #38A169)",
+            den=am.target_mt,     den_label="TOTAL REQUIRED (MT)",
+            den_color="var(--brand-primary)",
         ),
-        "rows": [
-            {"label": "Earliest deadline",
-             "value": am.earliest_deadline.isoformat() if am.earliest_deadline else "—"},
-            {"label": "Days remaining", "value": str(am.days_remaining)},
+        _ratio_card(
+            icon="♻️", title="RDF Disposal Status",
+            num=am.rdf_disposed_mt, num_label="DISPOSED (MT)",
+            num_color="var(--success, #38A169)",
+            den=am.rdf_expected_mt, den_label="EXPECTED RDF (MT)",
+            den_color="var(--brand-primary)",
+            badge_variant="green",
+        ),
+        _ratio_card(
+            icon="⚡", title="Agency Performance",
+            num=am.today_mt,            num_label="TODAY (MT)",
+            num_color="var(--brand-primary)",
+            den=am.daily_rate_required, den_label="REQUIRED (MT)",
+            den_color="var(--error, #E53E3E)",
+            num_str=_today_str(am.today_mt),
+            cap_pct=False,
+        ),
+        _grid_2x2_card(
+            icon="🏭", title="Site Reclamation Status",
+            badge_text=f"{am.active_sites} Sites",
+            stats=[
+                _stat(am.recl_100,      "100% COMPLETE", "var(--success, #38A169)"),
+                _stat(am.recl_75_99,    "75–99%",        "var(--info, #3182CE)"),
+                _stat(am.recl_50_75,    "50–75%",        "var(--warning, #DD6B20)"),
+                _stat(am.recl_below_50, "BELOW 50%",     "var(--error, #E53E3E)"),
+            ],
+        ),
+    ]
+
+    # --------- Row 2 ---------
+    n_no_out = len(am.no_outward_sites)
+    outward_card = _list_card(
+        icon="📤", title="Outward Performance",
+        badge_text=(f"{n_no_out} Site{'s' if n_no_out != 1 else ''} pending"
+                    if n_no_out else "All clear"),
+        badge_variant=("red" if n_no_out else "green"),
+        entries=[{"label": x["site_name"], "value": fmt_mt(x["total_weight_mt"])}
+                 for x in am.no_outward_sites[:5]],
+        empty_text="Every site has at least some outward processing 🎉",
+    )
+
+    lagging = sorted(am.site_rankings, key=lambda r: r["completion_pct"])[:5]
+    lagging_card = _list_card(
+        icon="📉", title="Lagging Sites",
+        entries=[{"label": r["site_name"],
+                  "value": fmt_pct(r["completion_pct"]),
+                  "color": _completion_color(r["completion_pct"])}
+                 for r in lagging],
+        empty_text="No site records",
+    )
+
+    total_disposal = (am.disposal_soil_mt + am.disposal_rdf_mt
+                      + am.disposal_cnd_mt + am.disposal_inert_mt)
+    disposal_card = _grid_2x2_card(
+        icon="🗑️", title="Disposal Statistics",
+        badge_text=fmt_mt(total_disposal),
+        stats=[
+            _stat(fmt_int_indian(int(am.disposal_soil_mt)),  "SOIL (MT)",  "var(--warning, #DD6B20)"),
+            _stat(fmt_int_indian(int(am.disposal_rdf_mt)),   "RDF (MT)",   "var(--success, #38A169)"),
+            _stat(fmt_int_indian(int(am.disposal_cnd_mt)),   "C&D (MT)",   "var(--info, #3182CE)"),
+            _stat(fmt_int_indian(int(am.disposal_inert_mt)), "INERT (MT)", "var(--text-secondary)"),
         ],
-    }
+    )
 
-    # Card 5 — Daily Rate (current vs required)
-    rate_ratio = _safe_div(am.daily_rate_current, am.daily_rate_required) * 100 \
-        if am.daily_rate_required else 0
-    rate_card = {
-        "kind": "progress",
-        "icon": "⚡",
-        "title": "Daily Rate",
-        "subtitle": "current vs required",
-        "primary_value": fmt_pct(rate_ratio),
-        "primary_color": _completion_color(rate_ratio),
-        "rows": [
-            {"label": "Current (7d avg)",    "value": fmt_mt(am.daily_rate_current, 1) + "/day"},
-            {"label": "Required",            "value": fmt_mt(am.daily_rate_required, 1) + "/day"},
-        ],
-    }
+    land_card = _ratio_card(
+        icon="🌳", title="Land Reclaimed",
+        num=am.land_reclaimed_acres,  num_label="RECLAIMED (ACRES)",
+        num_color="var(--success, #38A169)",
+        den=am.land_to_reclaim_acres, den_label="TO BE RECLAIMED (ACRES)",
+        den_color="var(--brand-primary)",
+        badge_variant="green",
+    )
 
-    # Card 6 — Cluster spread
-    cluster_card = {
-        "kind": "list",
-        "icon": "🗺️",
-        "title": "Clusters",
-        "subtitle": f"{len(am.clusters)} cluster(s)",
-        "entries": [{"label": c,
-                     "value": str(sum(1 for s in am.sites if s.cluster == c)) + " sites"}
-                    for c in am.clusters[:6]],
-    }
-
-    # Card 7 — Top Performing Sites
-    top_card = {
-        "kind": "list",
-        "icon": "🏆",
-        "title": "Top Performers",
-        "subtitle": "best completion %",
-        "entries": [{"label": r["site_name"],
-                     "value": fmt_pct(r["completion_pct"]),
-                     "color": _completion_color(r["completion_pct"])}
-                    for r in am.site_rankings[:5]],
-    }
-
-    # Card 8 — Critical Sites (behind schedule)
-    critical_card = {
-        "kind": "list",
-        "icon": "🚨",
-        "title": "Critical Sites",
-        "subtitle": "behind schedule",
-        "empty_text": "No sites behind schedule" if not am.critical_sites else None,
-        "entries": [{"label": r["site_name"],
-                     "value": f"−{r['behind_by_pts']:.0f} pts",
-                     "color": "var(--error, #E53E3E)"}
-                    for r in am.critical_sites[:5]],
-    }
-
-    return [progress_card, sites_card, reclaimed_card, timeline_card,
-            rate_card, cluster_card, top_card, critical_card]
+    return [*row1, outward_card, lagging_card, disposal_card, land_card]

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#1A202C" />
-  <title>{% block title %}Haritha Dashboard{% endblock %}</title>
+  <title>{% block title %}Swachha Andhra Dashboard{% endblock %}</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,6 +14,11 @@
 </head>
 
 <body>
+    <!-- hover-to-reveal login bar -->
+  <div class="top-login-bar">
+    <a href="/login" class="top-login-bar__btn">Login</a>
+  </div>
+
   <div class="public-layout" data-theme="dark">
     {% include "partials/hero.html" %}
 
@@ -24,7 +29,7 @@
     <footer class="layout-footer">
       <span>Last updated: {{ updated_at }}</span>
       <span class="footer-sep">•</span>
-      <span>Haritha</span>
+      <span>All rights reserved by Swachha Andhra Corporation,Andhra Pradesh. Built by Advitia Labs.</span>
     </footer>
   </div>
 

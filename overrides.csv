@@ -7,3 +7,42 @@ metric_name,value
 # RDF disposal numbers (Card 2 — RDF Disposal Status)
 project.rdf_disposed_mt,12500
 project.rdf_expected_mt,45000
+
+# ---------------------------------------------------------------------------
+# Per-agency RDF (powers Card 6)
+# Key format: agency.<exact agency_name from sites_master.csv>.rdf_disposed_mt
+# ---------------------------------------------------------------------------
+# agency.Tharuni Associates.rdf_disposed_mt,4200
+# agency.Tharuni Associates.rdf_expected_mt,15000
+# agency.Zigma Global Enviro.rdf_disposed_mt,5800
+# agency.Zigma Global Enviro.rdf_expected_mt,20000
+# agency.Saurashtra Enviro Projects.rdf_disposed_mt,2500
+# agency.Saurashtra Enviro Projects.rdf_expected_mt,10000
+
+# ---------------------------------------------------------------------------
+# Per-agency Disposal Statistics (powers Card 11 — Soil / RDF / C&D / Inert)
+# All values in MT.
+# ---------------------------------------------------------------------------
+# agency.Tharuni Associates.disposal_soil_mt,18000
+# agency.Tharuni Associates.disposal_rdf_mt,4200
+# agency.Tharuni Associates.disposal_cnd_mt,3100
+# agency.Tharuni Associates.disposal_inert_mt,2400
+# agency.Zigma Global Enviro.disposal_soil_mt,22000
+# agency.Zigma Global Enviro.disposal_rdf_mt,5800
+# agency.Zigma Global Enviro.disposal_cnd_mt,4500
+# agency.Zigma Global Enviro.disposal_inert_mt,3000
+# agency.Saurashtra Enviro Projects.disposal_soil_mt,9500
+# agency.Saurashtra Enviro Projects.disposal_rdf_mt,2500
+# agency.Saurashtra Enviro Projects.disposal_cnd_mt,1800
+# agency.Saurashtra Enviro Projects.disposal_inert_mt,1200
+
+# ---------------------------------------------------------------------------
+# Per-agency Land Reclamation (powers Card 12)
+# All values in ACRES.
+# ---------------------------------------------------------------------------
+# agency.Tharuni Associates.land_reclaimed_acres,28
+# agency.Tharuni Associates.land_to_reclaim_acres,75
+# agency.Zigma Global Enviro.land_reclaimed_acres,42
+# agency.Zigma Global Enviro.land_to_reclaim_acres,120
+# agency.Saurashtra Enviro Projects.land_reclaimed_acres,15
+# agency.Saurashtra Enviro Projects.land_to_reclaim_acres,40

@@ -3,13 +3,13 @@ Records API client.
 
 The spine tells us *what should be remediated*. The records API tells us
 *what has actually been remediated*: returns a list of weighbridge records,
-each with a net_weight (kg) and ticket_no.
+each with a net_weight (kg), ticket_no, and material_type.
 
 API contract (matches the FastAPI in /records):
     GET {RECORDS_API_BASE}/records?site_name=X&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
 
     -> {
-         "records": [{ticket_no, net_weight, ...}, ...],
+         "records": [{ticket_no, net_weight, material_type, ...}, ...],
          "pagination": {"page": 1, "limit": ..., "total": N, "pages": ...},
          ...
        }
@@ -30,6 +30,16 @@ from data.master import Site
 logger = logging.getLogger(__name__)
 _cache = TTLCache(config.CACHE_TTL_SECONDS)
 
+# Anything in this set (case-insensitive) is treated as raw legacy waste.
+# Any other material_type means outward (post-)processing has happened
+# (e.g. RDF, Soil, C&D, Inert, Compost, etc.).
+LEGACY_MATERIAL_TYPES = {
+    "legacy/msw",
+    "legacy msw",
+    "legacy",
+    "msw",
+}
+
 
 @dataclass(frozen=True)
 class SiteRecords:
@@ -37,6 +47,8 @@ class SiteRecords:
     site_name: str
     total_trips: int
     total_weight_kg: float
+    has_outward: bool = False   # True iff at least one record had a
+                                # material_type outside LEGACY_MATERIAL_TYPES.
 
     @property
     def total_weight_mt(self) -> float:
@@ -50,8 +62,15 @@ def _safe_float(v) -> float:
         return 0.0
 
 
+def _is_outward_material(raw: str) -> bool:
+    """True if the material_type indicates outward (post-)processing."""
+    mat = (raw or "").strip().lower()
+    if not mat:
+        return False        # missing => assume legacy (conservative)
+    return mat not in LEGACY_MATERIAL_TYPES
+
+
 def _fetch_records_for_api_name(api_name: str, start: date, end: date) -> list[dict]:
-    """Hit /records for one api-side name. Returns the raw records list (or [] on failure)."""
     url = f"{config.RECORDS_API_BASE}/records"
     params = {
         "site_name": api_name,
@@ -74,10 +93,15 @@ def _fetch_records_for_api_name(api_name: str, start: date, end: date) -> list[d
 
 
 def _aggregate_records(site: Site, raw_per_name: list[list[dict]]) -> SiteRecords:
-    """Dedupe by ticket_no across the per-api-name responses, then sum."""
+    """Dedupe by ticket_no across the per-api-name responses, then sum.
+
+    Also flips has_outward=True the first time we see a record whose
+    material_type is anything other than Legacy / MSW.
+    """
     seen_tickets: set[str] = set()
     trips = 0
     weight_kg = 0.0
+    has_outward = False
 
     for batch in raw_per_name:
         for rec in batch:
@@ -91,10 +115,14 @@ def _aggregate_records(site: Site, raw_per_name: list[list[dict]]) -> SiteRecord
             nw = _safe_float(rec.get("net_weight"))
             weight_kg += nw_calc if nw_calc > 0 else nw
 
+            if not has_outward and _is_outward_material(rec.get("material_type")):
+                has_outward = True
+
     return SiteRecords(
         site_name=site.site_name,
         total_trips=trips,
         total_weight_kg=weight_kg,
+        has_outward=has_outward,
     )
 
 

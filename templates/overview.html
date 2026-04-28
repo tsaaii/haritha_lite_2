@@ -1,25 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Haritha — Overview{% endblock %}
+{% block title %}Swachha Andhra — Overview{% endblock %}
 
 {% block content %}
   {# ---------- Top: Overall Project Overview ---------- #}
-  <section class="overview-section" aria-label="Overall project overview">
-    <h2 class="overview-section__title">
+<section class="overview-section" aria-label="Overall project overview">
+  <div class="overview-banner">
+    <h2 class="overview-banner__title">
       Overall Project Overview in Real Time as of {{ overview_date_str }}
     </h2>
+  </div>
 
-    <div class="overview-cards">
-      {% for card in overview_cards %}
-        {% include "partials/overview_card.html" %}
-      {% endfor %}
-    </div>
-  </section>
+  <div class="overview-cards">
+    {% for card in overview_cards %}
+      {% include "partials/overview_card.html" %}
+    {% endfor %}
+  </div>
+</section>
 
   {# ---------- Rotating agency header ---------- #}
   {% include "partials/agency_header.html" %}
 
-  {# ---------- 2×4 Main cards (one slide per agency) ---------- #}
+  {# ---------- 2×4 Main cards (one slide per agency) ----------
+     Reuses the SAME overview_card.html partial as the 4 top cards. #}
   <section class="main-cards-stage" aria-label="Agency details">
     {% for agency in agencies %}
       <div class="agency-slide{% if loop.first %} is-active{% endif %}"
@@ -27,7 +30,7 @@
            data-index="{{ loop.index0 }}">
         <div class="main-cards-grid">
           {% for card in agency.main_cards %}
-            {% include "partials/main_card.html" %}
+            {% include "partials/overview_card.html" %}
           {% endfor %}
         </div>
       </div>

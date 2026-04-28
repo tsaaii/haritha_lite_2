@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1A202C" />
+  <title>Sign in — Haritha</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}" />
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-card" aria-labelledby="login-heading">
+      <header class="login-card__head">
+        <div class="login-brand" aria-hidden="true">
+          <span class="login-brand__mark">SA</span>
+        </div>
+        <h1 id="login-heading" class="login-card__title">Swachha Andhra Corporation</h1>
+        <p class="login-card__sub">Sign in to access the dashboard</p>
+      </header>
+
+      {% if error %}
+        <div class="login-alert" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <form class="login-form" method="post"
+            action="{{ url_for('login.login_view') }}" novalidate
+            autocomplete="off">
+        <input type="hidden" name="next" value="{{ next_url }}" />
+        <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}" />
+
+        <label class="login-field">
+          <span class="login-field__label">Username</span>
+          <input class="login-field__input"
+                 type="text" name="username"
+                 autocomplete="off" autofocus required
+                 spellcheck="false" autocapitalize="none" />
+        </label>
+
+        <label class="login-field">
+          <span class="login-field__label">Password</span>
+          <input class="login-field__input"
+                 type="password" name="password"
+                 autocomplete="off" required />
+        </label>
+
+        <label class="login-field login-field--captcha">
+          <span class="login-field__label">
+            Verify you're human:
+            <strong class="login-captcha__q">{{ captcha_question }} = ?</strong>
+          </span>
+          <input class="login-field__input login-field__input--captcha"
+                 type="text" name="captcha_answer"
+                 inputmode="numeric" pattern="[0-9-]*"
+                 autocomplete="off" required
+                 placeholder="Answer" />
+        </label>
+
+        <button type="submit" class="login-submit">Sign in</button>
+      </form>
+
+      <footer class="login-card__foot">
+        <a href="{{ url_for('overview') }}" class="login-card__back">← Back to dashboard</a>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

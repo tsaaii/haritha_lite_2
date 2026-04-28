@@ -5,10 +5,13 @@ Routes:
     GET  /          -> public dashboard
     GET  /healthz   -> liveness probe (App Engine)
     POST /admin/refresh-cache -> manually invalidate spine + records caches
+    GET  /login, POST /login, GET /logout -> auth (registered via blueprint)
 """
 from __future__ import annotations
 
 import logging
+import os
+import secrets
 from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, render_template
@@ -22,6 +25,7 @@ from data.aggregate import (
     project_overview,
 )
 
+from views.login import bp as login_bp, login_required
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +37,14 @@ logger = logging.getLogger(__name__)
 def create_app() -> Flask:
     app = Flask(__name__, static_folder="static", template_folder="templates")
 
+    # Session config (required for captcha state + login state).
+    # In production set SECRET_KEY via env var.
+    app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+    app.permanent_session_lifetime = timedelta(hours=8)
+
+    # Register login blueprint (provides /login and /logout)
+    app.register_blueprint(login_bp)
+
     @app.route("/")
     def overview():
         sites = master.get_sites()
@@ -40,7 +52,8 @@ def create_app() -> Flask:
         today = config.today_ist()
         # Cumulative records: from earliest spine start_date (or 1y ago) to today.
         earliest_start = min(
-            (s.start_date for s in sites if s.start_date), default=today - timedelta(days=365),
+            (s.start_date for s in sites if s.start_date),
+            default=today - timedelta(days=365),
         )
         recs_all = records.get_records_for_sites(sites, earliest_start, today)
         recs_recent = records.get_records_for_sites(sites, today - timedelta(days=7), today)
@@ -82,6 +95,12 @@ def create_app() -> Flask:
         overrides.invalidate_cache()
         records.invalidate_cache()
         return jsonify(status="cache cleared")
+    
+
+    @app.route("/reports")
+    @login_required
+    def reports():
+        return "Welcome to login", 200
 
     return app
 

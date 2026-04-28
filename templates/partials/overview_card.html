@@ -1,17 +1,85 @@
+{# ---------------------------------------------------------------------------
+  Unified card partial. Renders BOTH the 4 top "overview" cards and the
+  8 per-agency main cards from the same template.
+
+  Card dict shape (all fields optional unless noted):
+    icon            :: emoji / glyph (required)
+    title           :: card heading (required)
+    subtitle        :: small grey line under the title (e.g. "cumulative")
+    badge_text      :: pill on the right of the head (e.g. "75.0%")
+    badge_variant   :: 'orange' | 'green' | 'red' | 'blue'
+    layout          :: 'stacked' | 'horizontal' | 'grid_2x2' | 'featured' | 'list'
+
+    # for stacked / horizontal / grid_2x2:
+    stats           :: [{value, label, color, size_class}]
+
+    # for featured (big number + rows):
+    primary_value   :: e.g. "75.0%"
+    primary_color   :: CSS color var
+    rows            :: [{label, value}]
+
+    # for list:
+    entries         :: [{label, value, color}]
+    empty_text      :: shown when entries is empty
+--------------------------------------------------------------------------- #}
 <article class="ov-card ov-card--{{ card.layout }}">
   <header class="ov-card__head">
     <span class="ov-card__icon" aria-hidden="true">{{ card.icon }}</span>
-    <h3 class="ov-card__title">{{ card.title }}</h3>
-    <span class="ov-card__badge ov-card__badge--{{ card.badge_variant }}">{{ card.badge_text }}</span>
+    <div class="ov-card__titles">
+      <h3 class="ov-card__title">{{ card.title }}</h3>
+      {% if card.subtitle %}
+        <p class="ov-card__subtitle">{{ card.subtitle }}</p>
+      {% endif %}
+    </div>
+    {% if card.badge_text %}
+      <span class="ov-card__badge ov-card__badge--{{ card.badge_variant or 'orange' }}">{{ card.badge_text }}</span>
+    {% endif %}
   </header>
 
   <div class="ov-card__body">
-    {% for stat in card.stats %}
-      <div class="ov-card__stat">
-        <div class="ov-card__stat-value {{ stat.size_class or '' }}" style="color: {{ stat.color }};">{{ stat.value }}</div>
-        <div class="ov-card__stat-label">{{ stat.label }}</div>
+    {# ---- featured: big primary value + supporting rows ---- #}
+    {% if card.layout == 'featured' %}
+      <div class="ov-card__primary"
+           {% if card.primary_color %}style="color: {{ card.primary_color }};"{% endif %}>
+        {{ card.primary_value }}
       </div>
-      {% if not loop.last %}<span class="ov-card__divider" aria-hidden="true"></span>{% endif %}
-    {% endfor %}
+      {% if card.rows %}
+        <ul class="ov-card__rows">
+          {% for row in card.rows %}
+            <li class="ov-card__row">
+              <span class="ov-card__row-label">{{ row.label }}</span>
+              <span class="ov-card__row-value">{{ row.value }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+    {# ---- list: vertical list of label/value rows ---- #}
+    {% elif card.layout == 'list' %}
+      {% if card.entries %}
+        <ul class="ov-card__list">
+          {% for it in card.entries %}
+            <li class="ov-card__list-item">
+              <span class="ov-card__list-label">{{ it.label }}</span>
+              <span class="ov-card__list-value"
+                    {% if it.color %}style="color: {{ it.color }};"{% endif %}>{{ it.value }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="ov-card__empty">{{ card.empty_text or '—' }}</p>
+      {% endif %}
+
+    {# ---- stacked / horizontal / grid_2x2: render `stats` ---- #}
+    {% else %}
+      {% for stat in card.stats %}
+        <div class="ov-card__stat">
+          <div class="ov-card__stat-value {{ stat.size_class or '' }}"
+               {% if stat.color %}style="color: {{ stat.color }};"{% endif %}>{{ stat.value }}</div>
+          <div class="ov-card__stat-label">{{ stat.label }}</div>
+        </div>
+        {% if not loop.last %}<span class="ov-card__divider" aria-hidden="true"></span>{% endif %}
+      {% endfor %}
+    {% endif %}
   </div>
 </article>
