@@ -1,9 +1,55 @@
-site_name,api_site_names,agency_name,cluster,target_mt,deadline_date,status,reclamation_status,start_date
-Bheemavaram,,Tharuni Associates,Nellore,125000.00,2026-05-31,active,in_progress,2025-08-01
-Kadapa,Kadapa|Kadapa2,Zigma Global Enviro,Kadapa,210000.00,2026-05-31,active,in_progress,2025-09-10
-Allipuram,,Zigma Global Enviro,GVMC,98000.00,2026-06-30,active,reclaimed,2025-06-15
-Eluru,,Tharuni Associates,Eluru,87000.00,2026-05-31,active,in_progress,2025-07-20
-Hindupur,,Tharuni Associates,Hindupur,49020.00,2026-05-31,active,not_started,2025-10-05
-Bethamcherla,,Saurashtra Enviro Projects,Nandyal,32000.00,2026-04-30,active,in_progress,2025-09-01
-Yemmiganur,,Saurashtra Enviro Projects,Kurnool,28500.00,2026-04-30,active,in_progress,2025-09-15
-Madanapalle,,Zigma Global Enviro,Chittoor,45000.00,2026-05-31,active,in_progress,2025-08-10
+site_name,api_site_names,agency_name,cluster,target_mt,remediated_mt,deadline_date,status,reclamation_status,start_date,soil_disposed_mt,rdf_disposed_mt,cnd_disposed_mt,inert_disposed_mt,land_total_acres,land_reclaimed_acres
+Narsaraopet,Phase4,Tharuni Associates,Phase4,92090,35434.8,2026-05-31,active,in progress,2025-03-30,13536.0936,1417.392,708.696,1948.914,26.611,9.115
+Ponnuru,Phase4,Tharuni Associates,Phase4,8211.5,2240,2026-05-31,active,in progress,2025-03-30,855.68,89.6,44.8,123.2,23.55,8.82
+Tharuni_Kadiri,Phase4,Tharuni Associates,Phase4,11679.27,156,2026-05-31,active,in progress,2025-03-30,59.592,6.24,3.12,8.58,72.567,30.334
+Hindupur,Phase4,Tharuni Associates,Phase4,72120.84,16262.43,2026-05-31,active,in progress,2025-03-30,6212.24826,650.4972,325.2486,894.43365,80.367,37.363
+Tharuni_Kurnool,Phase4,Tharuni Associates,Phase4,68075.5,26562.17,2026-05-31,active,in progress,2025-03-30,10146.74894,1062.4868,531.2434,1460.91935,73.404,20.49
+Kadapa,Phase4,Tharuni Associates,Phase4,291916.61,60469.54,2026-05-31,active,in progress,2025-03-30,23099.36428,2418.7816,1209.3908,3325.8247,34.388,16.276
+Tharuni_Kadiri2,Phase4,Tharuni Associates,Phase4,100666,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,73.905,17.211
+Tharuni_Adoni,Phase4,Tharuni Associates,Phase4,59452,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,54.619,21.379
+Tharuni_Yemmiganur,Phase4,Tharuni Associates,Phase4,26758,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,42.923,9.123
+Proddatur,Phase4,Tharuni Associates,Phase4,113914,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,10.317,2.307
+Tharuni_Proddatur,Phase5,Tharuni Associates,Phase4,27916,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,43.948,15.509
+Narsipatnam,Phase4,Tharuni Associates,Phase4,9226,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,42.658,16.028
+Srikakulam,Phase4,Tharuni Associates,Phase4,151016,2016,2026-05-31,active,in progress,2025-03-30,770.112,80.64,40.32,110.88,22.262,10.248
+Palasa-Kasibugga,Phase4,Tharuni Associates,Phase4,1175,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,29.295,7.609
+Bapatla,Phase4,Tharuni Associates,Phase4,123224,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,18.419,7.598
+Guntur,Phase4,Tharuni Associates,Phase4,27112,522,2026-05-31,active,in progress,2025-03-30,199.404,20.88,10.44,28.71,62.807,20.044
+Vizianagaram,Phase4,Tharuni Associates,Phase4,117480,2459,2026-05-31,active,in progress,2025-03-30,939.338,98.36,49.18,135.245,72.64,29.14
+Rajahmundry,Phase4,Tharuni Associates,Phase4,238244,1162,2026-05-31,active,in progress,2025-03-30,443.884,46.48,23.24,63.91,40.159,12.373
+Kakinada,Phase4,Tharuni Associates,Phase4,224377,39,2026-05-31,active,in progress,2025-03-30,14.898,1.56,0.78,2.145,59.284,25.367
+Anantapur,Phase4,Tharuni Associates,Phase4,210196,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,51.011,22.193
+Kurnool,Phase4,Saurashtra Enviro,Phase4,368318.4,81124,2026-05-31,active,in progress,2025-03-30,30989.368,3244.96,1622.48,4461.82,23.375,9.077
+Tenali,Phase4,Sudhakara Infra,Phase4,39569,36720,2026-05-31,active,in progress,2025-03-30,14027.04,1468.8,734.4,2019.6,54.921,13.08
+Tadepalligudem,Phase4,Iway Associates,Phase4,88064,37595,2026-05-31,active,in progress,2025-03-30,14361.29,1503.8,751.9,2067.725,79.868,17.563
+Nidadavole,Phase4,Iway Associates,Phase4,29358,12058,2026-05-31,active,in progress,2025-03-30,4606.156,482.32,241.16,663.19,78.182,42.261
+Mandapet,Phase4,Iway Associates,Phase4,11497,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,18.14,7.092
+Kandukur,Phase4,Geron Engineering,Phase4,46210,656,2026-05-31,active,in progress,2025-03-30,250.592,26.24,13.12,36.08,4.783,1.217
+Kavali,Phase4,Geron Engineering,Phase4,11177,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,74.716,27.437
+Nandyal,Phase4,Geron Engineering,Phase4,18126,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,3.787,2.031
+Dhone,Phase4,Geron Engineering,Phase4,20812.42,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,88.688,23.487
+Giddalur,Phase4,Geron Engineering,Phase4,19994.4,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,12.439,5.47
+Gudivada,Phase4,Coastline Projects,Phase4,38174.66,21210.7,2026-05-31,active,in progress,2025-03-30,8102.4874,848.428,424.214,1166.5885,64.782,24.93
+Machilipatnam,Phase4,Coastline Projects,Phase4,5466.72,4633.49,2026-05-31,active,in progress,2025-03-30,1769.99318,185.3396,92.6698,254.84195,38.632,13.206
+Eluru,Phase4,Coastline Projects,Phase4,130647,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,24.558,6.755
+Jangareddygudem,Phase4,Coastline Projects,Phase4,44810,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,10.705,5.451
+Jaggaihpet,Phase4,Coastline Projects,Phase4,27000,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,23.17,8.98
+Rayadurgam,Phase4,Zigma Global,Phase4,101957.37,15892,2026-05-31,active,in progress,2025-03-30,6070.744,635.68,317.84,874.06,54.25,15.879
+Sullurpet,Phase4,Zigma Global,Phase4,16614,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,78.202,26.624
+Srikalahasti,Phase4,Zigma Global,Phase4,71324,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,13.691,5.929
+Puttur,Phase4,Zigma Global,Phase4,25286,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,12.29,6.07
+Chittoor,Phase4,Zigma Global,Phase4,66166,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,8.354,4.415
+Guntakal,Phase4,Zigma Global,Phase4,61269,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,61.268,29.177
+GVMC,Phase4,Zigma Global,Phase4,293194,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,22.862,12.314
+kuppam,Phase4,RaghuRam Hume Pipes,Phase4,15000,0,2026-05-31,active,in progress,2025-03-30,0,0,0,0,59.375,12.116
+,Phase1,Tharuni Associates,Phase1,1664047.53,1571259.53,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Phase1,Saurashtra Enviro,Phase1,"314,825.00","314,076.21",2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Phase1,Zigma Global,Phase1,1447375,1366290.041,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Phase2-excess_15,Tharuni Associates,Phase2-excess_15,509244.8,414512.44,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Phase2-excess_15,Saurashtra Enviro,Phase2-excess_15,47223.75,26834.16,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Phase2-excess_15,Zigma Global,Phase2-excess_15,182653.35,182653.56,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Phase2-excess_15,Sudhakara Infra,Phase2-excess_15,9533,9533,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Phase3,Tharuni Associates,Phase3,2026511.01,2026510.54,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Old_balance,Tharuni Associates,Old_balance,221468,199729.28,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Old_balance,Sudhakara Infra,Old_balance,44606,44606,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,
+,Old_Remediation_2024,Old_Remediation,Old_Remediation_2024,5194136.38,5194136.38,2026-05-31,inactive,reclaimed,2025-03-30,,,,,,

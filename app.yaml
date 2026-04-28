@@ -5,12 +5,21 @@ entrypoint: gunicorn -b :$PORT main:app
 instance_class: F2
 
 env_variables:
-  USE_LOCAL_CSV: "0"
-  GCS_BUCKET: "advitia-weighbridge-data"
-  SITES_MASTER_PATH: "dashboard_config/sites_master.csv"
-  OVERRIDES_PATH: "dashboard_config/overrides.csv"
+  # Single source of truth — local path or gs:// URL. That's it.
+  SITES_MASTER_CSV: "gs://advitia-weighbridge-data/dashboard_config/sites_master.csv"
+
+  # /reports page only — dashboard no longer calls this.
   RECORDS_API_BASE: "https://weighbridge-api-mzfbv433ja-as.a.run.app"
+
+  # CSV is re-read once per cache window.
   CACHE_TTL_SECONDS: "1800"
+
+  # Synthetic today_mt ticker rate (cards 3 & 7).
+  TODAY_MT_RATE_PER_HOUR: "200"
+
+  # RDF expected = pct × target (cards 2 & 6).
+  RDF_EXPECTED_PCT: "0.15"
+
   PROJECT_DEADLINE: "2026-05-31"
   ROTATION_INTERVAL_MS: "12000"
 
