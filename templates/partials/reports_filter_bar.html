@@ -1,0 +1,171 @@
+{# ---------------------------------------------------------------------------
+  Filter bar partial.
+
+  Layout (top → bottom):
+    Row 1   Date range chips + custom from/to
+    Row 2   Agency / Site / Cluster / Material  (4 selects)
+    Row 3   Vehicle / Ticket / Transfer Party       (3 inputs)
+    Row 4   "Advanced ▾" toggle + Reset + Apply
+    Row 5   (advanced, hidden by default)
+            Site Incharge / User / Min wt / Max wt
+
+  Apply button is mostly cosmetic — the JS already debounces and applies
+  on every change. It exists for the keyboard / accessibility flow.
+--------------------------------------------------------------------------- #}
+<section class="reports-filters" aria-label="Filters">
+  <form class="reports-filters__form" id="js-filter-form" autocomplete="off"
+        onsubmit="event.preventDefault();">
+
+    {# ===================== Row 1: Date range ===================== #}
+    <div class="reports-filters__row">
+      <div class="reports-filters__group">
+        <label class="reports-filters__label">Date range</label>
+        <div class="reports-chips" role="group" aria-label="Quick date ranges">
+          <button type="button" class="reports-chip" data-preset="24h">Last 24h</button>
+          <button type="button" class="reports-chip" data-preset="7d">7 days</button>
+          <button type="button" class="reports-chip" data-preset="30d">30 days</button>
+          <button type="button" class="reports-chip" data-preset="all">All</button>
+        </div>
+      </div>
+
+      <label class="reports-filters__field reports-filters__field--date">
+        <span class="reports-filters__hint">From</span>
+        <input type="date" name="start_date" id="js-start-date"
+               min="{{ filter_options.date_min }}"
+               max="{{ filter_options.date_max }}" />
+      </label>
+
+      <label class="reports-filters__field reports-filters__field--date">
+        <span class="reports-filters__hint">To</span>
+        <input type="date" name="end_date" id="js-end-date"
+               min="{{ filter_options.date_min }}"
+               max="{{ filter_options.date_max }}" />
+      </label>
+    </div>
+
+    {# ===================== Row 2: Categorical selects ===================== #}
+    <div class="reports-filters__row">
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Agency</span>
+        <select name="agency_name">
+          <option value="">All agencies</option>
+          {% for v in filter_options.agencies %}
+            <option value="{{ v }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Site</span>
+        <select name="site_name">
+          <option value="">All sites</option>
+          {% for v in filter_options.sites %}
+            <option value="{{ v }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Cluster</span>
+        <select name="cluster">
+          <option value="">All clusters</option>
+          {% for v in filter_options.clusters %}
+            <option value="{{ v }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Material</span>
+        <select name="material">
+          <option value="">All materials</option>
+          {% for v in filter_options.materials %}
+            <option value="{{ v }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    {# ===================== Row 3: Text + party ===================== #}
+    <div class="reports-filters__row">
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Vehicle no</span>
+        <input type="text" name="vehicle_no" placeholder="e.g. AP39UX6276"
+               spellcheck="false" autocapitalize="characters" />
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Ticket no</span>
+        <input type="text" name="ticket_no" placeholder="e.g. T0682"
+               spellcheck="false" />
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Transfer party</span>
+        <select name="transfer_party_name">
+          <option value="">All parties</option>
+          {% for v in filter_options.transfer_parties %}
+            <option value="{{ v }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    {# ===================== Row 4: Action bar ===================== #}
+    <div class="reports-filters__row reports-filters__row--actions">
+      <button type="button" class="reports-filters__advanced"
+              id="js-advanced-toggle"
+              aria-expanded="false" aria-controls="js-advanced-row">
+        Advanced filters
+        <span class="reports-filters__caret" aria-hidden="true">▾</span>
+      </button>
+
+      <div class="reports-filters__actions">
+        <button type="button" class="reports-btn reports-btn--ghost" id="js-reset">
+          Reset
+        </button>
+        <button type="submit" class="reports-btn reports-btn--secondary" id="js-apply">
+          Apply filters
+        </button>
+      </div>
+    </div>
+
+    {# ===================== Row 5: Advanced (hidden) ===================== #}
+    <div class="reports-filters__row reports-filters__row--advanced"
+         id="js-advanced-row" hidden>
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Site incharge</span>
+        <select name="site_incharge">
+          <option value="">All</option>
+          {% for v in filter_options.site_incharges %}
+            <option value="{{ v }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">User</span>
+        <select name="user_name">
+          <option value="">All users</option>
+          {% for v in filter_options.users %}
+            <option value="{{ v }}">{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Min weight (kg)</span>
+        <input type="number" name="min_net_weight"
+               min="0" step="any"
+               placeholder="{{ filter_options.weight_min | int }}" />
+      </label>
+
+      <label class="reports-filters__field">
+        <span class="reports-filters__hint">Max weight (kg)</span>
+        <input type="number" name="max_net_weight"
+               min="0" step="any"
+               placeholder="{{ filter_options.weight_max | int }}" />
+      </label>
+    </div>
+  </form>
+</section>

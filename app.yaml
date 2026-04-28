@@ -9,7 +9,7 @@ env_variables:
   GCS_BUCKET: "advitia-weighbridge-data"
   SITES_MASTER_PATH: "dashboard_config/sites_master.csv"
   OVERRIDES_PATH: "dashboard_config/overrides.csv"
-  RECORDS_API_BASE: "https://your-fastapi-host.example.com"
+  RECORDS_API_BASE: "https://weighbridge-api-mzfbv433ja-as.a.run.app"
   CACHE_TTL_SECONDS: "1800"
   PROJECT_DEADLINE: "2026-05-31"
   ROTATION_INTERVAL_MS: "12000"

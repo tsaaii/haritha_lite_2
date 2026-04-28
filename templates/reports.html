@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1A202C" />
+  <title>Records — Swachha Andhra</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reports.css') }}" />
+</head>
+
+<body class="reports-body">
+  {# Thin animated progress bar pinned to the top of the viewport.
+     Replaces the old overlay — this lets the user keep reading existing
+     data while a refresh is in flight. #}
+  <div class="reports-progress" id="js-progress" hidden>
+    <div class="reports-progress__bar"></div>
+  </div>
+
+  <header class="reports-topbar">
+    <div class="reports-topbar__left">
+      <a href="{{ url_for('overview') }}" class="reports-topbar__back" title="Back to dashboard">
+        <span aria-hidden="true">←</span>
+      </a>
+      <div class="reports-topbar__titles">
+        <h1 class="reports-topbar__title">Records Explorer</h1>
+        <p class="reports-topbar__sub">Filter, browse &amp; export weighbridge records</p>
+      </div>
+    </div>
+    <div class="reports-topbar__right">
+      <span class="reports-topbar__updated">Updated {{ updated_at }}</span>
+      <a href="{{ url_for('login.logout_view') }}" class="reports-topbar__logout">Logout</a>
+    </div>
+  </header>
+
+  <main class="reports-main">
+    {% include "partials/reports_filter_bar.html" %}
+
+    <section class="reports-toolbar" aria-label="Result actions">
+      <div class="reports-toolbar__left">
+        <span class="reports-toolbar__count" id="js-result-count">Loading…</span>
+      </div>
+
+      <div class="reports-toolbar__right">
+        <label class="reports-toolbar__field">
+          <span>Rows</span>
+          <select id="js-page-size">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+          </select>
+        </label>
+
+        <div class="reports-columns" id="js-columns-wrap">
+          <button type="button" class="reports-btn reports-btn--ghost"
+                  id="js-columns-toggle"
+                  aria-haspopup="true" aria-expanded="false">
+            Columns <span class="reports-btn__caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="reports-columns__panel" id="js-columns-panel" hidden></div>
+        </div>
+
+        <button type="button" class="reports-btn reports-btn--primary"
+                id="js-export-pdf">
+          <span aria-hidden="true">⬇</span> Export Summary PDF
+        </button>
+      </div>
+    </section>
+
+    <section class="reports-results" aria-label="Results">
+      <div class="reports-table-wrap" id="js-table-wrap">
+        <table class="reports-table" id="js-table">
+          <thead><tr id="js-table-head"></tr></thead>
+          <tbody id="js-table-body"></tbody>
+        </table>
+      </div>
+
+      {# First-load skeleton: only shown when we have no data yet. After
+         that, refreshes use the top progress bar instead. #}
+      <div class="reports-overlay" id="js-overlay" hidden>
+        <div class="reports-overlay__spinner" aria-hidden="true"></div>
+        <p class="reports-overlay__text">Loading records…</p>
+      </div>
+
+      <div class="reports-empty" id="js-empty" hidden>
+        <div class="reports-empty__icon" aria-hidden="true">📭</div>
+        <h2 class="reports-empty__title" id="js-empty-title">No records found</h2>
+        <p class="reports-empty__text" id="js-empty-text">
+          The current filter combination returned zero rows. Try widening your search.
+        </p>
+        <div class="reports-empty__actions" id="js-empty-actions"></div>
+      </div>
+    </section>
+
+    <nav class="reports-pagination" id="js-pagination" aria-label="Pagination" hidden>
+      <button type="button" class="reports-btn reports-btn--ghost" id="js-prev-page">‹ Prev</button>
+      <span class="reports-pagination__info" id="js-page-info">Page 1 / 1</span>
+      <button type="button" class="reports-btn reports-btn--ghost" id="js-next-page">Next ›</button>
+    </nav>
+
+    <section class="reports-debug" id="js-debug" aria-label="Last API call">
+      <div class="reports-debug__head">
+        <span class="reports-debug__label">
+          <span class="reports-debug__dot" id="js-debug-dot" aria-hidden="true"></span>
+          Last API call
+        </span>
+        <div class="reports-debug__meta" id="js-debug-meta">
+          <span class="reports-debug__chip">—</span>
+        </div>
+      </div>
+      <div class="reports-debug__url-row">
+        <code class="reports-debug__url" id="js-debug-url"
+              title="Click to select all">—</code>
+        <div class="reports-debug__actions">
+          <button type="button" class="reports-btn reports-btn--ghost reports-btn--small"
+                  id="js-debug-copy" disabled>Copy</button>
+          <a href="#" target="_blank" rel="noopener"
+             class="reports-btn reports-btn--ghost reports-btn--small"
+             id="js-debug-open" aria-disabled="true">Open ↗</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="reports-footer">
+    <span>All rights reserved by Swachha Andhra Corporation, Andhra Pradesh.</span>
+    <span class="reports-footer__sep" aria-hidden="true">•</span>
+    <span>Built by Advitia Labs.</span>
+  </footer>
+
+  <script id="js-bootstrap" type="application/json">
+    {{ {
+      "filterOptions": filter_options,
+      "endpoints": {
+        "records": url_for('reports.api_records'),
+        "filters": url_for('reports.api_filters'),
+        "exportPdf": url_for('reports.api_export_pdf')
+      },
+      "defaults": {
+        "pageSize": page_size_default,
+        "exportCap": export_cap
+      }
+    } | tojson }}
+  </script>
+
+  <script src="{{ url_for('static', filename='js/reports.js') }}" defer></script>
+</body>
+</html>

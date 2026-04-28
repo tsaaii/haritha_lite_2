@@ -93,7 +93,7 @@ def _render_form(error: str | None = None,
 def login_view():
     # Already logged in? Skip the form.
     if session.get(SESSION_USER_KEY):
-        return redirect(url_for("reports"))
+        return redirect(url_for("reports.reports_view"))
 
     next_url = request.args.get("next") or request.form.get("next") or ""
 
@@ -152,7 +152,7 @@ def login_view():
 
     if _is_safe_redirect_target(next_url):
         return redirect(next_url)
-    return redirect(url_for("reports"))
+    return redirect(url_for("reports.reports_view"))
 
 
 @bp.route("/logout")

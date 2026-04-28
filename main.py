@@ -6,6 +6,7 @@ Routes:
     GET  /healthz   -> liveness probe (App Engine)
     POST /admin/refresh-cache -> manually invalidate spine + records caches
     GET  /login, POST /login, GET /logout -> auth (registered via blueprint)
+    GET  /reports + JSON APIs + PDF export -> registered via reports blueprint
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from datetime import datetime, timedelta
 from flask import Flask, jsonify, render_template
 
 import config
-from data import master, overrides, records
+from data import master, overrides, records, records_api
 from data.aggregate import (
     agency_metrics,
     main_cards,
@@ -25,7 +26,8 @@ from data.aggregate import (
     project_overview,
 )
 
-from views.login import bp as login_bp, login_required
+from views.login import bp as login_bp
+from views.reports import bp as reports_bp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,8 +44,9 @@ def create_app() -> Flask:
     app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
     app.permanent_session_lifetime = timedelta(hours=8)
 
-    # Register login blueprint (provides /login and /logout)
+    # Blueprints
     app.register_blueprint(login_bp)
+    app.register_blueprint(reports_bp)
 
     @app.route("/")
     def overview():
@@ -94,13 +97,8 @@ def create_app() -> Flask:
         master.invalidate_cache()
         overrides.invalidate_cache()
         records.invalidate_cache()
+        records_api.invalidate_cache()
         return jsonify(status="cache cleared")
-    
-
-    @app.route("/reports")
-    @login_required
-    def reports():
-        return "Welcome to login", 200
 
     return app
 
