@@ -18,9 +18,10 @@ from zoneinfo import ZoneInfo
 #     gs://my-bucket/dir/sites_master.csv         -> GCS object
 #
 # Plug-and-play between local dev and cloud — same code path either way.
+# In production (App Engine) this comes from app.yaml env_variables.
 # ---------------------------------------------------------------------------
-#SITES_MASTER_CSV = os.environ.get("SITES_MASTER_CSV", "sites_master.csv")
-SITES_MASTER_CSV=r"C:\Users\saait\Downloads\haritha_lite_2\sites_master.csv"
+SITES_MASTER_CSV = os.environ.get("SITES_MASTER_CSV", "sites_master.csv")
+
 
 def is_gcs_path(path: str) -> bool:
     return path.startswith("gs://")
