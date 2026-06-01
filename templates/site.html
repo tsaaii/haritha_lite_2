@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ site.site_name }} — Site Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
+  <style>
+    /* Theme tokens come from dashboard.css (:root). We only add layout here,
+       referencing those vars so this page tracks the dashboard's dark theme. */
+    .sw{max-width:1100px;margin:0 auto;padding:clamp(.75rem,2vw,1.5rem);
+        color:var(--text-primary);font-family:var(--font-body,Inter,system-ui,sans-serif)}
+    .sw__head{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;
+              flex-wrap:wrap;margin-bottom:1rem}
+    .sw__head h1{margin:0;font-size:clamp(1.25rem,3.5vw,1.7rem);font-weight:800}
+    .sw__head .agency{color:var(--text-secondary);font-weight:600;font-size:.92rem}
+    .sw__back{color:var(--brand-primary);text-decoration:none;font-weight:700;font-size:.9rem}
+
+    /* ---- Tiles ---- */
+    .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+           gap:clamp(.6rem,1.2vw,1rem);margin-bottom:1.25rem}
+    .tile{background:var(--card-bg-solid);border:1px solid var(--border-light);
+          border-radius:var(--radius-md,12px);padding:1rem 1.1rem;box-shadow:var(--shadow-sm)}
+    .tile h3{margin:0 0 .55rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;
+             color:var(--text-muted);font-weight:700}
+    .tile .big{font-size:clamp(1.35rem,4vw,1.7rem);font-weight:800;line-height:1.1;color:var(--text-primary)}
+    .tile .sub{color:var(--text-secondary);font-size:.84rem;margin-top:.3rem}
+    .bar{height:8px;border-radius:6px;background:var(--border-medium);overflow:hidden;margin-top:.6rem}
+    .bar>.fill{display:block;height:100%;background:var(--brand-primary)}
+    .pill{display:inline-block;font-size:.72rem;font-weight:700;padding:.12rem .55rem;border-radius:999px}
+    .pill--good{background:rgba(56,161,105,.18);color:var(--success)}
+    .pill--bad{background:rgba(229,62,62,.18);color:var(--error)}
+    .live{transition:opacity .3s ease} .live.loading{opacity:.4}
+    .split{display:flex;flex-direction:column;gap:.45rem;margin-top:.2rem}
+    .split .row{display:flex;align-items:center;gap:.5rem;font-size:.85rem}
+    .split .row .lab{width:48px;color:var(--text-muted)}
+    .split .row .barwrap{flex:1}
+    .split .row .pct{width:48px;text-align:right;font-weight:700;color:var(--text-primary)}
+
+    /* ---- Panel ---- */
+    .panel{background:var(--card-bg-solid);border:1px solid var(--border-light);
+           border-radius:var(--radius-md,12px);padding:clamp(.9rem,2vw,1.25rem);box-shadow:var(--shadow-sm)}
+    .panel h2{margin:0 0 .9rem;font-size:1.05rem;color:var(--text-primary)}
+
+    /* ---- Form controls: ONE shared size for inputs, selects, buttons ---- */
+    :root{ --control-h:42px; }
+    .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+             gap:.65rem;align-items:end}
+    .filters label{display:flex;flex-direction:column;gap:.32rem;font-size:.74rem;
+                   color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+    .filters input,.filters select{
+      width:100%;height:var(--control-h);padding:0 .7rem;font:inherit;font-size:.9rem;
+      color:var(--text-primary);background:var(--secondary-bg);
+      border:1px solid var(--border-medium);border-radius:var(--radius-sm,8px);
+      -webkit-appearance:none;appearance:none}
+    .filters input::placeholder{color:var(--text-muted)}
+    .filters input:focus,.filters select:focus{outline:2px solid var(--brand-primary);outline-offset:0;border-color:transparent}
+    .filters select{background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),
+                     linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);
+                     background-position:calc(100% - 18px) center,calc(100% - 13px) center;
+                     background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:2rem}
+
+    .actions{display:flex;gap:.6rem;margin-top:.9rem;flex-wrap:wrap}
+    .btn{height:var(--control-h);display:inline-flex;align-items:center;justify-content:center;
+         border:1px solid transparent;border-radius:var(--radius-sm,8px);padding:0 1.2rem;
+         font:inherit;font-weight:700;cursor:pointer}
+    .btn--primary{background:var(--brand-primary);color:#fff}
+    .btn--primary:hover{filter:brightness(1.06)}
+    .btn--ghost{background:transparent;color:var(--text-primary);border-color:var(--border-medium)}
+    .btn--ghost:hover{background:rgba(255,255,255,.05)}
+
+    /* ---- API call box ---- */
+    .apibox{margin-top:.9rem;border:1px solid var(--border-medium);border-radius:var(--radius-sm,8px);
+            background:var(--primary-bg);overflow:hidden}
+    .apibox__h{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.45rem .7rem;
+               background:var(--secondary-bg);color:var(--text-secondary);font-size:.7rem;
+               text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+    .apibox__copy{height:28px;border:1px solid var(--border-medium);background:transparent;
+                  color:var(--text-secondary);border-radius:6px;padding:0 .6rem;font:inherit;font-size:.7rem;cursor:pointer}
+    .apibox pre{margin:0;padding:.6rem .7rem;color:var(--text-secondary);
+                font:.78rem/1.55 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+    .apibox__note{padding:.4rem .7rem .6rem;color:var(--text-muted);font-size:.72rem}
+
+    /* ---- Summary cells ---- */
+    .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.65rem;margin:1.1rem 0}
+    .summary .cell{background:var(--secondary-bg);border:1px solid var(--border-light);
+                   border-radius:var(--radius-sm,8px);padding:.7rem .85rem}
+    .summary .cell .k{font-size:.7rem;text-transform:uppercase;color:var(--text-muted);font-weight:700}
+    .summary .cell .v{font-size:1.25rem;font-weight:800;margin-top:.2rem;color:var(--text-primary)}
+
+    /* ---- Tables ---- */
+    .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;
+                border:1px solid var(--border-light);border-radius:var(--radius-sm,8px);margin-top:.6rem}
+    table{width:100%;border-collapse:collapse;font-size:.86rem}
+    th,td{text-align:left;padding:.55rem .65rem;border-bottom:1px solid var(--border-light);white-space:nowrap}
+    thead th{color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;
+             background:var(--secondary-bg);position:sticky;top:0}
+    tbody td{color:var(--text-secondary)}
+    tbody tr:nth-child(even){background:rgba(255,255,255,.03)}
+    td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+    .mbar{height:7px;border-radius:5px;background:var(--border-medium);overflow:hidden;min-width:90px;display:block}
+    .mbar>.fill{display:block;height:100%;background:var(--brand-primary)}
+    .muted{color:var(--text-muted)} .hint{font-size:.82rem;color:var(--text-muted);margin-top:.5rem}
+    th[data-sort]{cursor:pointer;user-select:none} th[data-sort]:hover{color:var(--brand-primary)}
+    th[data-sort].asc::after{content:" ▲";font-size:.7em} th[data-sort].desc::after{content:" ▼";font-size:.7em}
+    .status{font-size:.85rem;margin-top:.6rem;color:var(--text-secondary)}
+
+    /* ---- Mobile ---- */
+    @media (max-width:640px){
+      .sw__head{flex-direction:column;align-items:flex-start;gap:.35rem}
+      .tiles{grid-template-columns:1fr}
+      .filters{grid-template-columns:1fr 1fr}
+      .filters label:nth-last-child(-n+1){grid-column:1 / -1}  /* limit/text full width */
+      .actions{flex-direction:column}
+      .actions .btn{width:100%}
+      .summary{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width:380px){
+      .filters{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body data-slug="{{ site.slug }}">
+  <div class="sw">
+    <div class="sw__head">
+      <div>
+        <h1>{{ site.site_name }}</h1>
+        <span class="agency">{{ site.agency_name }}{% if site.cluster %} · {{ site.cluster }}{% endif %}</span>
+      </div>
+      <a class="sw__back no-print" href="{{ url_for('overview') }}">← Dashboard</a>
+    </div>
+
+    <!-- ===== Four headline tiles (spine data) ===== -->
+    <div class="tiles">
+      <div class="tile">
+        <h3>Quantity &amp; Remediated</h3>
+        <div class="big">{{ tiles.remediated_mt }} / {{ tiles.target_mt }} MT</div>
+        <div class="sub">{{ tiles.completion_pct }}% remediated · {{ tiles.remaining_mt }} MT remaining</div>
+        <div class="bar"><span class="fill" data-pct="{{ tiles.completion_pct }}"></span></div>
+      </div>
+
+      <div class="tile" id="tile-pace" data-required="{{ tiles.required_per_day_mt }}">
+        <h3>Required vs Pace</h3>
+        <div class="big"><span id="pace-mt" class="live loading">—</span> MT/day</div>
+        <div class="sub">
+          {% if tiles.required_per_day_mt %}Needs {{ tiles.required_per_day_mt }} MT/day{% if tiles.days_left %} for {{ tiles.days_left }} days{% endif %}{% else %}No deadline set{% endif %}
+          <span id="pace-pill"></span>
+          <div id="pace-asof" class="muted" style="font-size:.72rem;margin-top:.3rem"></div>
+        </div>
+      </div>
+
+      <div class="tile">
+        <h3>Output Disposal</h3>
+        <div class="big">{{ tiles.disposal_pct }}%</div>
+        <div class="sub">{{ tiles.total_disposed_mt }} MT disposed of {{ tiles.remediated_mt }} MT remediated</div>
+        <div class="bar"><span class="fill" data-pct="{{ tiles.disposal_pct if tiles.disposal_pct <= 100 else 100 }}"></span></div>
+      </div>
+
+      <div class="tile">
+        <h3>Disposal Split</h3>
+        <div class="split">
+          {% for label, pct in tiles.split.items() %}
+          <div class="row">
+            <span class="lab">{{ label }}</span>
+            <span class="barwrap"><span class="mbar"><span class="fill" data-pct="{{ pct }}"></span></span></span>
+            <span class="pct">{{ pct }}%</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Records explorer (live API) ===== -->
+    <div class="panel">
+      <h2>Records Explorer</h2>
+
+      <div class="filters no-print">
+        <label>Start date <input type="date" id="f-start" /></label>
+        <label>End date <input type="date" id="f-end" /></label>
+        <label>Material type
+          <select id="f-material"><option value="">All materials</option></select>
+        </label>
+        <label>Vehicle no
+          <select id="f-vehicle"><option value="">All vehicles</option></select>
+        </label>
+        <label>Show
+          <select id="f-limit">
+            <option value="50" selected>50 records</option>
+            <option value="75">75 records</option>
+            <option value="100">100 records</option>
+            <option value="all">All records</option>
+          </select>
+        </label>
+        <label>Filter rows <input type="text" id="f-text" placeholder="ticket, vehicle…" /></label>
+      </div>
+
+      <div class="actions no-print">
+        <button class="btn btn--primary" id="btn-run">Run query</button>
+        <button class="btn btn--ghost" id="btn-pdf">Download PDF</button>
+      </div>
+
+      <div class="apibox no-print" id="apibox" hidden>
+        <div class="apibox__h">
+          <span>Live API call</span>
+          <button type="button" class="apibox__copy" id="api-copy">Copy</button>
+        </div>
+        <pre id="api-calls"></pre>
+        <div class="apibox__note" id="api-note" hidden></div>
+      </div>
+
+      <div class="status" id="status"></div>
+
+      <div id="results" hidden>
+        <div class="summary">
+          <div class="cell"><div class="k">Total records</div><div class="v" id="s-count">—</div></div>
+          <div class="cell"><div class="k">Total net weight</div><div class="v" id="s-mt">—</div></div>
+          <div class="cell"><div class="k">Materials</div><div class="v" id="s-mats">—</div></div>
+          <div class="cell"><div class="k">Vehicles</div><div class="v" id="s-vehs">—</div></div>
+        </div>
+
+        <h2 style="font-size:.95rem;margin-top:1rem">Net weight by material type</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Material</th><th class="num">Records</th><th class="num">Net (MT)</th><th>Share</th></tr></thead>
+            <tbody id="t-material"></tbody>
+          </table>
+        </div>
+
+        <h2 style="font-size:.95rem;margin-top:1.1rem">Records <span class="muted" id="rec-shown"></span></h2>
+        <div class="table-wrap">
+          <table id="rec-table">
+            <thead><tr>
+              <th data-sort="date">Date</th>
+              <th data-sort="time">Time</th>
+              <th data-sort="ticket_no">Ticket</th>
+              <th class="num" data-sort="first_weight_kg">First Wt</th>
+              <th data-sort="first_time">First Time</th>
+              <th class="num" data-sort="second_weight_kg">Second Wt</th>
+              <th data-sort="second_time">Second Time</th>
+              <th class="num" data-sort="net_weight_kg">Net Wt</th>
+              <th data-sort="material_type">Material</th>
+            </tr></thead>
+            <tbody id="t-records"></tbody>
+          </table>
+        </div>
+        <div class="hint" id="rec-note"></div>
+      </div>
+    </div>
+
+    <div class="hint no-print" style="margin-top:1rem">
+      Tiles come from the master sheet; the explorer queries the live API for
+      <code>{{ site.api_site_names|join(", ") if site.api_site_names else site.site_name }}</code>.
+    </div>
+  </div>
+
+  <script>
+    const SLUG = document.body.dataset.slug;
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => Number(n).toLocaleString(undefined, {maximumFractionDigits: 2});
+
+    function setBars(scope){
+      (scope||document).querySelectorAll(".fill[data-pct]").forEach((el) => {
+        el.style.width = Math.max(0, Math.min(100, parseFloat(el.dataset.pct)||0)) + "%";
+      });
+    }
+    setBars();   // static tile bars on load
+
+    (function initDates(){
+      const end = new Date();
+      const start = new Date(); start.setDate(end.getDate() - 30);
+      const iso = (d) => d.toISOString().slice(0,10);
+      $("f-end").value = iso(end);
+      $("f-start").value = iso(start);
+    })();
+
+    function rowsToTable(tbody, rows, render, cols){
+      tbody.innerHTML = rows.length ? rows.map(render).join("")
+        : `<tr><td colspan="${cols||9}" class="muted">No rows.</td></tr>`;
+    }
+
+    let ALL = [];
+    let sortKey = "date", sortDir = "desc";
+
+    function currentFilters(){
+      return {
+        start: $("f-start").value,
+        end: $("f-end").value,
+        material: $("f-material").value,
+        vehicle: $("f-vehicle").value,
+        text: $("f-text").value.trim().toLowerCase(),
+        limit: $("f-limit").value,
+      };
+    }
+
+    function fillDropdown(sel, values, allLabel){
+      const keep = sel.value;
+      sel.innerHTML = `<option value="">${allLabel}</option>` +
+        values.map(v => `<option value="${v}">${v}</option>`).join("");
+      if (values.includes(keep)) sel.value = keep;
+    }
+
+    function applyView(){
+      const f = currentFilters();
+      let rows = ALL.slice();
+      if (f.material) rows = rows.filter(r => r.material_type === f.material);
+      if (f.vehicle)  rows = rows.filter(r => r.vehicle_no === f.vehicle);
+      if (f.text)     rows = rows.filter(r =>
+        (r.ticket_no + " " + r.vehicle_no + " " + r.material_type).toLowerCase().includes(f.text));
+
+      rows.sort((a, b) => {
+        let x = a[sortKey], y = b[sortKey];
+        if (typeof x === "number" && typeof y === "number") return sortDir==="asc" ? x-y : y-x;
+        x = String(x); y = String(y);
+        return sortDir==="asc" ? x.localeCompare(y) : y.localeCompare(x);
+      });
+
+      const totMt = rows.reduce((s, r) => s + r.net_weight_mt, 0);
+      $("s-count").textContent = fmt(rows.length);
+      $("s-mt").textContent = fmt(Math.round(totMt*1000)/1000) + " MT";
+      $("s-mats").textContent = new Set(rows.map(r=>r.material_type)).size;
+      $("s-vehs").textContent = new Set(rows.map(r=>r.vehicle_no)).size;
+
+      const byMat = {};
+      rows.forEach(r => {
+        const m = r.material_type || "(unspecified)";
+        (byMat[m] = byMat[m] || {count:0, mt:0}).count++;
+        byMat[m].mt += r.net_weight_mt;
+      });
+      const matRows = Object.entries(byMat).sort((a,b)=>b[1].mt-a[1].mt);
+      const maxMat = Math.max(1, ...matRows.map(([,d])=>d.mt));
+      rowsToTable($("t-material"), matRows, ([name,d]) => `
+        <tr>
+          <td>${name}</td>
+          <td class="num">${fmt(d.count)}</td>
+          <td class="num">${fmt(Math.round(d.mt*1000)/1000)}</td>
+          <td><span class="mbar"><span class="fill" data-pct="${(d.mt/maxMat*100)}"></span></span></td>
+        </tr>`, 4);
+      setBars($("t-material"));
+
+      // Record limit (50/75/100/all) — caps the on-screen table only.
+      const cap = f.limit === "all" ? rows.length : parseInt(f.limit, 10);
+      const shown = rows.slice(0, cap);
+      rowsToTable($("t-records"), shown, (r) => `
+        <tr>
+          <td>${r.date}</td><td>${r.time}</td><td>${r.ticket_no}</td>
+          <td class="num">${fmt(r.first_weight_kg)}</td><td>${r.first_time}</td>
+          <td class="num">${fmt(r.second_weight_kg)}</td><td>${r.second_time}</td>
+          <td class="num">${fmt(r.net_weight_kg)}</td><td>${r.material_type}</td>
+        </tr>`);
+      $("rec-shown").textContent =
+        `(${fmt(rows.length)} match${rows.length===1?"":"es"}${rows.length>cap?`, showing ${cap}`:""})`;
+      $("rec-note").textContent = (f.limit !== "all" && rows.length > cap)
+        ? "Row limit affects this table only — Download PDF includes every matching record."
+        : "";
+
+      document.querySelectorAll("th[data-sort]").forEach(th => {
+        th.classList.toggle("asc",  th.dataset.sort===sortKey && sortDir==="asc");
+        th.classList.toggle("desc", th.dataset.sort===sortKey && sortDir==="desc");
+      });
+    }
+
+    async function run(){
+      const p = new URLSearchParams({ start: $("f-start").value, end: $("f-end").value });
+      $("status").textContent = "Querying…";
+      $("results").hidden = true;
+      try{
+        const res = await fetch(`/sites/${SLUG}/records.json?` + p.toString());
+        const data = await res.json();
+
+        if(data.api_calls && data.api_calls.length){
+          $("api-calls").textContent = data.api_calls.join("\n");
+          $("api-note").textContent = "Date range is the only server filter; material & vehicle are applied client-side. Pagination bumps the page param.";
+          $("api-note").hidden = false;
+          $("apibox").hidden = false;
+        }
+        if(!data.ok){ $("status").textContent = "Error: " + (data.error || res.status); return; }
+
+        ALL = data.records || [];
+        fillDropdown($("f-material"), data.summary.by_material.map(m=>m.material_type), "All materials");
+        fillDropdown($("f-vehicle"),  data.summary.by_vehicle.map(v=>v.vehicle_no),   "All vehicles");
+        applyView();
+
+        $("status").textContent = "";
+        $("results").hidden = false;
+      }catch(e){
+        $("status").textContent = "Request failed: " + e.message;
+      }
+    }
+
+    function openPdf(){
+      const f = currentFilters();
+      const p = new URLSearchParams({ start: f.start, end: f.end, material: f.material, vehicle: f.vehicle });
+      window.open(`/sites/${SLUG}/report.pdf?` + p.toString(), "_blank");
+    }
+
+    $("btn-run").addEventListener("click", run);
+    $("btn-pdf").addEventListener("click", openPdf);
+    ["f-material","f-vehicle","f-text","f-limit"].forEach(id => $(id).addEventListener("input", applyView));
+    document.querySelectorAll("th[data-sort]").forEach(th => {
+      th.addEventListener("click", () => {
+        const k = th.dataset.sort;
+        if (sortKey === k) sortDir = sortDir==="asc" ? "desc" : "asc";
+        else { sortKey = k; sortDir = "asc"; }
+        applyView();
+      });
+    });
+    $("api-copy").addEventListener("click", () => {
+      const t = $("api-calls").textContent;
+      if(t) navigator.clipboard?.writeText(t);
+    });
+
+    // ---- Tile 2: live pace ----
+    const REQUIRED = parseFloat($("tile-pace").dataset.required) || 0;
+    const POLL_MS = 60000;
+    async function refreshPace(){
+      const el = $("pace-mt");
+      el.classList.add("loading");
+      try{
+        const res = await fetch(`/sites/${SLUG}/pace.json`);
+        const d = await res.json();
+        if(d.ok){
+          el.textContent = fmt(d.pace_mt);
+          if(REQUIRED > 0){
+            const ok = d.pace_mt >= REQUIRED;
+            const pill = $("pace-pill");
+            pill.className = "pill " + (ok ? "pill--good" : "pill--bad");
+            pill.textContent = ok ? "On track" : "Behind";
+          }
+          $("pace-asof").textContent = "Updated " + new Date().toLocaleTimeString();
+        }
+      }catch(e){ /* keep last value */ }
+      finally{ el.classList.remove("loading"); }
+    }
+    refreshPace();
+    setInterval(refreshPace, POLL_MS);
+  </script>
+</body>
+</html>

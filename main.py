@@ -7,6 +7,7 @@ Routes:
     POST /admin/refresh-cache -> manually invalidate the CSV cache (login-gated)
     GET  /login, POST /login, GET /logout -> auth (login blueprint)
     GET  /reports + JSON APIs + PDF export -> reports blueprint
+    GET/POST /sites/<slug> -> per-site dashboard gate (sites blueprint)
 """
 from __future__ import annotations
 
@@ -28,6 +29,7 @@ from data.aggregate import (
 
 from views.login import bp as login_bp, login_required
 from views.reports import bp as reports_bp
+from views.sites import bp as sites_bp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -78,6 +80,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(login_bp)
     app.register_blueprint(reports_bp)
+    app.register_blueprint(sites_bp)
 
     @app.route("/")
     def overview():

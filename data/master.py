@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Optional
@@ -20,6 +21,15 @@ from data._cache import TTLCache
 logger = logging.getLogger(__name__)
 _cache = TTLCache(config.CACHE_TTL_SECONDS)
 _CACHE_KEY = "sites_master"
+
+
+def slugify(name: str) -> str:
+    """Lowercase, collapse non-alphanumerics to single hyphens, trim.
+
+    'Tharuni Srikakulam' -> 'tharuni-srikakulam'; 'Ananthapur' -> 'ananthapur'.
+    """
+    s = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower())
+    return s.strip("-")
 
 
 @dataclass(frozen=True)
@@ -47,8 +57,17 @@ class Site:
     # Land
     land_total_acres: float = 0.0
     land_reclaimed_acres: float = 0.0
+    # Per-site login (used only by the /sites/<slug> gate). Plaintext for the
+    # MVP; swap to hashes later without touching the route logic.
+    login_id: str = ""
+    login_pwd: str = ""
 
     # ---- Computed properties ----
+
+    @property
+    def slug(self) -> str:
+        """URL slug for the /sites/<slug> route. Derived from site_name."""
+        return slugify(self.site_name)
 
     @property
     def is_active(self) -> bool:
@@ -138,6 +157,8 @@ def _row_to_site(row: dict) -> Optional[Site]:
         inert_disposed_mt=_parse_float(row.get("inert_disposed_mt", "0")),
         land_total_acres=_parse_float(row.get("land_total_acres", "0")),
         land_reclaimed_acres=_parse_float(row.get("land_reclaimed_acres", "0")),
+        login_id=(row.get("login_id") or "").strip(),
+        login_pwd=(row.get("login_pwd") or ""),   # do NOT strip — preserve as-is
     )
 
 
@@ -190,6 +211,21 @@ def get_sites() -> list[Site]:
 
 def get_active_sites() -> list[Site]:
     return [s for s in get_sites() if s.is_active]
+
+
+def get_site_by_slug(slug: str) -> Optional[Site]:
+    """Resolve a URL slug to a renderable Site, or None.
+
+    Matches case/space-insensitively via slugify() on both sides. If two
+    sites slugify to the same value the first in CSV order wins.
+    """
+    target = slugify(slug)
+    if not target:
+        return None
+    for s in get_sites():
+        if s.is_renderable and s.slug == target:
+            return s
+    return None
 
 
 def get_agencies() -> list[str]:

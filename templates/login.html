@@ -20,7 +20,9 @@
           <span class="login-brand__mark">SA</span>
         </div>
         <h1 id="login-heading" class="login-card__title">Swachha Andhra Corporation</h1>
-        <p class="login-card__sub">Sign in to access the dashboard</p>
+        <p class="login-card__sub">
+          {% if site_name %}Sign in to access {{ site_name }}{% else %}Sign in to access the dashboard{% endif %}
+        </p>
       </header>
 
       {% if error %}
@@ -28,7 +30,7 @@
       {% endif %}
 
       <form class="login-form" method="post"
-            action="{{ url_for('login.login_view') }}" novalidate
+            action="{{ form_action or url_for('login.login_view') }}" novalidate
             autocomplete="off">
         <input type="hidden" name="next" value="{{ next_url }}" />
         <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}" />
