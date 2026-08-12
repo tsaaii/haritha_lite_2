@@ -163,6 +163,7 @@ def _normalize(rec: dict) -> dict:
         "ticket_no": str(rec.get("ticket_no", "")),
         "vehicle_no": (rec.get("vehicle_no") or "").strip(),
         "material_type": (rec.get("material_type") or rec.get("material") or "").strip(),
+        "transfer_party_name": (rec.get("transfer_party_name") or "").strip(),
         "first_weight_kg": _to_float(rec.get("first_weight")),
         "first_time": _timepart(rec.get("first_timestamp")),
         "second_weight_kg": _to_float(rec.get("second_weight")),

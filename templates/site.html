@@ -247,6 +247,31 @@
       </div>
     </div>
 
+    <!-- ===== Day-wise summary (per material type) ===== -->
+    <div class="panel">
+      <h2>Day-wise Summary</h2>
+      <p class="hint no-print" style="margin-top:-.4rem">
+        Trips &amp; net weight grouped by material type, one row per day.
+        Transfer party is a filter; &ldquo;All parties&rdquo; pools every party.
+      </p>
+
+      <div class="filters no-print">
+        <label>Start date <input type="date" id="dw-start" /></label>
+        <label>End date <input type="date" id="dw-end" /></label>
+        <label>Transfer party
+          <select id="dw-party"><option value="">All parties</option></select>
+        </label>
+      </div>
+
+      <div class="actions no-print">
+        <button class="btn btn--primary" id="dw-run">Run summary</button>
+        <button class="btn btn--ghost" id="dw-pdf">Export day-wise PDF</button>
+      </div>
+
+      <div class="status" id="dw-status"></div>
+      <div id="dw-results" hidden><div id="dw-tables"></div></div>
+    </div>
+
     <div class="hint no-print" style="margin-top:1rem">
       Tiles come from the master sheet; the explorer queries the live API for
       <code>{{ site.api_site_names|join(", ") if site.api_site_names else site.site_name }}</code>.
@@ -408,6 +433,85 @@
       const t = $("api-calls").textContent;
       if(t) navigator.clipboard?.writeText(t);
     });
+
+    // ===== Day-wise summary (per material type) =====
+    function dwDateDMY(s){
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s||"");
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : (s||"—");
+    }
+    function dwMt(n){
+      return Number(n||0).toLocaleString(undefined,
+        {minimumFractionDigits:3, maximumFractionDigits:3});
+    }
+    function dwFilters(){
+      return { start:$("dw-start").value, end:$("dw-end").value, party:$("dw-party").value };
+    }
+    function dwFillParties(parties){
+      const sel = $("dw-party"), cur = sel.value;
+      sel.innerHTML = '<option value="">All parties</option>' +
+        (parties||[]).map(p => `<option value="${p}">${p}</option>`).join("");
+      if(cur) sel.value = cur;
+    }
+    function dwRenderTables(summary){
+      const wrap = $("dw-tables");
+      const mats = (summary && summary.materials) || [];
+      if(!mats.length){
+        wrap.innerHTML = '<div class="hint">No records for this date range and transfer party.</div>';
+        return;
+      }
+      wrap.innerHTML = mats.map(mat => {
+        const rows = mat.days.map((d,i) => `
+          <tr>
+            <td class="num">${i+1}</td>
+            <td>${dwDateDMY(d.date)}</td>
+            <td>${d.start_time||"—"}</td>
+            <td>${d.end_time||"—"}</td>
+            <td class="num">${fmt(d.trips)}</td>
+            <td class="num">${dwMt(d.net_mt)}</td>
+          </tr>`).join("");
+        return `
+          <h2 style="font-size:.9rem;margin-top:1rem">Material type: ${mat.material_type}</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th class="num">S.No</th><th>Date</th><th>Start Time</th>
+                <th>End Time</th><th class="num">No of Trips</th><th class="num">Net Weight (MT)</th>
+              </tr></thead>
+              <tbody>
+                ${rows}
+                <tr>
+                  <td></td><td colspan="3" style="text-align:right;font-weight:700">TOTAL</td>
+                  <td class="num" style="font-weight:700">${fmt(mat.total.trips)}</td>
+                  <td class="num" style="font-weight:700">${dwMt(mat.total.net_mt)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>`;
+      }).join("");
+    }
+    async function dwRun(){
+      const f = dwFilters();
+      const p = new URLSearchParams({ start:f.start, end:f.end, party:f.party });
+      $("dw-status").textContent = "Querying…";
+      $("dw-results").hidden = true;
+      try{
+        const res = await fetch(`/sites/${SLUG}/daywise.json?` + p.toString());
+        const data = await res.json();
+        if(!data.ok){ $("dw-status").textContent = "Error: " + (data.error || res.status); return; }
+        dwFillParties(data.transfer_parties);
+        dwRenderTables(data.summary);
+        $("dw-status").textContent = "";
+        $("dw-results").hidden = false;
+      }catch(e){ $("dw-status").textContent = "Request failed: " + e.message; }
+    }
+    function dwOpenPdf(){
+      const f = dwFilters();
+      const p = new URLSearchParams({ start:f.start, end:f.end, party:f.party });
+      window.open(`/sites/${SLUG}/daywise.pdf?` + p.toString(), "_blank");
+    }
+    $("dw-run").addEventListener("click", dwRun);
+    $("dw-pdf").addEventListener("click", dwOpenPdf);
+    $("dw-party").addEventListener("change", dwRun);
 
     // ---- Tile 2: live pace ----
     const REQUIRED = parseFloat($("tile-pace").dataset.required) || 0;

@@ -26,7 +26,8 @@ from flask import (
 
 import captcha
 from auth import USERNAME, verify_credentials
-from data import master, site_api, site_pdf
+from data import (master, site_api, site_pdf, site_daywise, site_daywise_pdf,
+                  site_totals)
 from views.login import SESSION_USER_KEY
 
 bp = Blueprint("sites", __name__, url_prefix="/sites")
@@ -87,13 +88,41 @@ def _render_login(site, error=None, status=200):
 
 
 def _tiles(site) -> dict:
-    """All four headline tiles — derived from the spine, no API call.
+    """The four headline tiles.
 
-    Generic: every field exists on every Site, so this works for any slug.
+    remediated + disposal are DERIVED FROM ACTUAL RECORDS (site_totals:
+    the pipeline's deduped master.csv, topped up with the live API for the
+    days master.csv does not yet fully cover). They used to come off
+    sites_master.csv as hand-maintained numbers, which drifted from what the
+    weighbridge recorded and made these tiles disagree with the explorer.
+
+    target_mt / start_date / deadline_date STAY on the spine — no weighbridge
+    record contains a contract target, so there is nothing to derive them from.
+
+    If master.csv is unreachable we fall back to the spine values, so the page
+    degrades to the old behaviour instead of showing zeros.
     """
-    target = site.target_mt
-    remediated = site.remediated_mt
+    totals = site_totals.site_totals(site.api_site_names)
+    live = totals["source"] not in ("unavailable",)
+
+    if live:
+        remediated = totals["remediated_mt"]
+        split_mt = totals["disposal_mt"]
+        total_disposed = totals["total_disposed_mt"]
+    else:
+        remediated = site.remediated_mt
+        split_mt = {
+            "Soil": site.soil_disposed_mt,
+            "RDF": site.rdf_disposed_mt,
+            "CnD": site.cnd_disposed_mt,
+            "Inert": site.inert_disposed_mt,
+        }
+        total_disposed = sum(split_mt.values())
+
+    target = site.target_mt              # spine: contract quantity
     remaining = max(0.0, target - remediated)
+    completion_pct = (remediated / target * 100.0) if target > 0 else 0.0
+    completion_pct = max(0.0, min(100.0, completion_pct))
 
     today = date.today()
     days_elapsed = (today - site.start_date).days if site.start_date else 0
@@ -103,17 +132,15 @@ def _tiles(site) -> dict:
     days_left = (site.deadline_date - today).days if site.deadline_date else 0
     required_per_day = (remaining / days_left) if days_left and days_left > 0 else 0.0
 
-    total_disposed = (site.soil_disposed_mt + site.rdf_disposed_mt
-                      + site.cnd_disposed_mt + site.inert_disposed_mt)
     disposal_pct = (total_disposed / remediated * 100.0) if remediated > 0 else 0.0
 
-    def split(part):
+    def pct_of_disposed(part):
         return round(part / total_disposed * 100.0, 1) if total_disposed > 0 else 0.0
 
     return {
         "target_mt": round(target, 1),
         "remediated_mt": round(remediated, 1),
-        "completion_pct": round(site.completion_pct, 1),
+        "completion_pct": round(completion_pct, 1),
         "remaining_mt": round(remaining, 1),
         "avg_per_day_mt": round(avg_per_day, 1),
         "required_per_day_mt": round(required_per_day, 1),
@@ -122,11 +149,15 @@ def _tiles(site) -> dict:
         "total_disposed_mt": round(total_disposed, 1),
         "disposal_pct": round(disposal_pct, 1),
         "split": {
-            "Soil": split(site.soil_disposed_mt),
-            "Inert": split(site.inert_disposed_mt),
-            "CnD": split(site.cnd_disposed_mt),
-            "RDF": split(site.rdf_disposed_mt),
+            "Soil": pct_of_disposed(split_mt.get("Soil", 0.0)),
+            "Inert": pct_of_disposed(split_mt.get("Inert", 0.0)),
+            "CnD": pct_of_disposed(split_mt.get("CnD", 0.0)),
+            "RDF": pct_of_disposed(split_mt.get("RDF", 0.0)),
         },
+        # Provenance — handy for debugging, ignored by the template.
+        "source": totals["source"],
+        "as_of": totals["as_of"],
+        "legacy_trips": totals["legacy_trips"],
     }
 
 
@@ -294,6 +325,70 @@ def site_report_pdf(slug):
         summary=summary,
     )
     fname = f"{site.slug}_{start or 'all'}_{end or 'all'}.pdf"
+    return Response(
+        pdf_bytes, mimetype="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{fname}"'},
+    )
+
+
+@bp.route("/<slug>/daywise.json")
+def site_daywise_json(slug):
+    """Day-wise summary (per material type) for the explorer section.
+
+    Pulls the whole date range once (all materials, all parties), derives
+    the party dropdown from what appears, and builds the per-material-type
+    per-day rollup. Transfer party is a pure filter.
+    """
+    site = master.get_site_by_slug(slug)
+    if site is None:
+        abort(404)
+    if not _has_access(site.slug):
+        abort(403)
+
+    start = (request.args.get("start") or "").strip() or None
+    end = (request.args.get("end") or "").strip() or None
+    party = (request.args.get("party") or "").strip() or None
+
+    try:
+        records = site_api.query_records(
+            site.api_site_names, start_date=start, end_date=end,
+        )
+        return jsonify(
+            ok=True,
+            site_name=site.site_name,
+            filters={"start": start, "end": end, "party": party or "All"},
+            transfer_parties=site_daywise.list_transfer_parties(records),
+            summary=site_daywise.build_daywise(records, transfer_party=party),
+        )
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.exception("daywise.json failed for %s", site.slug)
+        return jsonify(ok=False, error=str(exc)), 502
+
+
+@bp.route("/<slug>/daywise.pdf")
+def site_daywise_pdf_route(slug):
+    """Day-wise summary PDF for the current date range + transfer party."""
+    site = master.get_site_by_slug(slug)
+    if site is None:
+        abort(404)
+    if not _has_access(site.slug):
+        abort(403)
+
+    start = (request.args.get("start") or "").strip() or None
+    end = (request.args.get("end") or "").strip() or None
+    party = (request.args.get("party") or "").strip() or None
+
+    records = site_api.query_records(
+        site.api_site_names, start_date=start, end_date=end,
+    )
+    summary = site_daywise.build_daywise(records, transfer_party=party)
+    pdf_bytes = site_daywise_pdf.build_daywise_pdf(
+        site_name=site.site_name,
+        agency_name=site.agency_name,
+        summary=summary,
+        start=start or "", end=end or "",
+    )
+    fname = f"{site.slug}_daywise_{start or 'all'}_{end or 'all'}.pdf"
     return Response(
         pdf_bytes, mimetype="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{fname}"'},
