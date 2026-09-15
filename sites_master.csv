@@ -1,5 +1,6 @@
-site_name,api_site_names,agency_name,cluster,target_mt,remediated_mt,deadline_date,status,reclamation_status,start_date,soil_disposed_mt,rdf_disposed_mt,cnd_disposed_mt,inert_disposed_mt,land_total_acres,land_reclaimed_acres
+site_name,api_site_names,agency_name,cluster,target_mt,remediated_mt,deadline_date,status,reclamation_status,start_date,soil_disposed_mt,rdf_disposed_mt,cnd_disposed_mt,inert_disposed_mt,land_total_acres,land_reclaimed_acres,login_id,login_pwd
 Narsaraopet,Phase4,Tharuni Associates,Phase4,92090,35434.8,2026-05-31,active,in progress,2025-03-30,13536.0936,1417.392,708.696,1948.914,26.611,9.115
+Ananthapur,Ananthapur,Tharuni Associates,Phase3,92090,35434.8,2026-06-30,active,in progress,2025-03-30,13536.0936,1417.392,708.696,1948.914,26.611,9.115,test1,123456
 Ponnuru,Phase4,Tharuni Associates,Phase4,8211.5,2240,2026-05-31,active,in progress,2025-03-30,855.68,89.6,44.8,123.2,23.55,8.82
 Tharuni_Kadiri,Phase4,Tharuni Associates,Phase4,11679.27,156,2026-05-31,active,in progress,2025-03-30,59.592,6.24,3.12,8.58,72.567,30.334
 Hindupur,Phase4,Tharuni Associates,Phase4,72120.84,16262.43,2026-05-31,active,in progress,2025-03-30,6212.24826,650.4972,325.2486,894.43365,80.367,37.363

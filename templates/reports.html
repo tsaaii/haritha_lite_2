@@ -135,13 +135,20 @@
     <span>Built by Advitia Labs.</span>
   </footer>
 
+  {# endpoints.imagesBase is a URL *template*, not a live URL — the __SITE__ /
+     __DATE__ / __TICKET__ sentinels are substituted per row in reports.js.
+     Built with url_for so the path stays correct if the blueprint's
+     url_prefix ever changes. #}
   <script id="js-bootstrap" type="application/json">
     {{ {
       "filterOptions": filter_options,
       "endpoints": {
         "records": url_for('reports.api_records'),
         "filters": url_for('reports.api_filters'),
-        "exportPdf": url_for('reports.api_export_pdf')
+        "exportPdf": url_for('reports.api_export_pdf'),
+        "imagesBase": url_for('record_images.sheet_view',
+                              site='__SITE__', date='__DATE__',
+                              ticket='__TICKET__')
       },
       "defaults": {
         "pageSize": page_size_default,

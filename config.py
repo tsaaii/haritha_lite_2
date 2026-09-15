@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 # In production (App Engine) this comes from app.yaml env_variables.
 # ---------------------------------------------------------------------------
 SITES_MASTER_CSV = os.environ.get("SITES_MASTER_CSV", "sites_master.csv")
-
+MASTER_RECORDS_CSV = os.environ.get("MASTER_RECORDS_CSV", "")
 
 def is_gcs_path(path: str) -> bool:
     return path.startswith("gs://")
@@ -40,7 +40,7 @@ def parse_gcs_path(path: str) -> tuple[str, str]:
 # the dashboard renders comes from the master CSV.
 # ---------------------------------------------------------------------------
 RECORDS_API_BASE = os.environ.get(
-    "RECORDS_API_BASE", "https://weighbridge-api-mzfbv433ja-as.a.run.app",
+    "RECORDS_API_BASE", "https://weighbridge-api-asia-south1-287877277037.asia-south1.run.app/",
 ).rstrip("/")
 RECORDS_API_TIMEOUT_S = int(os.environ.get("RECORDS_API_TIMEOUT_S", "10"))
 

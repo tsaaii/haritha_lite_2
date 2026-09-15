@@ -53,11 +53,21 @@ EXPORT_HARD_CAP = 5000  # PDF export will refuse more than this many rows
 
 # Fields that are noise for the UI — strip from every record before sending
 # to the browser. Cuts ~12 KB / page off the JSON payload.
+#
+# The first_*_image / second_*_image names are legacy: the v3 API replaced
+# them with a nested `images` map. Kept so a mixed/rolled-back deployment
+# still strips them.
 _STRIP_FIELDS: set[str] = {
     "_source_file", "_processed_timestamp", "_folder_source",
     "first_front_image", "first_back_image",
     "second_front_image", "second_back_image",
+    "images",
 }
+
+# Slot names the v3 API exposes under each record's `images` map.
+IMAGE_SLOTS: tuple[str, ...] = (
+    "first_front", "first_back", "second_front", "second_back",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -108,10 +118,29 @@ def _cache_has(cache: TTLCache, key: str) -> bool:
         return bool(entry and entry[0] > time.time())
 
 
+def _image_slots(record: dict) -> list[str]:
+    """Which image slots this record actually has, as a short list.
+
+    The API sends a full URL path per slot (~60 chars x 4 x 50 rows = ~12 KB
+    per page of pure redundancy) even for slots that are empty. Since the
+    path is fully determined by (site_name, date, ticket_no, slot), we send
+    only the slot NAMES and let the browser build the proxy URL.
+
+    An empty string upstream means "no image in that slot", so the list is
+    also what tells the UI whether to render an icon at all.
+    """
+    raw = record.get("images")
+    if not isinstance(raw, dict):
+        return []
+    return [s for s in IMAGE_SLOTS if (raw.get(s) or "").strip()]
+
+
 def _strip_record(record: dict) -> dict:
-    """Drop noisy / unused fields from a single record."""
-    return {k: v for k, v in record.items()
-            if k not in _STRIP_FIELDS and not k.startswith("_")}
+    """Drop noisy / unused fields from a single record, add image_slots."""
+    out = {k: v for k, v in record.items()
+           if k not in _STRIP_FIELDS and not k.startswith("_")}
+    out["image_slots"] = _image_slots(record)
+    return out
 
 
 def _do_fetch_records(params: dict) -> dict:

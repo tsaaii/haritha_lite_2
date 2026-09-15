@@ -19,6 +19,9 @@
   const DEFAULTS = BOOT.defaults;
 
   const COLUMN_STORAGE_KEY = 'reports.columns.v1';
+  // Separate flag rather than bumping the storage key to v2: bumping would
+  // throw away every column choice the user has already made.
+  const COLUMN_MIGRATION_KEY = 'reports.columns.migrated.images';
 
   // Mirror of pdf_export.COLUMN_SCHEMA. Keep these in sync.
   const COLUMNS = [
@@ -42,6 +45,11 @@
     { key: 'user_name',           label: 'User',          default: false },
     { key: 'record_status',       label: 'Status',        default: false, isStatus: true },
     { key: 'cloud_upload_timestamp', label: 'Uploaded',   default: false },
+    // Not in pdf_export.COLUMN_SCHEMA on purpose — an <a> has no meaning in a
+    // printed table. `noExport` is what keeps this key out of the ?columns=
+    // param; without it the exporter receives a key it doesn't know.
+    { key: 'images',              label: 'Images',        default: true,
+      isImages: true, noExport: true },
   ];
 
   const state = {
@@ -123,12 +131,60 @@
     return String(raw);
   }
 
+  /**
+   * Build the Images cell. Returns a Node, not a string — this is the only
+   * cell with an interactive element, and fmtCell's String() would render the
+   * server's array as "first_front,first_back".
+   *
+   * The link is built from image_slots (see records_api._image_slots): an
+   * empty list means this ticket has no captures, so we show a dash rather
+   * than an icon that opens four "no image" panels.
+   */
+  function imageCell(rec) {
+    const slots = (rec && rec.image_slots) || [];
+    if (!slots.length) {
+      const dash = document.createElement('span');
+      dash.className = 'muted';
+      dash.title = 'No images for this ticket';
+      dash.textContent = '—';
+      return dash;
+    }
+
+    const a = document.createElement('a');
+    a.className = 'reports-image-link';
+    a.href = ENDPOINTS.imagesBase
+      .replace('__SITE__',   encodeURIComponent(rec.site_name || ''))
+      .replace('__DATE__',   encodeURIComponent(rec.date || ''))
+      .replace('__TICKET__', encodeURIComponent(rec.ticket_no || ''));
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.title = `View ${slots.length} weighbridge image${slots.length === 1 ? '' : 's'}`;
+    a.setAttribute('aria-label', a.title);
+    a.textContent = '📷';
+    return a;
+  }
+
   function loadVisibleCols() {
     try {
       const stored = localStorage.getItem(COLUMN_STORAGE_KEY);
       if (stored) {
         const arr = JSON.parse(stored);
-        if (Array.isArray(arr) && arr.length) return new Set(arr);
+        if (Array.isArray(arr) && arr.length) {
+          const set = new Set(arr);
+          // The Images column ships on by default, but anyone who used this
+          // page before it existed has a saved array without it and would
+          // never discover the feature. Add it exactly once, then record that
+          // we did — otherwise a deliberate un-tick gets undone every reload.
+          if (!localStorage.getItem(COLUMN_MIGRATION_KEY)) {
+            set.add('images');
+            try {
+              localStorage.setItem(COLUMN_MIGRATION_KEY, '1');
+              localStorage.setItem(COLUMN_STORAGE_KEY,
+                JSON.stringify(Array.from(set)));
+            } catch (_) { /* ignore */ }
+          }
+          return set;
+        }
       }
     } catch (_) { /* ignore */ }
     return new Set(COLUMNS.filter((c) => c.default).map((c) => c.key));
@@ -308,7 +364,9 @@
       visibleCols.forEach((c) => {
         const td = document.createElement('td');
         if (c.align === 'right') td.className = 'num';
-        if (c.isStatus && rec[c.key]) {
+        if (c.isImages) {
+          td.appendChild(imageCell(rec));
+        } else if (c.isStatus && rec[c.key]) {
           const span = document.createElement('span');
           span.className = 'pill';
           span.textContent = rec[c.key];
@@ -499,7 +557,11 @@
   // -------------------------------------------------------------------------
   function exportPdf() {
     const params = new URLSearchParams(getFilters());
-    const cols = orderedVisibleColumnKeys();
+    // Drop columns that have no printable representation (Images). The server
+    // would discard the unknown key anyway via resolve_columns(), but relying
+    // on that couples this to an implementation detail of the exporter.
+    const cols = orderedVisibleColumnKeys()
+      .filter((k) => !COLUMNS.some((c) => c.key === k && c.noExport));
     if (cols.length) {
       params.set('columns', cols.join(','));
     }

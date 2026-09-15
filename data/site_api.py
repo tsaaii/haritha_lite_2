@@ -35,10 +35,20 @@ logger = logging.getLogger(__name__)
 _query_cache = TTLCache(getattr(config, "RECORDS_QUERY_TTL_SECONDS", 120))
 
 # ---- Pagination knobs (the part most likely to need tuning) ----
+#
+# v3 CONTRACT: the page-size parameter is `limit`, accepting 1-5000 and
+# defaulting to 100. It was previously sent as `page_size`, which the server
+# ignored — so every request silently came back with 100 rows regardless of
+# what was asked for. Combined with the _has_next fallback below, that capped
+# the explorer at a single page.
+#
+# 2000 rather than the 5000 ceiling: each record carries an images map, so a
+# 5000-row page is a multi-megabyte response to parse on an F2 instance. 2000
+# keeps requests well clear of the 120/min rate limit without that cost.
 _PAGE_PARAM = "page"
-_PAGE_SIZE_PARAM = "page_size"
-_PAGE_SIZE = 1000      # only helps if the server honors a larger size
-_MAX_PAGES = 500       # higher, but still a guard        # hard ceiling so a bad response can't loop forever
+_PAGE_SIZE_PARAM = "limit"
+_PAGE_SIZE = 2000
+_MAX_PAGES = 500       # hard ceiling so a bad response can't loop forever
 _TIMEOUT = 30
 
 
@@ -96,7 +106,14 @@ def _extract_records(payload: Any) -> list[dict]:
 
 
 def _has_next(payload: Any, got: int) -> bool:
-    """Best-effort 'is there another page'."""
+    """Best-effort 'is there another page'.
+
+    v3 sends {"page", "limit", "total", "pages"} — note `pages`, NOT
+    `total_pages`. Without that key checked here, this fell straight through
+    to the fallback, which compared a 100-row response against _PAGE_SIZE and
+    concluded there was nothing more. Result: the explorer stopped after page
+    one and silently showed a fraction of the records.
+    """
     if isinstance(payload, dict):
         pag = payload.get("pagination")
         if isinstance(pag, dict):
@@ -104,10 +121,11 @@ def _has_next(payload: Any, got: int) -> bool:
                 return bool(pag.get("next"))
             if "has_next" in pag:
                 return bool(pag.get("has_next"))
-            tp = pag.get("total_pages")
             cp = pag.get("page")
-            if isinstance(tp, int) and isinstance(cp, int):
-                return cp < tp
+            for key in ("pages", "total_pages"):
+                tp = pag.get(key)
+                if isinstance(tp, int) and isinstance(cp, int):
+                    return cp < tp
     # Fallback: a full page probably means more rows exist.
     return got >= _PAGE_SIZE
 
@@ -154,8 +172,28 @@ def _timepart(ts: Any) -> str:
     return s.split(" ", 1)[1] if " " in s else s
 
 
+# Slot names the v3 API exposes under each record's `images` map.
+IMAGE_SLOTS: tuple[str, ...] = (
+    "first_front", "first_back", "second_front", "second_back",
+)
+
+
+def _image_slots(rec: dict) -> list[str]:
+    """Which image slots this record actually has.
+
+    Slot NAMES only, not the paths the API sends: the path is fully determined
+    by (site_name, date, ticket_no, slot), so the client rebuilds it and we
+    keep the JSON small. An empty string upstream means "no image here".
+    """
+    raw = rec.get("images")
+    if not isinstance(raw, dict):
+        return []
+    return [s for s in IMAGE_SLOTS if (raw.get(s) or "").strip()]
+
+
 def _normalize(rec: dict) -> dict:
     net_kg = _to_float(rec.get("net_weight"))
+    slots = _image_slots(rec)
     return {
         "date": rec.get("date", ""),
         "time": rec.get("time", ""),
@@ -170,15 +208,33 @@ def _normalize(rec: dict) -> dict:
         "second_time": _timepart(rec.get("second_timestamp")),
         "net_weight_kg": net_kg,
         "net_weight_mt": round(net_kg / 1000.0, 3),
-        "_processed_timestamp": rec.get("_processed_timestamp", ""),
+        "image_slots": slots,
+        "has_images": bool(slots),
+        # v3 does not send this — corrections now come from the overrides
+        # table and every read is already an `effective_record`. Kept as ""
+        # so _dedup's comparison stays type-safe rather than crashing on None.
+        "_processed_timestamp": rec.get("_processed_timestamp", "") or "",
     }
 
 
 def _dedup(records: Iterable[dict]) -> list[dict]:
-    """Keep the latest _processed_timestamp per (site_name, ticket_no)."""
-    best: dict[tuple[str, str], dict] = {}
+    """Collapse genuine duplicates, keeping the latest _processed_timestamp.
+
+    KEY INCLUDES `date`, and that is not cosmetic. Ticket numbers RESET —
+    T0001 exists in March and again in September. Keying on
+    (site_name, ticket_no) alone silently merged two unrelated trips into one
+    and lost a real record, with no error and no log line.
+
+    On v3 the tiebreak is mostly inert: _processed_timestamp is gone, so every
+    row scores "" and the first one seen wins. That is fine, because v3 serves
+    effective_records with overrides already applied — there is no longer a
+    stale duplicate for this function to choose between. It stays in place to
+    absorb the overlap when a spine site fans out across several upstream
+    names.
+    """
+    best: dict[tuple[str, str, str], dict] = {}
     for r in records:
-        key = (r["site_name"], r["ticket_no"])
+        key = (r["site_name"], r["date"], r["ticket_no"])
         prev = best.get(key)
         if prev is None or r["_processed_timestamp"] > prev["_processed_timestamp"]:
             best[key] = r

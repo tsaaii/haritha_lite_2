@@ -101,6 +101,8 @@
     .mbar{height:7px;border-radius:5px;background:var(--border-medium);overflow:hidden;min-width:90px;display:block}
     .mbar>.fill{display:block;height:100%;background:var(--brand-primary)}
     .muted{color:var(--text-muted)} .hint{font-size:.82rem;color:var(--text-muted);margin-top:.5rem}
+    .imglink{text-decoration:none;font-size:1rem;line-height:1;opacity:.85}
+    .imglink:hover{opacity:1}
     th[data-sort]{cursor:pointer;user-select:none} th[data-sort]:hover{color:var(--brand-primary)}
     th[data-sort].asc::after{content:" ▲";font-size:.7em} th[data-sort].desc::after{content:" ▼";font-size:.7em}
     .status{font-size:.85rem;margin-top:.6rem;color:var(--text-secondary)}
@@ -239,6 +241,8 @@
               <th data-sort="second_time">Second Time</th>
               <th class="num" data-sort="net_weight_kg">Net Wt</th>
               <th data-sort="material_type">Material</th>
+              {# No data-sort: sorting by an image link is meaningless. #}
+              <th>Images</th>
             </tr></thead>
             <tbody id="t-records"></tbody>
           </table>
@@ -282,6 +286,28 @@
     const SLUG = document.body.dataset.slug;
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => Number(n).toLocaleString(undefined, {maximumFractionDigits: 2});
+
+    // Escape anything interpolated into an href/title. These values come from
+    // the weighbridge, not from us, and this table is built with innerHTML.
+    const esc = (s) => String(s == null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+    // Images cell. `image_slots` comes from site_api._image_slots — an empty
+    // list means this ticket has no captures, so show a dash rather than an
+    // icon that opens four "no image" panels.
+    function imgCell(r){
+      const slots = (r && r.image_slots) || [];
+      if(!slots.length){
+        return '<span class="muted" title="No images for this ticket">—</span>';
+      }
+      const url = `/record-images/${encodeURIComponent(r.site_name||"")}`
+                + `/${encodeURIComponent(r.date||"")}`
+                + `/${encodeURIComponent(r.ticket_no||"")}`;
+      const label = `View ${slots.length} weighbridge image${slots.length===1?"":"s"}`;
+      return `<a class="imglink" href="${esc(url)}" target="_blank" rel="noopener"
+                 title="${esc(label)}" aria-label="${esc(label)}">&#128247;</a>`;
+    }
 
     function setBars(scope){
       (scope||document).querySelectorAll(".fill[data-pct]").forEach((el) => {
@@ -371,7 +397,8 @@
           <td class="num">${fmt(r.first_weight_kg)}</td><td>${r.first_time}</td>
           <td class="num">${fmt(r.second_weight_kg)}</td><td>${r.second_time}</td>
           <td class="num">${fmt(r.net_weight_kg)}</td><td>${r.material_type}</td>
-        </tr>`);
+          <td>${imgCell(r)}</td>
+        </tr>`, 10);
       $("rec-shown").textContent =
         `(${fmt(rows.length)} match${rows.length===1?"":"es"}${rows.length>cap?`, showing ${cap}`:""})`;
       $("rec-note").textContent = (f.limit !== "all" && rows.length > cap)
