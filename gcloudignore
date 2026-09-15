@@ -1,0 +1,40 @@
+# See https://cloud.google.com/sdk/gcloud/reference/topic/gcloudignore
+# for the syntax. Anything matched here is excluded from `gcloud app deploy`.
+
+.gcloudignore
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local secrets and dev artefacts
+.env
+.env.*
+*.log
+
+# Local CSVs that should live in GCS, not in the deploy bundle.
+# (Comment these out if you want to bundle them with the deploy.)
+sites_master.csv
+overrides.csv
+
+# Docs and README aren't needed at runtime
+README.md

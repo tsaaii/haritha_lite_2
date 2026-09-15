@@ -1,6 +1,8 @@
 runtime: python311
 
-entrypoint: gunicorn -b :$PORT main:app
+# 2 workers × 8 threads ≈ best fit for F2 (512MB / 1 core) for a mostly
+# I/O-bound app. Drop to 1 worker if you see OOM under load.
+entrypoint: gunicorn -b :$PORT --workers 2 --threads 8 --timeout 60 main:app
 
 instance_class: F2
 
@@ -9,7 +11,7 @@ env_variables:
   SITES_MASTER_CSV: "gs://advitia-weighbridge-data/dashboard_config/sites_master.csv"
 
   # /reports page only — dashboard no longer calls this.
-  RECORDS_API_BASE: "https://weighbridge-api-mzfbv433ja-as.a.run.app"
+  RECORDS_API_BASE: "https://weighbridge-api-asia-south1-287877277037.asia-south1.run.app/"
 
   # CSV is re-read once per cache window.
   CACHE_TTL_SECONDS: "1800"
@@ -22,6 +24,11 @@ env_variables:
 
   PROJECT_DEADLINE: "2026-05-31"
   ROTATION_INTERVAL_MS: "12000"
+
+  # REQUIRED. Generate once with: python -c "import secrets; print(secrets.token_hex(32))"
+  # and paste the result below. If you'd rather not commit it, comment this
+  # line out and use Secret Manager (see deploy notes).
+  SECRET_KEY: "289c9278d43d1961d48652f9a9c4f059b9ac554e9df36bb782ce4b3157a51d6b"
 
 automatic_scaling:
   min_instances: 1

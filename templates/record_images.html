@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>{{ heading }} — weighbridge images</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
+  <style>
+    /* Theme tokens come from dashboard.css (:root); fallbacks keep this page
+       readable if it is ever opened without that stylesheet. */
+    body{margin:0;background:var(--primary-bg,#1A202C);
+         color:var(--text-primary,#E2E8F0);
+         font-family:Inter,system-ui,-apple-system,sans-serif}
+    .wrap{max-width:1200px;margin:0 auto;padding:clamp(.75rem,2vw,1.25rem)}
+
+    header{display:flex;flex-wrap:wrap;gap:.3rem 1rem;
+           align-items:baseline;margin-bottom:1rem}
+    h1{font-size:1.05rem;margin:0;font-weight:800}
+    .meta{color:var(--text-muted,#A0AEC0);font-size:.85rem}
+
+    /* The 2x2:  ff | fb
+                 sf | sb
+       Collapses to one column on phones — four photos side by side on a
+       380px screen is four unreadable thumbnails. */
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+    @media (max-width:700px){ .grid{grid-template-columns:1fr} }
+
+    figure{margin:0;border:1px solid var(--border-medium,#2D3748);
+           border-radius:var(--radius-md,10px);overflow:hidden;background:#000}
+    figcaption{padding:.5rem .7rem;font-size:.72rem;font-weight:700;
+               letter-spacing:.04em;text-transform:uppercase;
+               color:var(--text-muted,#A0AEC0);
+               background:var(--secondary-bg,#232C3B)}
+    .shot{display:block;width:100%;height:auto;background:#000}
+    .missing{display:flex;align-items:center;justify-content:center;
+             min-height:220px;color:var(--text-muted,#A0AEC0);font-size:.85rem}
+
+    @media print{
+      body{background:#fff;color:#000}
+      figure{border-color:#ccc}
+      figcaption{background:#eee;color:#333}
+      .grid{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>{{ heading }}</h1>
+      <span class="meta">{{ subheading }}</span>
+    </header>
+
+    {# Slot order is set in views/record_images.SLOTS — this just iterates. #}
+    <div class="grid">
+      {% for t in tiles %}
+      <figure>
+        <figcaption>{{ t.label }}</figcaption>
+        {# The proxy returns a real 404 when a slot has no image. Catching it
+           here means one template covers every combination of present and
+           missing slots, with no per-record pre-check on the server. #}
+        <img class="shot" src="{{ t.url }}" alt="{{ t.label }}" loading="lazy"
+             onerror="this.outerHTML='<div class=\'missing\'>No image in this slot</div>'" />
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

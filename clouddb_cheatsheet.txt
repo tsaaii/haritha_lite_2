@@ -1,0 +1,100 @@
+gcloud services enable sqladmin.googleapis.com
+
+gcloud sql instances create weighbridge \
+  --database-version=POSTGRES_15 \
+  --tier=db-f1-micro \
+  --region=asia-south1 \
+  --storage-size=10GB \
+  --storage-auto-increase
+
+
+
+
+gcloud sql users set-password postgres \
+
+  --instance=weighbridge \
+
+  --password='1Ph0n3202O'
+
+
+  gcloud sql databases create weighbridge --instance=weighbridge
+
+
+
+  Creating Cloud SQL instance for POSTGRES_15...done.                                                                                                                                                                                            
+Created [https://sqladmin.googleapis.com/sql/v1beta4/projects/applied-pursuit-332603/instances/weighbridge].
+NAME: weighbridge
+DATABASE_VERSION: POSTGRES_15
+LOCATION: asia-south1-c
+TIER: db-f1-micro
+PRIMARY_ADDRESS: 8.234.86.195
+PRIVATE_ADDRESS: -
+STATUS: RUNNABLE
+saaitejaa@cloudshell:~ (applied-pursuit-332603)$ 
+
+
+
+gcloud sql users set-password postgres \
+  --instance=weighbridge \
+  --password='1Ph0n3202O'
+
+
+  gcloud sql databases create weighbridge --instance=weighbridge
+
+
+  gcloud sql connect weighbridge --user=postgres --database=weighbridge < schema.sql
+
+
+  gcloud sql connect weighbridge --user=postgres --database=weighbridge -c "\dt" 2>/dev/null || echo "connect interactively and run \\dt"
+
+
+
+
+
+
+To add a new site manually
+
+
+cd ~/weighbridge
+source venv/bin/activate
+
+pgrep -f cloud-sql-proxy > /dev/null && echo "proxy already running" || \
+  (./cloud-sql-proxy applied-pursuit-332603:asia-south1:weighbridge & sleep 3)
+
+
+  echo "${DATABASE_URL:-NOT SET}"
+export DATABASE_URL="postgresql://postgres:YOURPASSWORD@127.0.0.1:5432/weighbridge"
+
+
+export IMAGE_TOKEN_SECRET="${IMAGE_TOKEN_SECRET:-$(openssl rand -base64 32)}"
+
+
+psql "$DATABASE_URL" -c "SELECT count(*) FROM pg_tables WHERE schemaname='public';"
+
+
+python load.py --list-sites
+
+
+python load.py --peek Card_box_Company/Tirupathi
+
+
+python load.py --site Card_box_Company/Tirupathi
+
+
+psql "$DATABASE_URL" -c "
+SELECT a.name AS agency, s.name AS site, s.cluster,
+       count(*) AS records,
+       min(r.capture_date) AS first_date,
+       max(r.capture_date) AS last_date,
+       round(sum(r.net_weight_kg)/1000, 2) AS tonnes
+FROM records r
+JOIN sites s ON s.id = r.site_id
+JOIN agencies a ON a.id = s.agency_id
+WHERE s.name = 'Tirupati'
+GROUP BY 1,2,3;"
+
+
+
+uvicorn app.main:app --port 8080 --reload
+
+
