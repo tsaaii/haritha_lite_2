@@ -32,6 +32,7 @@ from views.login import bp as login_bp, login_required
 from views.reports import bp as reports_bp
 from views.sites import bp as sites_bp
 from views.record_images import bp as record_images_bp
+from views.field import bp as field_bp 
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,6 +86,7 @@ def create_app() -> Flask:
     app.register_blueprint(sites_bp)
     # Must come after sites_bp: record_images imports SESSION_SITE_KEY from it.
     app.register_blueprint(record_images_bp)
+    app.register_blueprint(field_bp) 
 
     @app.route("/")
     def overview():

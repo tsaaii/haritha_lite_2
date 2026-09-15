@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{% include "field/_head.html" %}
+<title>All site status — {{ brand.org }}</title>
+</head>
+<body>
+<div class="wrap">
+  <section id="lock">
+    <img src="{{ logo_url }}" alt="">
+    <div style="font-size:24px">Site status</div>
+    <div class="hint">{{ brand.org }}</div>
+    <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off">
+    <div class="msg" id="msg"></div>
+    <button class="btn" id="open" type="button">Open</button>
+  </section>
+
+  <section id="app">
+    <div class="hero">
+      <div class="row c"><div class="kicker">All site status</div><input type="date" id="date"></div>
+      <div class="nums">
+        <div><b id="nSub">–</b><span>submitted</span></div>
+        <div><b id="nPen" style="color:var(--leaf)">–</b><span>pending</span></div>
+      </div>
+      <div class="hint">Cut-off {{ brand.cutoff }} · sites are learnt from past reports</div>
+    </div>
+    <main>
+      <div class="msg" id="appMsg"></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="row c"><div class="lbl">Pending</div><button class="btn sec small" id="copy" type="button">Copy as text</button></div>
+        <div id="pending" class="list"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="row c"><div class="lbl">Submitted</div><div class="hint">MSW in · disposed</div></div>
+        <div id="submitted" class="list"></div>
+      </div>
+      <a class="link" id="sheet" href="#" target="_blank" rel="noopener">Open this day's Google Sheet</a>
+      <a class="link" href="{{ form_url }}" style="color:var(--muted);font-weight:400">Operator form</a>
+    </main>
+  </section>
+</div>
+<script src="{{ js_url }}" defer></script>
+</body>
+</html>

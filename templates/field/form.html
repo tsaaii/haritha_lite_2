@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{% include "field/_head.html" %}
+<title>{{ brand.title }} — {{ brand.org }}</title>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img src="{{ logo_url }}" alt="">
+    <div><h1>{{ brand.title }}</h1><small>{{ brand.org }}</small></div>
+  </header>
+
+  <main id="form">
+    <div class="offline" id="offline">No signal — reports will be saved on this phone.</div>
+    <div class="queued" id="queued"></div>
+
+    <div class="who" id="who" style="display:none">
+      <div><b id="whoName"></b><span id="whoPhone"></span></div>
+      <button class="link" type="button" id="whoChange">Change</button>
+    </div>
+    <div id="whoEdit" style="display:flex;flex-direction:column;gap:12px">
+      <label class="f"><span class="lbl">Your name</span><input id="operator" placeholder="e.g. Ravi Kumar" autocomplete="name"></label>
+      <label class="f"><span class="lbl">Your phone number</span><input id="phone" placeholder="10 digits" inputmode="tel" autocomplete="tel" maxlength="12"></label>
+      <div class="hint">Asked once. Remembered on this phone.</div>
+    </div>
+
+    <label class="f"><span class="lbl">Site name</span>
+      <input id="site" list="sites" placeholder="Type the site name" autocomplete="off">
+      <datalist id="sites"></datalist>
+    </label>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="lbl">Shift</div>
+      <div class="grid">
+        <label class="f"><span class="hint">Start date</span><input type="date" id="startDate"></label>
+        <label class="f"><span class="hint">Start time</span><input type="time" id="startTime"></label>
+        <label class="f"><span class="hint">End date</span><input type="date" id="endDate"></label>
+        <label class="f"><span class="hint">End time</span><input type="time" id="endTime"></label>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="row"><div class="lbl">Quantities</div><div class="hint">tap what moved today</div></div>
+      <div class="chips" id="chips"></div>
+      <div class="none" id="none">Nothing selected — all quantities will be sent as 0.</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label class="qty" id="q_msw"><span>MSW inward <small>tonnes</small></span><input id="msw" inputmode="decimal" placeholder="0.0"></label>
+        <label class="qty" id="q_soil"><span>Soil disposed <small>tonnes</small></span><input id="soil" inputmode="decimal" placeholder="0.0"></label>
+        <label class="qty" id="q_inert"><span>Inert disposed <small>tonnes</small></span><input id="inert" inputmode="decimal" placeholder="0.0"></label>
+        <label class="qty" id="q_rdf"><span>RDF disposed <small>tonnes</small></span><input id="rdf" inputmode="decimal" placeholder="0.0"></label>
+        <label class="qty" id="q_cnd"><span>C&amp;D disposed <small>tonnes</small></span><input id="cnd" inputmode="decimal" placeholder="0.0"></label>
+      </div>
+    </div>
+
+    <label class="f"><span class="lbl">Remarks <span style="font-weight:400;color:var(--muted)">(optional)</span></span><textarea id="remarks" rows="2" placeholder="Anything unusual today"></textarea></label>
+
+    <div class="err" id="err"></div>
+    <button class="btn" id="send" type="button">Send report</button>
+    <div class="foot">Goes straight to the office sheet. You can edit until {{ brand.cutoff }}.</div>
+  </main>
+
+  <section id="sent">
+    <div class="check"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <div><div class="big" id="sentTitle">Report sent.</div><div style="font-size:16px;color:var(--muted);margin-top:8px" id="sentSub"></div></div>
+    <div class="sum" id="sum"></div>
+    <div style="flex:1"></div>
+    <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+      <button class="btn sec" id="editBtn" type="button">Edit this report</button>
+      <div class="hint" id="editHint"></div>
+      <button class="link" type="button" id="anotherBtn" style="font-size:16px">Report another site</button>
+    </div>
+  </section>
+</div>
+<script src="{{ js_url }}" defer></script>
+</body>
+</html>

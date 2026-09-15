@@ -30,6 +30,11 @@ env_variables:
   # line out and use Secret Manager (see deploy notes).
   SECRET_KEY: "289c9278d43d1961d48652f9a9c4f059b9ac554e9df36bb782ce4b3157a51d6b"
 
+  TH_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyesxPy3PgSYEYwYjhAjL3aAyEsgNGABxFT0N5c-LH818O6mlA87qY5yM9P0AmqQtio5g/exec"
+  TH_SCRIPT_TOKEN: "rbfeN7PhkRL73Gesx71pTG6oUyLrX4ESpO-xao1kO7A"
+  AP_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbz38G9cMS5FiJMV34x1Zb8vsUYIidcKYhHekW8lrAAYAS6VNKXyVkC6fEaupDXs/exec"
+  AP_SCRIPT_TOKEN: "zwu2Jzj11avXuzTR1jw0zFbejg6ftLvh6qh3HkiOt9s"
+
 automatic_scaling:
   min_instances: 1
   max_instances: 4
@@ -42,3 +47,6 @@ handlers:
   - url: /.*
     script: auto
     secure: always
+
+
+
