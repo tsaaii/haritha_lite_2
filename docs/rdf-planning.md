@@ -24,6 +24,7 @@ session, so an agency can only see and write its own rows.
 
 **Drive (under the "Haritha RDF" folder)**
 ```
+RDF Planning Records/All_agencies_RDF_data.csv          ← every agency, rebuilt on every change
 RDF Planning Records/<Agency>/<Agency>_RDF_data.csv     ← rewritten on every change; same file as "Download all my data"
 RDF Planning Records/<Agency>/<Phase>/<Site>/<ID>_<Site>.pdf  + other attachments
 RDF Certificates/<Agency>/<Site>/<Phase>/<ID>_D1_<file>       ← one per co-processing certificate
@@ -91,6 +92,8 @@ Chrome › ⋮ › **Add to Home screen**.
 - **Site / Phase / Destination** are text fields with a suggestion list: your `Sites` tab, plus
   anything that agency (sites/phases) or anyone (destinations) submitted before, plus names typed
   on that phone. A site/phase not in the list asks for cluster and awarded quantity, and is remembered.
+- **PIN or password.** Each agency's entry in `AGENCY_PINS` can be a 4-digit PIN or a password (4–32 characters, no spaces, in quotes).
+- **All agencies.** Every submission and late certificate rebuilds the `All_RDF_data` tab and `RDF Planning Records/All_agencies_RDF_data.csv` (same 20 columns as the agency CSV). After editing RDF_plan / RDF_dispatch by hand, run `rebuildAllData` in the Apps Script editor.
 - **PIN lockout.** 5 wrong PINs lock that agency's login for 15 minutes (`CONFIG` in Code.gs).
 - **Drafts.** An unfinished entry is kept on the phone and restored on the next visit;
   attached files are not, so certificates have to be attached again.
