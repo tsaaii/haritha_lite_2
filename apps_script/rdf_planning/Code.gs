@@ -9,7 +9,9 @@
 //   Sites         Phase_data.csv imported as-is (agency_name, site_name, phase, cluster, target_mt …)
 //   RDF_plan      one row per submission          (created by setup)
 //   RDF_dispatch  one row per destination          (created by setup)
+//   All_RDF_data  every agency, one row per destination, the 20 CSV columns (rebuilt on every change)
 // Drive (under ROOT_FOLDER_ID):
+//   RDF Planning Records/All_agencies_RDF_data.csv  same rows as All_RDF_data
 //   RDF Planning Records/<Agency>/<Agency>_RDF_data.csv
 //   RDF Planning Records/<Agency>/<Phase>/<Site>/   submission PDF + other attachments
 //   RDF Certificates/<Agency>/<Site>/<Phase>/       co-processing certificates
@@ -23,8 +25,9 @@ const CONFIG = {
   MAX_FILE_MB: 15,
 };
 
-// One 4-digit PIN per agency. Run makePins() once, paste the logged block over
-// this one, then Deploy › Manage deployments › Edit › New version.
+// One PIN or password per agency (4–32 characters, no spaces, keep the quotes).
+// Run makePins() once, paste the logged block over this one, then
+// Deploy › Manage deployments › Edit › New version.
 // Only agencies listed here appear in the login dropdown.
 const AGENCY_PINS = {
   // 'Tharuni Associates': '1234',
@@ -80,12 +83,17 @@ function json_(o) {
 }
 
 // ---------- PIN login ----------
+const PIN_RE = /^\S{4,32}$/;
+function pinOf_(agency) {
+  return Object.prototype.hasOwnProperty.call(AGENCY_PINS, agency) ? String(AGENCY_PINS[agency]) : '';
+}
+
 function agencies_() {
-  return Object.keys(AGENCY_PINS).filter(a => /^\d{4}$/.test(AGENCY_PINS[a])).sort();
+  return Object.keys(AGENCY_PINS).filter(a => PIN_RE.test(pinOf_(a))).sort();
 }
 
 function knownAgency_(agency) {
-  if (!Object.prototype.hasOwnProperty.call(AGENCY_PINS, agency) || !/^\d{4}$/.test(AGENCY_PINS[agency])) {
+  if (!PIN_RE.test(pinOf_(agency))) {
     throw new Error('Unknown agency.');
   }
 }
@@ -98,7 +106,7 @@ function checkPin_(agency, pin) {
   if (fails >= CONFIG.MAX_PIN_TRIES) {
     throw new Error('Too many wrong PINs. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
   }
-  if (String(pin) !== AGENCY_PINS[agency]) {
+  if (String(pin) !== pinOf_(agency)) {
     cache.put(key, String(fails + 1), CONFIG.LOCK_MINUTES * 60);
     throw new Error('Wrong PIN for ' + agency + '. Try again.');
   }
@@ -227,6 +235,7 @@ function submit_(agency, r) {
       res.recDir.getUrl(), pdf.getUrl(), otherUrls, txt_(uploader), "'" + phone,
     ]]);
     csv = agencyCsv_(agency);
+    allData_();
   } finally {
     lock.releaseLock();
   }
@@ -288,6 +297,7 @@ function addCertificate_(agency, b) {
       SpreadsheetApp.flush();
       refreshPlan_(recordId);
       agencyCsv_(agency);
+      allData_();
       return { left: left, pending: pending_(agency, site) };
     }
   } finally {
@@ -309,33 +319,67 @@ function refreshPlan_(id) {
   sh.getRange(row, h.indexOf('Status') + 1).setValue(pend > 0 ? PENDING : 'Complete');
 }
 
-// ---------- one CSV per agency, one row per destination — rewritten on every change ----------
-function agencyCsv_(agency) {
+// ---------- CSV rows: one per destination, joined with its RDF_plan row ----------
+// agency = null → every agency. Values are raw (numbers, Dates) for the sheet tab.
+function dataRows_(agency) {
   const plan = {};
   rows_('RDF_plan').forEach(p => { plan[String(p['Record ID'])] = p; });
-  const cell = v => {
-    if (v instanceof Date) v = Utilities.formatDate(v, CONFIG.TZ, 'dd-MM-yyyy');
+  return rows_('RDF_dispatch').filter(d => !agency || d['Agency'] === agency).map(d => {
+    const p = plan[String(d['Record ID'])] || {};
+    return [d['Record ID'], p['Submitted at'], d['Agency'], d['Site'], p['Cluster'], d['Phase'],
+      p['Awarded Legacy Qty (MT)'], p['Work started on'], p['Work ended on'],
+      p['Land reclaimed (acres)'], p['RDF generated (MT)'], d['Destination'],
+      d['RDF disposed (MT)'], d['Date disposed'], d['Certificate'], d['Cert qty (MT)'],
+      d['Pending qty (MT)'], d['Cert status'], p['Uploaded by'], p['Uploader phone']];
+  });
+}
+
+function toCsv_(rows) {
+  const cell = (v, i) => {
+    if (v instanceof Date) v = Utilities.formatDate(v, CONFIG.TZ, i === 1 ? 'dd-MM-yyyy HH:mm' : 'dd-MM-yyyy');
     v = String(v == null ? '' : v).replace(/^'/, '');
     if (/^[=+\-@]/.test(v) && isNaN(Number(v))) v = "'" + v;   // no formulas when opened in Excel
     return '"' + v.replace(/"/g, '""') + '"';
   };
-  const lines = rows_('RDF_dispatch').filter(d => d['Agency'] === agency).map(d => {
-    const p = plan[String(d['Record ID'])] || {};
-    const at = p['Submitted at'] instanceof Date ? Utilities.formatDate(p['Submitted at'], CONFIG.TZ, 'dd-MM-yyyy HH:mm') : p['Submitted at'];
-    return [d['Record ID'], at, agency, d['Site'], p['Cluster'], d['Phase'],
-      p['Awarded Legacy Qty (MT)'], p['Work started on'], p['Work ended on'],
-      p['Land reclaimed (acres)'], p['RDF generated (MT)'], d['Destination'],
-      d['RDF disposed (MT)'], d['Date disposed'], d['Certificate'], d['Cert qty (MT)'],
-      d['Pending qty (MT)'], d['Cert status'], p['Uploaded by'], p['Uploader phone']].map(cell).join(',');
-  });
-  const csv = [CSV_HEAD.map(cell).join(',')].concat(lines).join('\r\n');
-  const dir = path_(['RDF Planning Records', agency]);
-  const name = agency + '_RDF_data.csv';
+  return [CSV_HEAD].concat(rows).map(r => r.map(cell).join(',')).join('\r\n');
+}
+
+function writeCsv_(dir, name, csv) {
   const old = dir.getFilesByName(name);
   if (old.hasNext()) old.next().setContent(csv);
   else dir.createFile(name, csv, MimeType.CSV);
+}
+
+// One CSV per agency — rewritten on every change. Same file as "Download all my data".
+function agencyCsv_(agency) {
+  const csv = toCsv_(dataRows_(agency));
+  writeCsv_(path_(['RDF Planning Records', agency]), agency + '_RDF_data.csv', csv);
   return csv;
 }
+
+// Every agency: the All_RDF_data tab and All_agencies_RDF_data.csv — rebuilt on every change.
+// Also safe to Run by hand after editing RDF_plan / RDF_dispatch directly.
+function allData_() {
+  const rows = dataRows_(null);
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName('All_RDF_data');
+  if (!sh) {
+    sh = ss.insertSheet('All_RDF_data');
+    sh.setFrozenRows(1);
+  }
+  sh.clearContents();
+  const phone = CSV_HEAD.indexOf('Uploader phone');
+  // Text read back from the sheet must stay text: no formulas, phone keeps its leading digits.
+  const vals = rows.map(r => r.map((v, i) => i === phone ? "'" + String(v).replace(/^'/, '') : (typeof v === 'string' ? txt_(v) : v)));
+  sh.getRange(1, 1, 1, CSV_HEAD.length).setValues([CSV_HEAD]).setFontWeight('bold').setBackground('#e6f4ea');
+  if (vals.length) sh.getRange(2, 1, vals.length, CSV_HEAD.length).setValues(vals);
+  sh.getRange('B:B').setNumberFormat('dd-MM-yyyy HH:mm');
+  sh.getRange('H:I').setNumberFormat('dd-MM-yyyy');
+  sh.getRange('N:N').setNumberFormat('dd-MM-yyyy');
+  writeCsv_(path_(['RDF Planning Records']), 'All_agencies_RDF_data.csv', toCsv_(rows));
+}
+
+function rebuildAllData() { allData_(); }
 
 // ---------- helpers ----------
 function sheet_(n) { return SpreadsheetApp.getActive().getSheetByName(n); }
@@ -424,11 +468,12 @@ function setup() {
   const disp = make('RDF_dispatch', DISP_HEAD);
   disp.getRange('G:G').setNumberFormat('dd-MM-yyyy');
   disp.getRange('M:M').setNumberFormat('dd-MM-yyyy HH:mm');
+  allData_();
   if (!ss.getSheetByName('Sites')) Logger.log('WARNING: no "Sites" tab. Import Phase_data.csv and rename the tab to Sites.');
   Logger.log('Agencies that can log in: ' + (agencies_().join(', ') || 'none — run makePins() and paste AGENCY_PINS'));
 }
 
-// Logs a fresh AGENCY_PINS block (one random PIN per agency in the Sites tab).
+// Logs a fresh AGENCY_PINS block (keeps existing PINs/passwords, random 4-digit PIN for new agencies).
 // Copy it from View › Logs (Execution log) over the AGENCY_PINS block above.
 function makePins() {
   const names = {};

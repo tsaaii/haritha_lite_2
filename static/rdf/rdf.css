@@ -52,7 +52,7 @@ button:disabled{opacity:.6;cursor:default}
 .in[type=date]{padding:0 10px;font-size:15px}
 select.in{padding:0 12px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235f625e' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 14px center;padding-right:36px}
 .in:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,104,54,.18)}
-.in.pin{height:56px;border-radius:12px;font:600 24px 'IBM Plex Mono',monospace;letter-spacing:.5em;text-align:center;padding:0 16px}
+.in.pin{height:56px;border-radius:12px;font:600 22px 'IBM Plex Mono',monospace;letter-spacing:.2em;text-align:center;padding:0 16px}
 .in.bad{border-color:var(--red-line)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .phone{display:flex;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden;height:48px}

@@ -181,9 +181,9 @@ def api_agencies():
 @bp.route(URL_PREFIX + "/api/login", methods=["POST"])
 def api_login():
     raw = request.get_json(silent=True) or {}
-    agency, pin = _s(raw.get("agency")), _s(raw.get("pin"), 8)
+    agency, pin = _s(raw.get("agency")), _s(raw.get("pin"), 64)
     if not agency or not pin:
-        return jsonify(ok=False, error="Select your agency and enter the PIN."), 400
+        return jsonify(ok=False, error="Select your agency and enter the PIN or password."), 400
     try:
         data = _call("login", {"agency": agency, "pin": pin})
     except UpstreamError as exc:

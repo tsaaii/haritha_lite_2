@@ -180,11 +180,11 @@
   }
 
   function loginView() {
-    return `<div class="h big"><h2>Agency log in</h2><p>Select your agency and enter the 4-digit PIN shared by the Swachh Andhra team.</p></div>
+    return `<div class="h big"><h2>Agency log in</h2><p>Select your agency and enter the PIN or password shared by the Swachh Andhra team.</p></div>
       <label class="fld"><span class="lbl">Agency name</span>
         <select class="in" data-login="agency"><option value="">${S.agencies.length ? 'Select agency' : 'Loading agencies…'}</option>${S.agencies.map(a => `<option value="${esc(a)}" ${a === S.loginAgency ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label>
-      <label class="fld"><span class="lbl">PIN</span>
-        <input class="in pin ${S.loginErr ? 'bad' : ''}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" value="${esc(S.pin)}" data-login="pin"></label>
+      <label class="fld"><span class="lbl">PIN / password</span>
+        <input class="in pin ${S.loginErr ? 'bad' : ''}" type="password" maxlength="32" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••" value="${esc(S.pin)}" data-login="pin"></label>
       ${S.loginErr ? `<div class="err">${esc(S.loginErr)}</div>` : ''}
       <button type="button" class="btn" data-act="login" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Checking…' : 'Log in'}</button>
       <div class="note c">Forgot PIN? Contact the district RDF coordinator.</div>`;
@@ -387,7 +387,7 @@
   async function login() {
     const a = S.loginAgency, pin = S.pin;
     if (!a) { S.loginErr = 'Select your agency.'; return render(); }
-    if (!/^\d{4}$/.test(pin)) { S.loginErr = 'Enter your 4-digit PIN.'; return render(); }
+    if (pin.length < 4) { S.loginErr = 'Enter your PIN or password.'; return render(); }
     S.busy = true; S.loginErr = ''; render();
     try { const d = await post(CFG.api.login, { agency: a, pin }); S.busy = false; S.pin = ''; signedIn(d); }
     catch (e) { S.busy = false; S.pin = ''; S.loginErr = e.message; render(); }
@@ -546,7 +546,7 @@
   app.addEventListener('input', e => {
     const t = e.target;
     if (t.dataset.num !== undefined) { const v = decimal(t.value); if (v !== t.value) t.value = v; }
-    if (t.dataset.login === 'pin') { t.value = t.value.replace(/\D/g, '').slice(0, 4); S.pin = t.value; return; }
+    if (t.dataset.login === 'pin') { S.pin = t.value.trim(); return; }
     if (t.dataset.comboIn) { setComboValue(t.dataset.comboIn, t.value); if (S.focus !== t.dataset.comboIn) openCombo(t.dataset.comboIn); else refreshCombo(t.dataset.comboIn); return; }
     if (t.dataset.f) {
       let v = t.value;
