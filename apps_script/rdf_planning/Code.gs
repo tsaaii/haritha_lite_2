@@ -47,10 +47,15 @@ const CSV_HEAD = ['Record ID', 'Submitted at', 'Agency', 'Site', 'Cluster', 'Pha
   'Cert qty (MT)', 'Pending qty (MT)', 'Cert status', 'Uploaded by', 'Uploader phone'];
 
 const PENDING = 'Certificate pending';
+const BUILD = '2026-09-26c';   // shown by doGet — bump when you change this file
 
 // ---------- HTTP ----------
 function doGet() {
-  return json_({ ok: true, service: 'rdf_planning', note: 'POST only' });
+  // Open the /exec URL in a browser to see which code the live deployment runs.
+  const has = n => { try { return typeof eval(n) === 'function'; } catch (e) { return false; } };
+  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only',
+    functions: ['agencies_', 'checkPin_', 'submit_', 'allData_'].filter(n => !has(n)).length ? 'MISSING — paste the whole Code.gs again' : 'all present',
+    agencies: has('agencies_') ? agencies_().length : 0 });
 }
 
 function doPost(e) {
@@ -394,9 +399,27 @@ function rows_(n) {
 
 function append_(n, head, rows) {
   if (!rows.length) return;
-  const sh = sheet_(n);
-  if (!sh) throw new Error('Sheet "' + n + '" is missing — run setup() once.');
+  const sh = ensureSheet_(n, head);
   sh.getRange(sh.getLastRow() + 1, 1, rows.length, head.length).setValues(rows);
+}
+
+// Get a tab, creating it with its header row if it is missing or empty (no need to run setup first).
+function ensureSheet_(n, head) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(n) || ss.insertSheet(n);
+  if (sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#e6f4ea');
+    sh.setFrozenRows(1);
+    if (n === 'RDF_plan') {
+      sh.getRange('M:M').setNumberFormat('0.0%');
+      sh.getRange('B:B').setNumberFormat('dd-MM-yyyy HH:mm');
+      sh.getRange('H:I').setNumberFormat('dd-MM-yyyy');
+    } else if (n === 'RDF_dispatch') {
+      sh.getRange('G:G').setNumberFormat('dd-MM-yyyy');
+      sh.getRange('M:M').setNumberFormat('dd-MM-yyyy HH:mm');
+    }
+  }
+  return sh;
 }
 
 function path_(names) {                       // get-or-create nested folders
@@ -455,21 +478,11 @@ function fmtDate_(d) { return Utilities.formatDate(d, CONFIG.TZ, 'dd-MM-yyyy'); 
 function setup() {
   DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID);   // fails loudly if the ID is wrong
   const ss = SpreadsheetApp.getActive();
-  const make = (n, h) => {
-    const s = ss.getSheetByName(n) || ss.insertSheet(n);
-    s.getRange(1, 1, 1, h.length).setValues([h]).setFontWeight('bold').setBackground('#e6f4ea');
-    s.setFrozenRows(1);
-    return s;
-  };
-  const plan = make('RDF_plan', PLAN_HEAD);
-  plan.getRange('M:M').setNumberFormat('0.0%');
-  plan.getRange('B:B').setNumberFormat('dd-MM-yyyy HH:mm');
-  plan.getRange('H:I').setNumberFormat('dd-MM-yyyy');
-  const disp = make('RDF_dispatch', DISP_HEAD);
-  disp.getRange('G:G').setNumberFormat('dd-MM-yyyy');
-  disp.getRange('M:M').setNumberFormat('dd-MM-yyyy HH:mm');
+  ensureSheet_('RDF_plan', PLAN_HEAD);
+  ensureSheet_('RDF_dispatch', DISP_HEAD);
   allData_();
   if (!ss.getSheetByName('Sites')) Logger.log('WARNING: no "Sites" tab. Import Phase_data.csv and rename the tab to Sites.');
+  Logger.log('Build ' + BUILD);
   Logger.log('Agencies that can log in: ' + (agencies_().join(', ') || 'none — run makePins() and paste AGENCY_PINS'));
 }
 

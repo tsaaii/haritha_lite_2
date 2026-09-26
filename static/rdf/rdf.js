@@ -35,6 +35,9 @@
     f: null,
     pending: [], pendingFor: '', pendLoading: false, pendOpen: '', pendQty: '', pendFile: null, pendErr: '', pendBusy: false,
     done: null,
+    batch: [],                          // finished sites waiting to be submitted together
+    results: [],                        // sites already submitted in this batch
+    progress: '',
     focus: '',                          // open combobox key
   };
   function blank() {
@@ -45,27 +48,26 @@
 
   // Drafts survive a reload or a dropped connection. Files can't be kept, so they are re-attached.
   let draftTimer = 0;
-  function saveDraft() {
-    clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => {
-      if (!S.agency || !S.f) return;
-      const f = { ...S.f, attachments: [], dispatches: S.f.dispatches.map(d => ({ ...d, file: null })) };
-      store.set('draft_' + S.agency, { f, step: S.step });
-    }, 400);
+  const noFiles = f => ({ ...f, attachments: [], dispatches: f.dispatches.map(d => ({ ...d, file: null })) });
+  const fromDraft = f => { f = { ...blank(), ...f, attachments: [] }; if (!f.dispatches.length) f.dispatches = [newD()]; return f; };
+  function writeDraft() {
+    if (!S.agency || !S.f || S.screen !== 'form') return;
+    store.set('draft_' + S.agency, { f: noFiles(S.f), step: S.step, batch: S.batch.map(noFiles) });
   }
+  function saveDraft() { clearTimeout(draftTimer); draftTimer = setTimeout(writeDraft, 400); }
   function loadDraft() {
     const d = store.get('draft_' + S.agency, null);
     if (!d || !d.f || !Array.isArray(d.f.dispatches)) return false;
-    S.f = { ...blank(), ...d.f, attachments: [] };
-    if (!S.f.dispatches.length) S.f.dispatches = [newD()];
+    S.f = fromDraft(d.f);
+    S.batch = Array.isArray(d.batch) ? d.batch.filter(x => x && Array.isArray(x.dispatches)).map(fromDraft) : [];
     S.step = Math.min(Math.max(Number(d.step) || 0, 0), 4);
     return true;
   }
 
   // ---------------------------------------------------------------- derived
   function mySites() { return [...S.sites, ...store.get('sites_' + S.agency, [])]; }
-  function siteMeta() {
-    const f = S.f, s = lc(f.site), p = lc(f.phase);
+  function siteMeta(f = S.f) {
+    const s = lc(f.site), p = lc(f.phase);
     const r = mySites().find(x => lc(x.site) === s && lc(x.phase) === p);
     if (r) return { known: true, cluster: r.cluster || '—', awarded: num(r.awarded), awardedStr: fmt(r.awarded) };
     const aw = num(f.awarded);
@@ -86,12 +88,15 @@
     if (!d.file) return ['Quantities match — attach the certificate.', 'mute'];
     return ['Certified — quantities match.', 'ok'];
   }
-  function validate(step) {
-    const f = S.f;
+  function validateAll(f) {
+    for (let s = 0; s < 4; s++) { const e = validate(s, f); if (e) return [s, e]; }
+    return null;
+  }
+  function validate(step, f = S.f) {
     if (step === 0) {
       if (!f.site.trim()) return 'Enter the site.';
       if (!f.phase.trim()) return 'Enter the phase.';
-      if (!siteMeta().known && num(f.awarded) <= 0) return 'Enter awarded legacy quantity for this new site.';
+      if (!siteMeta(f).known && num(f.awarded) <= 0) return 'Enter awarded legacy quantity for this new site.';
     }
     if (step === 1) {
       if (!f.startDate) return 'Enter the date work started.';
@@ -173,7 +178,8 @@
   // ---------------------------------------------------------------- screens
   function header() {
     const f = S.f, authed = S.screen === 'form' || S.screen === 'done';
-    const sub = !authed ? 'Legacy waste remediation' : (f && f.site ? `${S.agency} · ${f.site}` : S.agency);
+    const more = S.screen === 'form' && S.batch.length ? ` (+${S.batch.length} site${S.batch.length > 1 ? 's' : ''})` : '';
+    const sub = !authed ? 'Legacy waste remediation' : (f && f.site ? `${S.agency} · ${f.site}` : S.agency) + more;
     const ctr = S.screen === 'login' ? 'LOG IN' : S.screen === 'done' ? 'DONE' : S.screen === 'form' ? `STEP ${S.step + 1}/5` : '';
     const stepper = S.screen === 'form' ? `<div class="stepper">${LABELS.map((l, i) => `<div class="${i <= S.step ? 'on' : ''} ${i === S.step ? 'cur' : ''}"><i></i><span>${l}</span></div>`).join('')}</div>` : '';
     return `<header class="top"><div class="top-row"><div class="top-t"><span class="t">RDF Planning</span><span class="s" id="hsub">${esc(sub)}</span></div><span class="ctr">${ctr}</span></div>${stepper}</header>`;
@@ -203,9 +209,16 @@
       </div>`;
   }
 
+  function batchBanner() {
+    if (!S.batch.length) return '';
+    const names = S.batch.map(b => esc(b.site)).join(', ');
+    return `<div class="info batch-note"><b>${S.batch.length} site${S.batch.length > 1 ? 's' : ''} ready:</b> ${names}. They are submitted together with this one.
+      ${S.step === 0 && !S.f.site.trim() ? '<button type="button" class="link-btn" data-act="site-cancel">Cancel this new site</button>' : ''}</div>`;
+  }
+
   function step0() {
     const f = S.f;
-    return `<div class="h"><h2>Site details</h2><p>Type the site and phase — pick from the list to reuse a saved name.</p></div>
+    return `${batchBanner()}<div class="h"><h2>Site details</h2><p>Type the site and phase — pick from the list to reuse a saved name.</p></div>
       <div class="card who"><span class="av">${esc((S.agency || '?')[0])}</span><div class="nm"><span class="cap">Agency</span><b>${esc(S.agency)}</b></div><button type="button" class="sm" data-act="logout">Log out</button></div>
       <div class="fld"><span class="lbl">Site</span>${combo('site', f.site, 'Type site name')}</div>
       <div class="fld"><span class="lbl">Phase</span>${combo('phase', f.phase, 'Type phase, e.g. Phase 3')}</div>
@@ -214,7 +227,7 @@
 
   function step1() {
     const f = S.f;
-    return `<div class="h"><h2>Work progress</h2><p>${esc(f.site)} · ${esc(f.phase)}</p></div>
+    return `${batchBanner()}<div class="h"><h2>Work progress</h2><p>${esc(f.site)} · ${esc(f.phase)}</p></div>
       <div class="g2">
         <label class="fld"><span class="lbl">Work started on</span><input class="in" type="date" value="${esc(f.startDate)}" data-f="startDate"></label>
         <label class="fld"><span class="lbl">Work ended on</span><input class="in" type="date" value="${esc(f.endDate)}" data-f="endDate"></label>
@@ -274,7 +287,7 @@
 
   function step2() {
     const f = S.f;
-    return `<div class="h"><h2>RDF disposed</h2><p>Add each cement / WtE plant the RDF was sent to.</p></div>
+    return `${batchBanner()}<div class="h"><h2>RDF disposed</h2><p>Add each cement / WtE plant the RDF was sent to.</p></div>
       <div class="totals" id="r-totals">${totalsRegion()}</div>
       <div id="r-pending">${pendingRegion()}</div>
       ${f.dispatches.map((d, i) => dCard(d, i, f.dispatches.length > 1)).join('')}
@@ -283,7 +296,7 @@
 
   function step3() {
     const f = S.f;
-    return `<div class="h"><h2>Attachments &amp; contact</h2><p>Site photos, weighbridge slips or any other document.</p></div>
+    return `${batchBanner()}<div class="h"><h2>Attachments &amp; contact</h2><p>Site photos, weighbridge slips or any other document.</p></div>
       ${f.attachments.map((a, i) => `<div class="card att"><span class="ext">${esc((a.name.split('.').pop() || '').slice(0, 4).toUpperCase())}</span><span class="nm">${esc(a.name)}</span><button type="button" data-act="att-remove" data-i="${i}" aria-label="Remove">×</button></div>`).join('')}
       <label class="addfile"><b>+</b>Add attachments<input type="file" class="hide" multiple data-file="att"></label>
       <div class="rule"></div>
@@ -307,26 +320,45 @@
         }),
         ['RDF disposed %', c.pct.toFixed(1) + '%'], ['Certified RDF', fmt(c.certified) + ' MT', green],
         ['Certificate pending', fmt(c.pending) + ' MT', c.pending > 0 ? warn : ''], ['RDF at site', fmt(c.atSite) + ' MT']])}
-      ${sec('Attachments & contact', 3, [['Attachments', f.attachments.length ? f.attachments.length + ' file(s)' : 'None'], ['Uploaded by', f.uploader], ['Phone', '+91 ' + f.phone]])}`;
+      ${sec('Attachments & contact', 3, [['Attachments', f.attachments.length ? f.attachments.length + ' file(s)' : 'None'], ['Uploaded by', f.uploader], ['Phone', '+91 ' + f.phone]])}
+      ${batchList()}
+      <button type="button" class="add" data-act="add-site"><b>+</b>Add another site</button>
+      <div class="note c">Submitting several sites? Add each one here and submit them together.</div>`;
+  }
+
+  function batchList() {
+    if (!S.batch.length) return '';
+    const rows = S.batch.map((b, i) => {
+      const c = calc(b);
+      return `<div class="bi"><div><b>${esc(b.site)}</b><span>${esc(b.phase)} · ${fmt(c.disposed)} MT disposed · ${b.dispatches.length} destination${b.dispatches.length > 1 ? 's' : ''}</span></div>
+        <div class="acts"><button type="button" class="sm" data-act="b-edit" data-i="${i}">Edit</button><button type="button" class="sm x" data-act="b-remove" data-i="${i}">Remove</button></div></div>`;
+    }).join('');
+    return `<div class="rv"><div class="rh"><b>Other sites in this submission (${S.batch.length})</b></div><div class="rb">${rows}</div></div>`;
   }
 
   function doneView() {
-    const d = S.done;
-    const msg = d.pending > 0
-      ? `${fmt(d.pending)} MT is in Certificate pending. Open this form for ${d.site} when the plant issues the certificate.`
-      : 'All RDF disposed in this entry is certified.';
-    const rows = [['RDF_plan', `1 row · status ${d.pending > 0 ? 'Certificate pending' : 'Complete'}`], ['RDF_dispatch', `${d.dispatchCount} row(s)`],
-      ['Records folder', d.recordsPath], ['Certificates folder', d.certsPath]];
-    return `<div class="done"><div class="ok">✓</div><h2>Submitted</h2><span class="rid">${esc(d.id)}</span><p>${esc(msg)}</p></div>
-      <div class="dl">${rows.map(([k, v]) => `<div><span class="cap">${esc(k)}</span><code>${esc(v)}</code></div>`).join('')}</div>
-      <button type="button" class="btn" data-act="pdf">Download PDF</button>
-      <button type="button" class="btn sec" data-act="csv"><span>Download all my data (CSV)</span><small>${d.csvRows} rows · all ${esc(S.agency)} entries</small></button>
+    const list = S.done.results, many = list.length > 1;
+    const pend = list.filter(d => d.pending > 0);
+    const msg = pend.length
+      ? `${fmt(pend.reduce((a, d) => a + d.pending, 0))} MT is in Certificate pending (${pend.map(d => d.site).join(', ')}). Open this form for that site when the plant issues the certificate.`
+      : `All RDF disposed in ${many ? 'these entries' : 'this entry'} is certified.`;
+    const block = (d, i) => {
+      const rows = [['RDF_plan', `1 row · status ${d.pending > 0 ? 'Certificate pending' : 'Complete'}`], ['RDF_dispatch', `${d.dispatchCount} row(s)`],
+        ['Records folder', d.recordsPath], ['Certificates folder', d.certsPath]];
+      return `<div class="dl">${many ? `<div class="dsite"><b>${esc(d.site)}</b><span class="rid">${esc(d.id)}</span></div>` : ''}
+        ${rows.map(([k, v]) => `<div><span class="cap">${esc(k)}</span><code>${esc(v)}</code></div>`).join('')}</div>
+        <button type="button" class="btn" data-act="pdf" data-i="${i}">Download PDF${many ? ' — ' + esc(d.site) : ''}</button>`;
+    };
+    return `<div class="done"><div class="ok">✓</div><h2>${many ? list.length + ' sites submitted' : 'Submitted'}</h2>${many ? '' : `<span class="rid">${esc(list[0].id)}</span>`}<p>${esc(msg)}</p></div>
+      ${list.map(block).join('')}
+      <button type="button" class="btn sec" data-act="csv"><span>Download all my data (CSV)</span><small>${S.done.csvRows} rows · all ${esc(S.agency)} entries</small></button>
       <button type="button" class="btn ghost" data-act="new">New entry</button>`;
   }
 
   function nav() {
     if (S.screen !== 'form') return '';
-    const label = S.busy ? 'Submitting…' : S.step === 4 ? 'Submit' : S.fromReview ? 'Save & back to review' : 'Continue';
+    const n = S.batch.length + 1;
+    const label = S.busy ? (S.progress || 'Submitting…') : S.step === 4 ? (n > 1 ? `Submit ${n} sites` : 'Submit') : S.fromReview ? 'Save & back to review' : 'Continue';
     return `<div class="nav"><div id="r-err">${S.err ? `<div class="err">${esc(S.err)}</div>` : ''}</div>
       <div class="bar">${S.step > 0 ? `<button type="button" class="btn back" data-act="back" ${S.busy ? 'disabled' : ''}>Back</button>` : ''}<button type="button" class="btn grow" data-act="next" ${S.busy ? 'disabled' : ''}>${label}</button></div></div>`;
   }
@@ -361,10 +393,10 @@
   function signedIn(data) {
     S.agency = data.agency; S.sites = data.sites || []; S.phases = data.phases || []; S.dests = data.destinations || [];
     store.set('lastAgency', S.agency);
-    S.f = blank(); S.step = 0; S.fromReview = false; S.err = ''; S.done = null;
+    S.f = blank(); S.batch = []; S.results = []; S.step = 0; S.fromReview = false; S.err = ''; S.done = null;
     S.pending = []; S.pendingFor = ''; S.pendOpen = '';
     if (loadDraft()) {
-      const files = S.f.dispatches.some(d => d.hasCert === 'yes');
+      const files = [S.f, ...S.batch].some(f => f.dispatches.some(d => d.hasCert === 'yes'));
       S.err = 'Your unsent entry was restored.' + (files ? ' Attach the certificates again before submitting.' : '');
     }
     S.screen = 'form'; render(true);
@@ -452,52 +484,90 @@
     return { name, mimeType: type, data: await readB64(blob) };
   }
 
-  async function submit() {
-    for (let s = 0; s < 4; s++) { const e = validate(s); if (e) { S.step = s; S.fromReview = false; S.err = e; return render(true); } }
-    const f = S.f, m = siteMeta();
-    S.busy = true; S.err = ''; render();
-    try {
-      const dispatches = [];
-      for (const d of f.dispatches) {
-        dispatches.push({ dest: d.dest.trim(), qty: d.qty, date: d.date, hasCert: d.hasCert,
-          certQty: d.hasCert === 'yes' ? d.certQty : '', certFile: d.hasCert === 'yes' && d.file ? await toPayload(d.file) : null });
-      }
-      const attachments = [];
-      for (const a of f.attachments) attachments.push(await toPayload(a));
-      const record = { site: f.site.trim(), phase: f.phase.trim(), cluster: m.known ? '' : f.cluster.trim(), awarded: m.known ? '' : f.awarded,
-        startDate: f.startDate, endDate: f.endDate, land: f.land, rdfGen: f.rdfGen, uploader: f.uploader.trim(), phone: f.phone, dispatches, attachments };
-      const body = JSON.stringify({ record });
-      if (body.length > CFG.maxBodyBytes) throw new Error(`Files are too large together (${(body.length / 1048576).toFixed(1)} MB). Remove some or use smaller photos.`);
-      const res = await api(CFG.api.submit, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
-
-      // Remember names for the dropdowns next time.
-      store.set('uploader', f.uploader.trim()); store.set('phone', f.phone);
-      store.set('dests', [...new Set([...store.get('dests', []), ...dispatches.map(d => d.dest)])]);
-      store.set('phases', [...new Set([...store.get('phases', []), res.phase])]);
-      const k = x => lc(x.site) + '|' + lc(x.phase);
-      const ns = { site: res.site, phase: res.phase, cluster: m.cluster === '—' ? '' : m.cluster, awarded: m.awarded };
-      store.set('sites_' + S.agency, [...store.get('sites_' + S.agency, []).filter(x => k(x) !== k(ns)), ns]);
-      S.dests = [...new Set([...S.dests, ...dispatches.map(d => d.dest)])];
-      store.del('draft_' + S.agency);
-
-      S.done = { ...res, dispatchCount: dispatches.length };
-      S.busy = false; S.screen = 'done'; render(true);
-    } catch (e) {
-      S.busy = false;
-      if (e.auth) return signedOut(e.message);
-      S.err = e.message; render();
+  async function buildRecord(f) {
+    const m = siteMeta(f), dispatches = [], attachments = [];
+    for (const d of f.dispatches) {
+      dispatches.push({ dest: d.dest.trim(), qty: d.qty, date: d.date, hasCert: d.hasCert,
+        certQty: d.hasCert === 'yes' ? d.certQty : '', certFile: d.hasCert === 'yes' && d.file ? await toPayload(d.file) : null });
     }
+    for (const a of f.attachments) attachments.push(await toPayload(a));
+    return { site: f.site.trim(), phase: f.phase.trim(), cluster: m.known ? '' : f.cluster.trim(), awarded: m.known ? '' : f.awarded,
+      startDate: f.startDate, endDate: f.endDate, land: f.land, rdfGen: f.rdfGen, uploader: f.uploader.trim(), phone: f.phone, dispatches, attachments };
+  }
+
+  function remember(f, rec, res) {
+    const m = siteMeta(f);
+    store.set('uploader', rec.uploader); store.set('phone', rec.phone);
+    store.set('dests', [...new Set([...store.get('dests', []), ...rec.dispatches.map(d => d.dest)])]);
+    store.set('phases', [...new Set([...store.get('phases', []), res.phase])]);
+    const k = x => lc(x.site) + '|' + lc(x.phase);
+    const ns = { site: res.site, phase: res.phase, cluster: m.cluster === '—' ? '' : m.cluster, awarded: m.awarded };
+    store.set('sites_' + S.agency, [...store.get('sites_' + S.agency, []).filter(x => k(x) !== k(ns)), ns]);
+    S.dests = [...new Set([...S.dests, ...rec.dispatches.map(d => d.dest)])];
+  }
+
+  // Opens a site from the batch for editing; the site on screen goes back into the batch.
+  function openFromBatch(i, step, err) {
+    const item = S.batch[i];
+    S.batch.splice(i, 1, S.f);
+    S.f = item; S.pendingFor = ''; S.pending = [];
+    S.step = step; S.fromReview = step !== 4; S.err = err || '';
+    render(true); saveDraft();
+    if (step === 2) loadPending();
+  }
+
+  // Every site in the batch is its own submission (own Record ID, PDF and folder),
+  // sent one after another so a large batch never hits the upload size limit.
+  async function submit() {
+    const e = validateAll(S.f);
+    if (e) { S.step = e[0]; S.fromReview = false; S.err = e[1]; return render(true); }
+    for (let i = 0; i < S.batch.length; i++) {
+      const be = validateAll(S.batch[i]);
+      if (be) return openFromBatch(i, be[0], `${S.batch[i].site}: ${be[1]}`);
+    }
+    const queue = [...S.batch, S.f], total = queue.length + S.results.length;
+    S.busy = true; S.err = ''; render();
+    let csvRows = 0;
+    while (queue.length) {
+      const f = queue[0];
+      S.progress = total > 1 ? `Submitting ${S.results.length + 1} of ${total}…` : 'Submitting…'; render();
+      try {
+        const record = await buildRecord(f);
+        const body = JSON.stringify({ record });
+        if (body.length > CFG.maxBodyBytes) throw new Error(`Files are too large together (${(body.length / 1048576).toFixed(1)} MB). Remove some or use smaller photos.`);
+        const res = await api(CFG.api.submit, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        remember(f, record, res);
+        S.results.push({ ...res, dispatchCount: record.dispatches.length });
+        csvRows = res.csvRows;
+        queue.shift();
+        if (queue.length) { S.batch = queue.slice(0, -1); S.f = queue[queue.length - 1]; }
+        writeDraft();
+      } catch (err) {
+        S.busy = false; S.progress = '';
+        if (err.auth) return signedOut(err.message);
+        // Failed site goes on screen; the rest stay in the batch.
+        S.f = queue.shift(); S.batch = queue; S.step = 4; S.fromReview = false;
+        const done = S.results.length ? ` ${S.results.length} site${S.results.length > 1 ? 's were' : ' was'} already submitted.` : '';
+        S.err = `${S.f.site}: ${err.message}${done}`;
+        writeDraft(); return render(true);
+      }
+    }
+    store.del('draft_' + S.agency);
+    S.done = { results: S.results, csvRows };
+    S.results = []; S.batch = [];
+    S.busy = false; S.progress = ''; S.screen = 'done'; render(true);
   }
 
   function download(href, name) {
     const a = document.createElement('a'); a.href = href; if (name) a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
   }
-  function downloadPdf() {
-    const bin = atob(S.done.pdfData || ''), bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  function downloadPdf(i) {
+    const d = S.done.results[i] || S.done.results[0];
+    const bin = atob(d.pdfData || ''), bytes = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-    download(url, S.done.pdfName || S.done.id + '.pdf');
+    download(url, d.pdfName || d.id + '.pdf');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
@@ -620,13 +690,30 @@
       }
       case 'pend-cancel': S.pendOpen = ''; S.pendErr = ''; return paint('r-pending', pendingRegion());
       case 'pend-save': return savePending();
-      case 'pdf': return downloadPdf();
+      case 'pdf': return downloadPdf(i || 0);
+      case 'add-site': {
+        const e = validateAll(f);
+        if (e) { S.step = e[0]; S.fromReview = false; S.err = e[1]; return render(true); }
+        S.batch.push(f);
+        S.f = { ...blank(), uploader: f.uploader, phone: f.phone };
+        S.pendingFor = ''; S.pending = [];
+        return goStep(0);
+      }
+      case 'site-cancel': {
+        if (!S.batch.length) return;
+        S.f = S.batch.pop(); S.pendingFor = '';
+        return goStep(4);
+      }
+      case 'b-edit': return openFromBatch(i, 4);
+      case 'b-remove':
+        if (!confirm(`Remove ${S.batch[i].site} from this submission?`)) return;
+        S.batch.splice(i, 1); render(); return saveDraft();
       case 'csv': return download(CFG.api.csv);
-      case 'new': S.f = blank(); S.step = 0; S.done = null; S.err = ''; S.fromReview = false; S.pendingFor = ''; S.screen = 'form'; return render(true);
+      case 'new': S.f = blank(); S.batch = []; S.results = []; S.step = 0; S.done = null; S.err = ''; S.fromReview = false; S.pendingFor = ''; S.screen = 'form'; return render(true);
     }
   });
 
-  window.addEventListener('beforeunload', () => { if (S.screen === 'form') { clearTimeout(draftTimer); draftTimer = 0; const f = S.f; if (f) store.set('draft_' + S.agency, { f: { ...f, attachments: [], dispatches: f.dispatches.map(d => ({ ...d, file: null })) }, step: S.step }); } });
+  window.addEventListener('beforeunload', () => { clearTimeout(draftTimer); writeDraft(); });
 
   render();
   boot();
