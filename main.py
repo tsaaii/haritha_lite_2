@@ -9,6 +9,7 @@ Routes:
     GET  /reports + JSON APIs + PDF export -> reports blueprint
     GET/POST /sites/<slug> -> per-site dashboard gate (sites blueprint)
     GET  /record-images/... -> weighbridge image proxy + 2x2 viewer
+    GET  /rdf_planning/ + /rdf_planning/api/* -> agency RDF form (views/rdf.py)
 """
 from __future__ import annotations
 
@@ -33,6 +34,7 @@ from views.reports import bp as reports_bp
 from views.sites import bp as sites_bp
 from views.record_images import bp as record_images_bp
 from views.field import bp as field_bp 
+from views.rdf import bp as rdf_bp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -87,6 +89,7 @@ def create_app() -> Flask:
     # Must come after sites_bp: record_images imports SESSION_SITE_KEY from it.
     app.register_blueprint(record_images_bp)
     app.register_blueprint(field_bp) 
+    app.register_blueprint(rdf_bp)
 
     @app.route("/")
     def overview():

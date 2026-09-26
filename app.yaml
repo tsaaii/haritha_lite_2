@@ -35,6 +35,11 @@ env_variables:
   AP_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbz38G9cMS5FiJMV34x1Zb8vsUYIidcKYhHekW8lrAAYAS6VNKXyVkC6fEaupDXs/exec"
   AP_SCRIPT_TOKEN: "zwu2Jzj11avXuzTR1jw0zFbejg6ftLvh6qh3HkiOt9s"
 
+  # /rdf_planning — fill both after deploying apps_script/rdf_planning (docs/rdf-planning.md).
+  # Until RDF_SCRIPT_URL is set the form shows "backend is not configured".
+  RDF_SCRIPT_URL: ""
+  RDF_SCRIPT_TOKEN: ""
+
 automatic_scaling:
   min_instances: 1
   max_instances: 4
