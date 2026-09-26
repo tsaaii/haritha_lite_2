@@ -47,10 +47,15 @@ const CSV_HEAD = ['Record ID', 'Submitted at', 'Agency', 'Site', 'Cluster', 'Pha
   'Cert qty (MT)', 'Pending qty (MT)', 'Cert status', 'Uploaded by', 'Uploader phone'];
 
 const PENDING = 'Certificate pending';
+const BUILD = '2026-09-26b';   // shown by doGet — bump when you change this file
 
 // ---------- HTTP ----------
 function doGet() {
-  return json_({ ok: true, service: 'rdf_planning', note: 'POST only' });
+  // Open the /exec URL in a browser to see which code the live deployment runs.
+  const has = n => { try { return typeof eval(n) === 'function'; } catch (e) { return false; } };
+  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only',
+    functions: ['agencies_', 'checkPin_', 'submit_', 'allData_'].filter(n => !has(n)).length ? 'MISSING — paste the whole Code.gs again' : 'all present',
+    agencies: has('agencies_') ? agencies_().length : 0 });
 }
 
 function doPost(e) {
@@ -470,6 +475,7 @@ function setup() {
   disp.getRange('M:M').setNumberFormat('dd-MM-yyyy HH:mm');
   allData_();
   if (!ss.getSheetByName('Sites')) Logger.log('WARNING: no "Sites" tab. Import Phase_data.csv and rename the tab to Sites.');
+  Logger.log('Build ' + BUILD);
   Logger.log('Agencies that can log in: ' + (agencies_().join(', ') || 'none — run makePins() and paste AGENCY_PINS'));
 }
 
