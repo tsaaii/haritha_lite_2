@@ -85,6 +85,8 @@ Chrome › ⋮ › **Add to Home screen**.
 
 ## Behaviour notes
 
+- **Several sites at once.** On the Review screen, *+ Add another site* keeps the finished site and starts the next one (name and phone carried over). *Submit N sites* sends them one after another; each gets its own Record ID, PDF and folders. If one fails, the ones already sent stay sent and the rest wait on screen to retry.
+- **Tabs create themselves.** `RDF_plan`, `RDF_dispatch` and `All_RDF_data` are created with headers on first use if missing; running `setup()` is optional.
 - **Certificate pending is automatic.** "No" certificate, or a certificate quantity lower than
   RDF disposed, puts the difference in *Certificate pending*. Agencies never pick that status.
 - **Late certificates.** When an agency opens the same site again, entries still waiting for a

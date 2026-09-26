@@ -175,6 +175,18 @@ input[type=file].hide{position:absolute;width:1px;height:1px;opacity:0;pointer-e
 .dl div:last-child{border-bottom:0}
 .dl code{font-size:13px;font-family:'IBM Plex Mono',monospace;word-break:break-word}
 
+/* multi-site batch */
+.batch-note{display:flex;flex-direction:column;gap:6px}
+.link-btn{align-self:flex-start;border:0;background:none;padding:4px 0;color:var(--green-ink);font-size:13px;font-weight:600;text-decoration:underline}
+.bi{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line-3)}
+.bi:last-child{border-bottom:0}
+.bi > div:first-child{display:flex;flex-direction:column;min-width:0}
+.bi b{font-weight:600;font-size:14px}
+.bi span{font-size:12px;color:var(--muted)}
+.bi .acts{display:flex;gap:6px;flex:none}
+.dl .dsite{flex-direction:row;justify-content:space-between;align-items:center}
+.dl .dsite b{font-size:15px;font-weight:600}
+
 /* bottom nav */
 .nav{position:sticky;bottom:0;z-index:25;background:#fff;border-top:1px solid var(--line-2);padding:10px 14px 14px;padding-bottom:max(14px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
 .nav .bar{display:flex;gap:10px}
