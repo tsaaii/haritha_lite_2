@@ -196,10 +196,11 @@
 
   function doneView() {
     return `<div class="done"><div class="ok">✓</div><h2>${S.last.edited ? 'Changes saved' : 'Submitted'}</h2><span class="rid">${esc(S.last.id)}</span>
-        <p>Saved in the RDF Planning sheet. Your CSV in Drive has been updated too.</p></div>
-      <button type="button" class="btn" data-act="csv">Download all my data (CSV)</button>
+        <p>Saved in the RDF Planning sheet. ${S.last.csvLater ? 'The CSV in Drive updates within a few minutes.' : 'Your CSV in Drive has been updated too.'}</p></div>
+      <button type="button" class="btn" data-act="new">+ Add another site / phase</button>
+      <div class="note">Report your next site now — you stay logged in.</div>
+      <button type="button" class="btn ghost" data-act="csv">Download all my data (CSV)</button>
       <button type="button" class="btn ghost" data-act="pdf">Download PDF</button>
-      <button type="button" class="btn ghost" data-act="new">+ Add another site / phase</button>
       <button type="button" class="btn plain" data-act="home">Back to my sites</button>`;
   }
 
@@ -313,7 +314,7 @@
       if (!entry.id) { clearTimeout(draftTimer); store.del('draft_' + S.agency); }
       S.entries = r.entries || S.entries; S.factories = r.factories || S.factories;
       S.x = { ...entry, id: r.id };
-      S.last = { id: r.id, edited: !!r.edited };
+      S.last = { id: r.id, edited: !!r.edited, csvLater: !!r.csvLater };
       S.busy = false; S.view = 'done'; render(true);
     } catch (e) {
       S.busy = false;

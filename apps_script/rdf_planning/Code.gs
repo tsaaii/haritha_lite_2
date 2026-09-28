@@ -7,9 +7,10 @@
 //
 // Sheet tab:
 //   RDF_plan_v2   one row per site + phase entry (32 columns). Editing an entry
-//                 rewrites its row. Created automatically on first submit.
+//                 rewrites its row. Created automatically the first time it's needed.
 //                 (The v1 tabs RDF_plan / RDF_dispatch / All_RDF_data are left as they are.)
-// Drive (under ROOT_FOLDER_ID), rewritten on every submit:
+// Drive (under ROOT_FOLDER_ID), rewritten in the background a few minutes after a submit
+// (run setup() once to install that timer; without it they're rewritten during the submit):
 //   RDF Planning/<Agency>/<Agency>_RDF_plan.csv   ← the file the agency downloads
 //   RDF Planning/All_agencies_RDF_plan.csv
 
@@ -17,7 +18,6 @@ const CONFIG = {
   TOKEN: 'CHANGE-ME-long-random-string',   // must equal RDF_SCRIPT_TOKEN in app.yaml
   ROOT_FOLDER_ID: '',                      // Drive folder "Haritha RDF" — the part after /folders/ in its URL
   TZ: 'Asia/Kolkata',
-  SHEET: 'RDF_plan_v2',
   MAX_PIN_TRIES: 5,                        // wrong PINs before that agency name is locked out …
   LOCK_MINUTES: 15,                        // … for this long
 };
@@ -28,8 +28,15 @@ const AGENCY_PINS = {
   // 'Tharuni Associates': '1234',
 };
 
-const BUILD = '2026-09-28-v2b';   // shown by doGet — bump when you change this file
+// ---------- nothing below this line needs editing ----------
+const BUILD = '2026-09-28-v2d';   // shown by doGet — bump when you change this file
 const API_VERSION = 2;            // the website refuses to log in if this doesn't match
+const SHEET = 'RDF_plan_v2';      // the one tab this script writes to
+// Defaults, so an older CONFIG block (kept from a previous version) still works.
+const TZ = CONFIG.TZ || 'Asia/Kolkata';
+const MAX_PIN_TRIES = CONFIG.MAX_PIN_TRIES || 5;
+const LOCK_MINUTES = CONFIG.LOCK_MINUTES || 15;
+const CSV_EVERY_MIN = 5;          // background refresh of the Drive CSVs (1, 5, 10, 15 or 30)
 
 const MATERIALS = ['RDF', 'Soil', 'Inert', 'CnD'];
 const LABEL = { RDF: 'RDF', Soil: 'Soil', Inert: 'Inert', CnD: 'C&D' };
@@ -50,7 +57,7 @@ const DATE_COLS = [5, 6, 9, 10, 21, 22, 23, 24];   // 0-based: start, end, remDa
 // ---------- HTTP ----------
 function doGet() {
   // Open the /exec URL in a browser to see which code the live deployment runs.
-  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only', agencies: agencyNames_().length });
+  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only', agencies: agencyNames_().length, sheet: SHEET });
 }
 
 function doPost(e) {
@@ -64,7 +71,7 @@ function doPost(e) {
       case 'login':  { const a = checkPin_(body.agency, body.pin); out = bootstrap_(a); break; }
       case 'list':   out = bootstrap_(known_(body.agency)); break;
       case 'submit': { const a = known_(body.agency); out = save_(a, body.entry || {}); break; }
-      case 'csv':    out = { csv: writeCsv_(known_(body.agency)) }; break;
+      case 'csv':    out = { csv: toCsv_(sheetValues_().filter(r => r[2] === known_(body.agency))) }; break;
       default: throw new Error('Unknown action.');
     }
     out.ok = true;
@@ -97,16 +104,16 @@ function checkPin_(name, pin) {
   const cache = CacheService.getScriptCache();
   const key = 'pinfail_' + Utilities.base64EncodeWebSafe(norm_(name)).slice(0, 200);
   const fails = Number(cache.get(key) || 0);
-  if (fails >= CONFIG.MAX_PIN_TRIES) {
-    throw new Error('Too many wrong attempts. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
+  if (fails >= MAX_PIN_TRIES) {
+    throw new Error('Too many wrong attempts. Try again in ' + LOCK_MINUTES + ' minutes.');
   }
   const a = find_(name);
   if (!a || String(pin) !== String(AGENCY_PINS[a])) {
-    const left = CONFIG.MAX_PIN_TRIES - fails - 1;
-    cache.put(key, String(fails + 1), CONFIG.LOCK_MINUTES * 60);
+    const left = MAX_PIN_TRIES - fails - 1;
+    cache.put(key, String(fails + 1), LOCK_MINUTES * 60);
     throw new Error(left > 0
       ? 'Agency name or PIN is wrong. ' + left + ' attempt' + (left === 1 ? '' : 's') + ' left.'
-      : 'Too many wrong attempts. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
+      : 'Too many wrong attempts. Try again in ' + LOCK_MINUTES + ' minutes.');
   }
   cache.remove(key);
   return a;
@@ -122,7 +129,7 @@ function bootstrap_(agency) {
 
 // ---------- validation (same rules as the form) ----------
 function clean_(x) {
-  const today = Utilities.formatDate(new Date(), CONFIG.TZ, 'yyyy-MM-dd');
+  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
   const e = [];
   const str = k => String(x[k] == null ? '' : x[k]).trim();
   const out = {};
@@ -192,7 +199,7 @@ function save_(agency, entry) {
   const x = clean_(entry);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
-  let id, csv;
+  let id;
   try {
     const sh = sheet_();
     let row;
@@ -207,17 +214,20 @@ function save_(agency, entry) {
     }
     sh.getRange(row, 1, 1, HEADERS.length).setValues([toRow_(id, agency, x)]);
     SpreadsheetApp.flush();
-    csv = writeCsv_(agency);
   } finally {
     lock.releaseLock();
   }
+  // Drive is the slow part of a submit. With the timer from setup() installed,
+  // just mark this agency's CSV as out of date; refreshCsvs() rewrites it shortly.
+  const later = markCsvDirty_(agency);
+  if (!later) writeCsvs_([agency]);
   const b = bootstrap_(agency);
-  return { id: id, edited: !!x.id, csvRows: Math.max(csv.split('\r\n').length - 1, 0), entries: b.entries, factories: b.factories };
+  return { id: id, edited: !!x.id, csvLater: later, csvRows: b.entries.length, entries: b.entries, factories: b.factories };
 }
 
 function newId_() {   // caller holds the script lock
   const props = PropertiesService.getScriptProperties();
-  let id = 'RDF-' + Utilities.formatDate(new Date(), CONFIG.TZ, 'yyMMdd-HHmmss');
+  let id = 'RDF-' + Utilities.formatDate(new Date(), TZ, 'yyMMdd-HHmmss');
   const last = props.getProperty('lastId') || '';
   if (last === id || last.indexOf(id + '-') === 0) id += '-' + (Number(last.split('-')[3] || 1) + 1);
   props.setProperty('lastId', id);
@@ -248,11 +258,11 @@ function parseFactories_(s) {
 }
 
 function toEntry_(r) {
-  const iso = v => (v instanceof Date ? Utilities.formatDate(v, CONFIG.TZ, 'yyyy-MM-dd') : String(v == null ? '' : v));
+  const iso = v => (v instanceof Date ? Utilities.formatDate(v, TZ, 'yyyy-MM-dd') : String(v == null ? '' : v));
   const s = v => String(v == null ? '' : v);
   const x = {
     id: s(r['Record ID']),
-    submitted: r['Submitted at'] instanceof Date ? Utilities.formatDate(r['Submitted at'], CONFIG.TZ, 'yyyy-MM-dd HH:mm') : s(r['Submitted at']),
+    submitted: r['Submitted at'] instanceof Date ? Utilities.formatDate(r['Submitted at'], TZ, 'yyyy-MM-dd HH:mm') : s(r['Submitted at']),
     site: s(r['Site']), phase: s(r['Phase']), start: iso(r['Start date']), end: iso(r['End date']),
     awarded: s(r['Total qty awarded by ULB (MT)']), processed: s(r['Total qty processed by ULB (MT)']),
     remDate: iso(r['Site 100% remediation date']), rdfLast: iso(r['Last date of RDF disposal']),
@@ -271,28 +281,71 @@ function toEntry_(r) {
 }
 
 // ---------- CSV in Drive: one per agency + one for all agencies ----------
-function writeCsv_(agency) {
+function sheetValues_() {
   const sh = sheet_();
-  const vals = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, HEADERS.length).getValues();
+  return sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, HEADERS.length).getValues();
+}
+
+function toCsv_(rows) {
   const cell = (v, i) => {
-    if (v instanceof Date) v = Utilities.formatDate(v, CONFIG.TZ, i === 1 ? 'dd-MM-yyyy HH:mm' : 'dd-MM-yyyy');
+    if (v instanceof Date) v = Utilities.formatDate(v, TZ, i === 1 ? 'dd-MM-yyyy HH:mm' : 'dd-MM-yyyy');
     v = String(v == null ? '' : v);
     if (/^[=+\-@]/.test(v) && isNaN(Number(v))) v = "'" + v;   // no formulas when opened in Excel
     return '"' + v.replace(/"/g, '""') + '"';
   };
-  const toCsv = rows => [HEADERS].concat(rows).map(r => r.map(cell).join(',')).join('\r\n');
-  const mine = toCsv(vals.filter(r => r[2] === agency));
+  return [HEADERS].concat(rows).map(r => r.map(cell).join(',')).join('\r\n');
+}
+
+// Rewrites <Agency>_RDF_plan.csv for the given agencies, and All_agencies_RDF_plan.csv.
+function writeCsvs_(agencies) {
+  const vals = sheetValues_();
   const root = folder_(DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID), 'RDF Planning');
-  put_(folder_(root, folderName_(agency)), agency + '_RDF_plan.csv', mine);
-  put_(root, 'All_agencies_RDF_plan.csv', toCsv(vals));
-  return mine;
+  agencies.forEach(a => put_(folder_(root, folderName_(a)), a + '_RDF_plan.csv', toCsv_(vals.filter(r => r[2] === a))));
+  put_(root, 'All_agencies_RDF_plan.csv', toCsv_(vals));
+}
+
+// Returns true when the background timer will write the CSVs (so the submit doesn't).
+function markCsvDirty_(agency) {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('csvTimer') !== '1') return false;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const dirty = JSON.parse(props.getProperty('csvDirty') || '[]');
+    if (dirty.indexOf(agency) < 0) dirty.push(agency);
+    props.setProperty('csvDirty', JSON.stringify(dirty));
+  } finally {
+    lock.releaseLock();
+  }
+  return true;
+}
+
+// Run by the timer that setup() installs. Cheap when nothing changed.
+function refreshCsvs() {
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  let dirty;
+  try {
+    dirty = JSON.parse(props.getProperty('csvDirty') || '[]');
+    props.deleteProperty('csvDirty');
+  } finally {
+    lock.releaseLock();
+  }
+  if (!dirty.length) return;
+  try {
+    writeCsvs_(dirty);
+  } catch (err) {
+    dirty.forEach(a => markCsvDirty_(a));   // try again next time
+    throw err;
+  }
 }
 
 // ---------- helpers ----------
 function sheet_() {
   const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName(CONFIG.SHEET);
-  if (!sh) sh = ss.insertSheet(CONFIG.SHEET);
+  let sh = ss.getSheetByName(SHEET);
+  if (!sh) sh = ss.insertSheet(SHEET);
   const head = sh.getLastRow() === 0 ? [] : sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
   if (head.length && head.length < HEADERS.length && head.every((h, i) => h === HEADERS[i])) {
     // Tab made by an earlier build: add the new column names at the end.
@@ -334,6 +387,13 @@ function setup() {
   if (!CONFIG.ROOT_FOLDER_ID) throw new Error('Set ROOT_FOLDER_ID in CONFIG first.');
   DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID);   // fails loudly if the ID is wrong
   sheet_();                                          // creates RDF_plan_v2 with its header row
+  // Timer that keeps the Drive CSVs up to date, so submits don't wait for Drive.
+  if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'refreshCsvs')) {
+    ScriptApp.newTrigger('refreshCsvs').timeBased().everyMinutes(CSV_EVERY_MIN).create();
+  }
+  PropertiesService.getScriptProperties().setProperty('csvTimer', '1');
+  writeCsvs_([...new Set(sheetValues_().map(r => String(r[2])).filter(String))]);
   Logger.log('Build ' + BUILD);
+  Logger.log('Drive CSVs are refreshed every ' + CSV_EVERY_MIN + ' minutes after a submit.');
   Logger.log('Agencies that can log in: ' + (agencyNames_().join(', ') || 'none — fill AGENCY_PINS'));
 }
