@@ -80,6 +80,21 @@ textarea.in{height:auto;min-height:84px;padding:10px 12px;resize:vertical;line-h
 .add{grid-column:1 / -1;height:46px;border:1.5px dashed var(--green-line);border-radius:12px;background:transparent;color:var(--green-ink);font-size:15px;font-weight:600}
 .fac-note{grid-column:1 / -1}
 
+/* tick box + yes/no */
+.chk{display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.chk input{position:absolute;opacity:0;width:1px;height:1px}
+.chk .box{width:24px;height:24px;flex:none;border:2px solid #b9bcb5;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center}
+.chk input:checked + .box{background:var(--green);border-color:var(--green)}
+.chk input:checked + .box::after{content:'';width:6px;height:12px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:translateY(-1px) rotate(45deg)}
+.chk input:focus-visible + .box{box-shadow:0 0 0 3px rgba(0,104,54,.25)}
+.chk .lbl{font-size:14.5px;line-height:1.35;padding-top:1px}
+.chk:has(input:checked){border-color:var(--green-line);background:#ebf9ef}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#f0f0ec;padding:4px;border-radius:12px}
+.seg button{height:42px;border:0;border-radius:9px;font-size:15px;font-weight:600;background:transparent;color:var(--muted)}
+.seg .yes.on{background:#fff;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg .no.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.is-err .seg{box-shadow:0 0 0 1px var(--err-line);background:var(--err-bg)}
+
 /* buttons */
 .btn{height:52px;border:0;border-radius:12px;background:var(--green);color:#fff;font-size:16px;font-weight:600}
 .btn:disabled{background:var(--green-busy)}

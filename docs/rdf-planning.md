@@ -18,7 +18,9 @@ session, so an agency can only see and edit its own entries.
 ## What gets written
 
 - **Tab `RDF_plan_v2`** in the "Haritha RDF Planning" sheet — one row per site + phase entry,
-  30 columns. Created automatically on the first submit. **Editing** an entry from "My sites"
+  32 columns (the last two: *Site 100% reclaimed, no disposals pending* and *Fresh waste dumped on
+  reclaimed site*, Yes/No). A tab made by the earlier 30-column build gets the two headers added
+  automatically; its old rows show them blank. Created automatically on the first submit. **Editing** an entry from "My sites"
   rewrites that same row (Submitted at is updated).
 - **Drive** (under the "Haritha RDF" folder), rewritten on every submit:
   ```
@@ -36,7 +38,9 @@ session, so an agency can only see and edit its own entries.
    `ROOT_FOLDER_ID`, and the `AGENCY_PINS` block (keep the quotes).
 3. Optional: run **setup** once — it checks the folder and creates `RDF_plan_v2`.
 4. **Deploy › Manage deployments › ✎ › Version: New version › Deploy.** The `/exec` URL stays the same.
-5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-28-v2"`.
+5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-28-v2b"`.
+   If the website says *"The RDF server (Apps Script) is an older version than this form"*, the
+   new Code.gs was pasted but not deployed as a **New version** (or not pasted at all).
 6. Deploy the website: `git pull origin main` then `gcloud app deploy app.yaml --quiet`.
 
 ## Behaviour notes
@@ -49,6 +53,9 @@ session, so an agency can only see and edit its own entries.
   no factory twice. **Warnings** (don't block): processed > awarded, a timeline after the 100%
   remediation date, RDF balance that can't be cleared by the timeline at the daily rate,
   factory total below cumulative RDF.
+- **Site status:** *Site is 100% reclaimed, with no disposals pending* (tick box) — when ticked, every
+  balance at site must be 0 and a future 100% date gets a warning. *Is fresh waste being dumped on the
+  site you reclaimed?* — Yes/No, required.
 - **Drafts:** an unfinished new entry is kept on the phone; "My sites" offers *Continue it* / *Discard*.
 - **Suggestions:** site and phase names from the agency's own entries; factory names from all
   agencies' entries.

@@ -34,6 +34,9 @@
       { t: 'Work period', d: 'End date can be planned (future) or actual.', dot: 'site', f: [F('start', 'Start date', 'date', 'Day work began', 1), F('end', 'End date', 'date', 'Past or future', 1)] },
       { t: 'ULB quantities', d: 'Legacy waste, in metric tonnes.', dot: 'site', f: [F('awarded', 'Total qty awarded by ULB', 'num', 'As per work order', 1), F('processed', 'Total qty processed', 'num', 'Processed so far', 1)] },
       { t: 'Completion', d: '', dot: 'site', f: [F('remDate', 'When will the site be 100% remediated?', 'date', 'Expected date. Past or future.')] },
+      { t: 'Site status', d: '', dot: 'site', f: [
+        F('reclaimed', 'Site is 100% reclaimed, with no disposals pending', 'check', 'Tick only if nothing is left to dispose. Every balance at site must then be 0.'),
+        F('freshDump', 'Is fresh waste being dumped on the site you reclaimed?', 'yesno', 'New waste arriving after remediation.')] },
     ] },
     { name: 'RDF', cards: [
       { t: 'RDF disposal', d: 'Refuse-derived fuel sent to cement or waste-to-energy (WtE) plants.', dot: 'RDF', f: [F('rdfLast', 'Last date of RDF disposal', 'dateMax', 'Today or earlier', 1), F('rdfDaily', 'RDF disposed every day', 'num', 'Average per day. 0 if stopped.', 1), F('RDF_cum', 'Cumulative RDF disposed', 'num', 'Total sent so far', 1), F('RDF_bal', 'Balance RDF at site', 'num', 'Still waiting at site', 1)] },
@@ -51,7 +54,7 @@
   const FAC_HINT = 'Cement or WtE plant, with the quantity sent there. Factories you used before are suggested.';
 
   function blank() {
-    const x = { id: '', site: '', phase: '', start: '', end: '', awarded: '', processed: '', remDate: '', rdfLast: '', rdfDaily: '', factories: [{ name: '', qty: '' }], remarks: '' };
+    const x = { id: '', site: '', phase: '', start: '', end: '', awarded: '', processed: '', remDate: '', reclaimed: '', freshDump: '', rdfLast: '', rdfDaily: '', factories: [{ name: '', qty: '' }], remarks: '' };
     MK.forEach(m => Object.assign(x, { [m + '_cum']: '', [m + '_bal']: '', [m + '_tl']: '', [m + '_iss']: '' }));
     return x;
   }
@@ -71,6 +74,11 @@
     ['site', 'phase'].forEach(k => empty(k) && err(k, 'Required.'));
     ['start', 'end', 'remDate', 'rdfLast', ...MK.map(m => m + '_tl')].forEach(k => empty(k) && err(k, 'Pick a date.'));
     ['awarded', 'processed', 'rdfDaily', ...MK.flatMap(m => [m + '_cum', m + '_bal'])].forEach(k => empty(k) && err(k, 'Required. Enter 0 if none.'));
+    if (x.freshDump !== 'yes' && x.freshDump !== 'no') err('freshDump', 'Choose Yes or No.');
+    if (x.reclaimed === 'yes') {
+      MK.forEach(m => { if (num(x[m + '_bal']) > 0) err(m + '_bal', 'Site is marked 100% reclaimed with no disposals pending, so this must be 0.'); });
+      if (x.remDate > t) warn('remDate', 'Site is marked 100% reclaimed, but this date is in the future.');
+    }
     if (x.start && x.end && x.end < x.start) err('end', `Before the start date (${fd(x.start)}).`);
     if (x.rdfLast && x.rdfLast > t) err('rdfLast', 'Can’t be in the future.');
     if (x.start && x.rdfLast && x.rdfLast < x.start) err('rdfLast', 'Before work started.');
@@ -130,7 +138,7 @@
 
   function homeView() {
     const d = getDraft();
-    const list = S.entries.map((e, i) => `<div class="entry"><div><b>${esc(e.site)} · ${esc(e.phase)}</b><span>Updated ${fd(String(e.submitted).split(' ')[0])} · RDF at site ${fmt(e.RDF_bal)} MT</span></div><button type="button" class="sm g" data-act="edit-entry" data-i="${i}">Edit</button></div>`).join('');
+    const list = S.entries.map((e, i) => `<div class="entry"><div><b>${esc(e.site)} · ${esc(e.phase)}</b><span>Updated ${fd(String(e.submitted).split(' ')[0])} · ${e.reclaimed === 'yes' ? '100% reclaimed' : `RDF at site ${fmt(e.RDF_bal)} MT`}</span></div><button type="button" class="sm g" data-act="edit-entry" data-i="${i}">Edit</button></div>`).join('');
     return `<div class="row"><h2 class="title">My sites</h2><button type="button" class="sm" data-act="logout">Log out</button></div>
       ${S.err ? `<div class="err-box">${esc(S.err)}</div>` : ''}
       ${d ? `<div class="warnbox"><span>There’s an unsaved entry on this phone (${esc(d.site || 'no site yet')}).</span><div class="acts"><button type="button" class="sm p" data-act="draft-restore">Continue it</button><button type="button" class="sm" data-act="draft-discard">Discard</button></div></div>` : ''}
@@ -142,7 +150,12 @@
   function fieldHtml(f, E) {
     const e = show(E, f.k), v = S.x[f.k] == null ? '' : S.x[f.k];
     let input;
-    if (f.t === 'num') input = `<div class="unit"><input inputmode="decimal" placeholder="0" value="${esc(v)}" data-k="${f.k}" data-num><span>MT</span></div>`;
+    if (f.t === 'check') {
+      return `<div class="fld full ${lookCls(e)}" data-w="${f.k}"><label class="chk"><input type="checkbox" data-k="${f.k}" ${v === 'yes' ? 'checked' : ''}><span class="box" aria-hidden="true"></span><span class="lbl">${esc(f.l)}</span></label>
+        <span class="${hintCls(e)}" data-h="${f.k}">${esc(e ? e[0] : f.h)}</span></div>`;
+    }
+    if (f.t === 'yesno') input = `<div class="seg" role="group">${['yes', 'no'].map(o => `<button type="button" class="${o} ${v === o ? 'on' : ''}" data-act="yn" data-k="${f.k}" data-v="${o}" aria-pressed="${v === o}">${o === 'yes' ? 'Yes' : 'No'}</button>`).join('')}</div>`;
+    else if (f.t === 'num') input = `<div class="unit"><input inputmode="decimal" placeholder="0" value="${esc(v)}" data-k="${f.k}" data-num><span>MT</span></div>`;
     else if (f.t.startsWith('date')) input = `<input class="in" type="date" ${f.t === 'dateMax' ? `max="${today()}"` : ''} value="${esc(v)}" data-k="${f.k}">`;
     else if (f.t === 'area') input = `<textarea class="in" rows="3" placeholder="${esc(f.ph || '')}" data-k="${f.k}">${esc(v)}</textarea>`;
     else input = `<input class="in" list="dl_${f.k}" autocomplete="off" autocapitalize="words" placeholder="${esc(f.ph || '')}" value="${esc(v)}" data-k="${f.k}">`;
@@ -167,7 +180,9 @@
   function summaryRows(x) {
     return STEPS.map((s, i) => ({ name: s.name, i, rows: s.cards.flatMap(c => c.factories
       ? x.factories.filter(f => f.name.trim()).map(f => ({ k: f.name, v: fmt(f.qty) + ' MT' }))
-      : c.f.map(f => ({ k: f.l, v: f.t === 'num' ? fmt(x[f.k]) + ' MT' : f.t.startsWith('date') ? fd(x[f.k]) : (String(x[f.k] || '').trim() || '—') }))) }));
+      : c.f.map(f => ({ k: f.l, v: f.t === 'num' ? fmt(x[f.k]) + ' MT' : f.t.startsWith('date') ? fd(x[f.k])
+        : f.t === 'check' ? (x[f.k] === 'yes' ? 'Yes' : 'No') : f.t === 'yesno' ? ({ yes: 'Yes', no: 'No' }[x[f.k]] || '—')
+        : (String(x[f.k] || '').trim() || '—') }))) }));
   }
 
   function formView() {
@@ -325,7 +340,8 @@
     if (t.dataset.login === 'agency') { S.agIn = t.value.slice(0, 80); return; }
     if (t.dataset.login === 'pin') { t.value = t.value.replace(/\D/g, '').slice(0, 4); S.pinIn = t.value; return; }
     if (t.dataset.num !== undefined) { const v = cleanNum(t.value); if (v !== t.value) t.value = v; }
-    if (t.dataset.k) S.x[t.dataset.k] = t.value;
+    if (t.type === 'checkbox') S.x[t.dataset.k] = t.checked ? 'yes' : '';
+    else if (t.dataset.k) S.x[t.dataset.k] = t.value;
     else if (t.dataset.fac) S.x.factories[Number(t.dataset.i)][t.dataset.fac] = t.value;
     else return;
     setErr(''); refreshLooks(); saveDraft();
@@ -353,6 +369,7 @@
         return;
       }
       case 'fac-remove': if (S.x.factories.length > 1) { S.x.factories.splice(i, 1); render(); saveDraft(); } return;
+      case 'yn': S.x[b.dataset.k] = b.dataset.v; setErr(''); render(); return saveDraft();
       case 'csv': return download(CFG.api.csv);
       case 'pdf': return printPdf();
     }

@@ -6,7 +6,7 @@
 // other action can be trusted — only Flask knows TOKEN.
 //
 // Sheet tab:
-//   RDF_plan_v2   one row per site + phase entry (30 columns). Editing an entry
+//   RDF_plan_v2   one row per site + phase entry (32 columns). Editing an entry
 //                 rewrites its row. Created automatically on first submit.
 //                 (The v1 tabs RDF_plan / RDF_dispatch / All_RDF_data are left as they are.)
 // Drive (under ROOT_FOLDER_ID), rewritten on every submit:
@@ -28,7 +28,8 @@ const AGENCY_PINS = {
   // 'Tharuni Associates': '1234',
 };
 
-const BUILD = '2026-09-28-v2';   // shown by doGet — bump when you change this file
+const BUILD = '2026-09-28-v2b';   // shown by doGet — bump when you change this file
+const API_VERSION = 2;            // the website refuses to log in if this doesn't match
 
 const MATERIALS = ['RDF', 'Soil', 'Inert', 'CnD'];
 const LABEL = { RDF: 'RDF', Soil: 'Soil', Inert: 'Inert', CnD: 'C&D' };
@@ -41,6 +42,8 @@ const HEADERS = [
   'Balance RDF at site (MT)', 'Balance Soil at site (MT)', 'Balance Inert at site (MT)', 'Balance C&D at site (MT)',
   'Timeline RDF disposal', 'Timeline Soil disposal', 'Timeline Inert disposal', 'Timeline C&D disposal',
   'Issues RDF', 'Issues Soil', 'Issues Inert', 'Issues C&D', 'Other remarks',
+  // Added later — kept at the end so rows already in the tab stay aligned.
+  'Site 100% reclaimed, no disposals pending', 'Fresh waste dumped on reclaimed site',
 ];
 const DATE_COLS = [5, 6, 9, 10, 21, 22, 23, 24];   // 0-based: start, end, remDate, rdfLast, 4 timelines
 
@@ -114,7 +117,7 @@ function bootstrap_(agency) {
   const all = rows_();
   const fac = {};
   all.forEach(r => parseFactories_(r['RDF disposed factory name(s)']).forEach(f => { fac[f.name] = 1; }));
-  return { agency: agency, entries: all.filter(r => r['Agency'] === agency).map(toEntry_), factories: Object.keys(fac).sort() };
+  return { api: API_VERSION, agency: agency, entries: all.filter(r => r['Agency'] === agency).map(toEntry_), factories: Object.keys(fac).sort() };
 }
 
 // ---------- validation (same rules as the form) ----------
@@ -160,6 +163,14 @@ function clean_(x) {
     text(m + '_iss');
   });
   text('remarks');
+  out.reclaimed = str('reclaimed') === 'yes' ? 'Yes' : 'No';
+  const fresh = str('freshDump');
+  if (fresh !== 'yes' && fresh !== 'no') e.push('Answer Yes or No: is fresh waste being dumped on the reclaimed site?');
+  out.freshDump = fresh === 'yes' ? 'Yes' : 'No';
+  if (out.reclaimed === 'Yes') {
+    const left = MATERIALS.filter(m => out[m + '_bal'] > 0).map(m => LABEL[m]);
+    if (left.length) e.push('Site is marked 100% reclaimed with no disposals pending, but balance at site is not 0 for: ' + left.join(', ') + '.');
+  }
 
   out.factories = (Array.isArray(x.factories) ? x.factories : []).slice(0, 30)
     // ; ( ) would break the "Name (qty MT); Name (qty MT)" cell format, so they become spaces.
@@ -224,6 +235,7 @@ function toRow_(id, agency, x) {
     ...MATERIALS.map(m => d(x[m + '_tl'])),
     ...MATERIALS.map(m => txt_(x[m + '_iss'])),
     txt_(x.remarks),
+    x.reclaimed, x.freshDump,
   ];
 }
 
@@ -246,6 +258,8 @@ function toEntry_(r) {
     remDate: iso(r['Site 100% remediation date']), rdfLast: iso(r['Last date of RDF disposal']),
     rdfDaily: s(r['RDF disposed per day (MT)']), remarks: s(r['Other remarks']),
     factories: parseFactories_(r['RDF disposed factory name(s)']),
+    reclaimed: r['Site 100% reclaimed, no disposals pending'] === 'Yes' ? 'yes' : '',
+    freshDump: ({ Yes: 'yes', No: 'no' })[r['Fresh waste dumped on reclaimed site']] || '',
   };
   MATERIALS.forEach(m => {
     x[m + '_cum'] = s(r['Cumulative ' + LABEL[m] + ' disposed (MT)']);
@@ -279,6 +293,11 @@ function sheet_() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(CONFIG.SHEET);
   if (!sh) sh = ss.insertSheet(CONFIG.SHEET);
+  const head = sh.getLastRow() === 0 ? [] : sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  if (head.length && head.length < HEADERS.length && head.every((h, i) => h === HEADERS[i])) {
+    // Tab made by an earlier build: add the new column names at the end.
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold').setBackground('#e6f4ea').setWrap(true);
+  }
   if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold').setBackground('#e6f4ea').setWrap(true);
     sh.setFrozenRows(1);
