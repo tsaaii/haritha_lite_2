@@ -1,718 +1,362 @@
-/* RDF_planning — agency form. Reads config from #rdf-config. No build step.
+/* RDF_planning v2 — agency form. Reads config from #rdf-config. No build step.
  *
- * Rendering: render() rebuilds the screen on navigation and on clicks.
- * While typing, only the dependent regions (paint(...)) are redrawn so the
- * focused input is never replaced.
+ * Views: login → home ("My sites") → form (4 steps) → done.
+ * render() rebuilds the screen on navigation and clicks. While typing, only
+ * each field's border + hint are refreshed (refreshLooks), so the focused
+ * input is never replaced.
  */
 (function () {
   'use strict';
   const CFG = JSON.parse(document.getElementById('rdf-config').textContent);
   const app = document.getElementById('app');
-  const byId = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const p2 = v => String(v).padStart(2, '0');
+  const iso = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  const today = () => iso(new Date());
+  const addDays = k => { const d = new Date(); d.setDate(d.getDate() + k); return iso(d); };
   const num = v => parseFloat(String(v == null ? '' : v).replace(/,/g, '')) || 0;
-  const fmt = (n, d = 2) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: d });
-  const fd = s => { if (!s) return ''; const [y, m, d] = String(s).split('-'); return `${d}-${m}-${y}`; };
-  const lc = s => String(s || '').trim().toLowerCase();
-  // Pasted numbers often carry +91 / 0 / spaces — keep the 10-digit mobile.
-  const mobile = v => { v = String(v).replace(/\D/g, ''); if (v.length > 10 && /^(91|0)/.test(v)) v = v.replace(/^(91|0)/, ''); return v.slice(0, 10); };
-  const uid = () => Math.random().toString(36).slice(2, 10);
-  const decimal = v => { v = String(v).replace(/[^\d.]/g, ''); const i = v.indexOf('.'); return i < 0 ? v : v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, ''); };
+  const fmt = v => num(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const fd = s => (s ? String(s).split('-').reverse().join('-') : '—');
+  const cleanNum = v => { let s = String(v).replace(/[^\d.]/g, ''); const i = s.indexOf('.'); if (i >= 0) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, '').slice(0, 2); return s.slice(0, 12); };
   const store = {
-    get(k, d) { try { const v = JSON.parse(localStorage.getItem('rdf_' + k)); return v == null ? d : v; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('rdf_' + k, JSON.stringify(v)); } catch (e) { /* quota / private mode */ } },
-    del(k) { try { localStorage.removeItem('rdf_' + k); } catch (e) { /* ignore */ } },
+    get(k, d) { try { const v = JSON.parse(localStorage.getItem('rdf2_' + k)); return v == null ? d : v; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('rdf2_' + k, JSON.stringify(v)); } catch (e) { /* quota / private mode */ } },
+    del(k) { try { localStorage.removeItem('rdf2_' + k); } catch (e) { /* ignore */ } },
   };
-  const MAX_FILE = 10 * 1024 * 1024;
-  const LABELS = ['Site', 'Work', 'RDF', 'Files', 'Review'];
+
+  // ---------------------------------------------------------------- form definition
+  const M = { RDF: 'RDF', Soil: 'Soil', Inert: 'Inert', CnD: 'C&D' };
+  const MK = Object.keys(M);
+  const F = (k, l, t, h, half, ph) => ({ k, l, t, h, half, ph });
+  const STEPS = [
+    { name: 'Site', cards: [
+      { t: 'Site & phase', d: 'Type the site and phase this report is for.', dot: 'site', f: [F('site', 'Site name', 'text', 'Type the full site name. Sites you entered before are suggested.', 0, 'e.g. Kadapa'), F('phase', 'Phase', 'text', 'An agency can report many phases, one entry each.', 0, 'e.g. Phase 3')] },
+      { t: 'Work period', d: 'End date can be planned (future) or actual.', dot: 'site', f: [F('start', 'Start date', 'date', 'Day work began', 1), F('end', 'End date', 'date', 'Past or future', 1)] },
+      { t: 'ULB quantities', d: 'Legacy waste, in metric tonnes.', dot: 'site', f: [F('awarded', 'Total qty awarded by ULB', 'num', 'As per work order', 1), F('processed', 'Total qty processed', 'num', 'Processed so far', 1)] },
+      { t: 'Completion', d: '', dot: 'site', f: [F('remDate', 'When will the site be 100% remediated?', 'date', 'Expected date. Past or future.')] },
+    ] },
+    { name: 'RDF', cards: [
+      { t: 'RDF disposal', d: 'Refuse-derived fuel sent to cement or waste-to-energy (WtE) plants.', dot: 'RDF', f: [F('rdfLast', 'Last date of RDF disposal', 'dateMax', 'Today or earlier', 1), F('rdfDaily', 'RDF disposed every day', 'num', 'Average per day. 0 if stopped.', 1), F('RDF_cum', 'Cumulative RDF disposed', 'num', 'Total sent so far', 1), F('RDF_bal', 'Balance RDF at site', 'num', 'Still waiting at site', 1)] },
+      { t: 'Factories', d: 'Where the RDF went. One row per factory.', dot: 'RDF', factories: true },
+      { t: 'RDF timeline & issues', d: '', dot: 'RDF', f: [F('RDF_tl', 'Timeline to complete RDF disposal', 'date', 'Past or future'), F('RDF_iss', 'Any issues in disposing RDF?', 'area', 'Optional. Write as much as you need.', 0, 'e.g. Plant accepting only 2 trucks a day')] },
+    ] },
+    { name: 'Soil · Inert · C&D', cards: ['Soil', 'Inert', 'CnD'].map(m => ({ t: M[m], d: '', dot: m, f: [
+      F(m + '_cum', 'Cumulative ' + M[m] + ' disposed', 'num', '0 or more', 1), F(m + '_bal', 'Balance ' + M[m] + ' at site', 'num', '0 or more', 1),
+      F(m + '_tl', 'Timeline to complete ' + M[m] + ' disposal', 'date', 'Past or future'), F(m + '_iss', 'Any issues in disposing ' + M[m] + '?', 'area', 'Optional. Write as much as you need.')] })) },
+    { name: 'Review', cards: [{ t: 'Other remarks', d: '', dot: 'site', f: [F('remarks', 'Any other remarks or concerns by the agency?', 'area', 'Optional. Write as much as you need.')] }] },
+  ];
+  const FIELDS = STEPS.flatMap((s, i) => s.cards.flatMap(c => (c.f || []).map(f => ({ ...f, step: i }))));
+  const def = k => FIELDS.find(f => f.k === k);
+  const stepOf = k => (k.startsWith('fac') ? 1 : (def(k) || { step: 0 }).step);
+  const FAC_HINT = 'Cement or WtE plant, with the quantity sent there. Factories you used before are suggested.';
+
+  function blank() {
+    const x = { id: '', site: '', phase: '', start: '', end: '', awarded: '', processed: '', remDate: '', rdfLast: '', rdfDaily: '', factories: [{ name: '', qty: '' }], remarks: '' };
+    MK.forEach(m => Object.assign(x, { [m + '_cum']: '', [m + '_bal']: '', [m + '_tl']: '', [m + '_iss']: '' }));
+    return x;
+  }
 
   // ---------------------------------------------------------------- state
   const S = {
-    screen: 'loading',                 // loading | login | form | done
-    agencies: [], loginAgency: store.get('lastAgency', ''), pin: '', loginErr: '', busy: false,
-    agency: '', sites: [], phases: [], dests: [],
-    step: 0, fromReview: false, err: '',
-    f: null,
-    pending: [], pendingFor: '', pendLoading: false, pendOpen: '', pendQty: '', pendFile: null, pendErr: '', pendBusy: false,
-    done: null,
-    batch: [],                          // finished sites waiting to be submitted together
-    results: [],                        // sites already submitted in this batch
-    progress: '',
-    focus: '',                          // open combobox key
+    view: 'loading', agency: '', entries: [], factories: [],
+    agIn: store.get('lastAgency', ''), pinIn: '', loginErr: '', busy: false,
+    step: 0, x: blank(), tried: {}, err: '', fromReview: false, last: null,
   };
-  function blank() {
-    return { site: '', phase: '', cluster: '', awarded: '', startDate: '', endDate: '', land: '', rdfGen: '',
-      dispatches: [newD()], attachments: [], uploader: store.get('uploader', ''), phone: store.get('phone', '') };
-  }
-  function newD() { return { id: uid(), dest: '', qty: '', date: '', hasCert: '', certQty: '', file: null }; }
 
-  // Drafts survive a reload or a dropped connection. Files can't be kept, so they are re-attached.
+  // ---------------------------------------------------------------- validation (errors block, warnings don't)
+  function check(x) {
+    const E = {}, t = today();
+    const err = (k, m) => (E[k] = E[k] || [m, 0]), warn = (k, m) => (E[k] = E[k] || [m, 1]);
+    const empty = k => String(x[k] == null ? '' : x[k]).trim() === '';
+    ['site', 'phase'].forEach(k => empty(k) && err(k, 'Required.'));
+    ['start', 'end', 'remDate', 'rdfLast', ...MK.map(m => m + '_tl')].forEach(k => empty(k) && err(k, 'Pick a date.'));
+    ['awarded', 'processed', 'rdfDaily', ...MK.flatMap(m => [m + '_cum', m + '_bal'])].forEach(k => empty(k) && err(k, 'Required. Enter 0 if none.'));
+    if (x.start && x.end && x.end < x.start) err('end', `Before the start date (${fd(x.start)}).`);
+    if (x.rdfLast && x.rdfLast > t) err('rdfLast', 'Can’t be in the future.');
+    if (x.start && x.rdfLast && x.rdfLast < x.start) err('rdfLast', 'Before work started.');
+    if (x.start && x.remDate && x.remDate < x.start) err('remDate', 'Before the start date.');
+    if (x.awarded !== '' && num(x.processed) > num(x.awarded)) warn('processed', 'More than the quantity awarded. Please check.');
+    MK.forEach(m => { if (x.remDate && x[m + '_tl'] > x.remDate) warn(m + '_tl', 'Later than the 100% remediation date.'); });
+    const bal = num(x.RDF_bal), day = num(x.rdfDaily);
+    if (bal > 0 && x.RDF_tl && x.rdfDaily !== '') {
+      if (day === 0) warn('RDF_tl', `Disposal is 0 MT/day but ${fmt(bal)} MT is still at site.`);
+      else { const need = Math.ceil(bal / day), pd = addDays(need); if (x.RDF_tl < pd) warn('RDF_tl', `At ${fmt(day)} MT/day the balance needs ${need} days (≈ ${fd(pd)}).`); }
+    }
+    const seen = {};
+    x.factories.forEach((f, i) => {
+      const nm = f.name.trim().toLowerCase();
+      if (!nm && num(f.qty)) err('fac' + i, 'Type the factory name.');
+      else if (nm && seen[nm]) err('fac' + i, 'Already added above.');
+      if (nm) seen[nm] = 1;
+    });
+    const named = x.factories.filter(f => f.name.trim()), sum = x.factories.reduce((s, f) => s + num(f.qty), 0);
+    if (num(x.RDF_cum) > 0 && !named.length) err('fac', 'Add at least one factory.');
+    else if (sum > num(x.RDF_cum) + 0.01) err('fac', `Factory total (${fmt(sum)} MT) is more than cumulative RDF (${fmt(x.RDF_cum)} MT).`);
+    else if (named.length && sum < num(x.RDF_cum) - 0.01) warn('fac', `Factory total is ${fmt(sum)} of ${fmt(x.RDF_cum)} MT.`);
+    return E;
+  }
+  // Errors show once the agency tried to continue, or the field has a value; warnings always.
+  function show(E, k) {
+    const e = E[k]; if (!e) return null;
+    const filled = k.startsWith('fac') || String(S.x[k] == null ? '' : S.x[k]).trim() !== '';
+    return (S.tried[stepOf(k)] || e[1] || filled) ? e : null;
+  }
+  const lookCls = e => (e ? (e[1] ? 'is-warn' : 'is-err') : '');
+  const hintCls = e => (e ? (e[1] ? 'hint warn' : 'hint err') : 'hint');
+
+  // ---------------------------------------------------------------- drafts (new entries only)
   let draftTimer = 0;
-  const noFiles = f => ({ ...f, attachments: [], dispatches: f.dispatches.map(d => ({ ...d, file: null })) });
-  const fromDraft = f => { f = { ...blank(), ...f, attachments: [] }; if (!f.dispatches.length) f.dispatches = [newD()]; return f; };
-  function writeDraft() {
-    if (!S.agency || !S.f || S.screen !== 'form') return;
-    store.set('draft_' + S.agency, { f: noFiles(S.f), step: S.step, batch: S.batch.map(noFiles) });
-  }
+  const writeDraft = () => { if (S.view === 'form' && !S.x.id && S.agency) store.set('draft_' + S.agency, S.x); };
   function saveDraft() { clearTimeout(draftTimer); draftTimer = setTimeout(writeDraft, 400); }
-  function loadDraft() {
-    const d = store.get('draft_' + S.agency, null);
-    if (!d || !d.f || !Array.isArray(d.f.dispatches)) return false;
-    S.f = fromDraft(d.f);
-    S.batch = Array.isArray(d.batch) ? d.batch.filter(x => x && Array.isArray(x.dispatches)).map(fromDraft) : [];
-    S.step = Math.min(Math.max(Number(d.step) || 0, 0), 4);
-    return true;
-  }
+  const getDraft = () => { const d = store.get('draft_' + S.agency, null); return d && Array.isArray(d.factories) ? d : null; };
 
-  // ---------------------------------------------------------------- derived
-  function mySites() { return [...S.sites, ...store.get('sites_' + S.agency, [])]; }
-  function siteMeta(f = S.f) {
-    const s = lc(f.site), p = lc(f.phase);
-    const r = mySites().find(x => lc(x.site) === s && lc(x.phase) === p);
-    if (r) return { known: true, cluster: r.cluster || '—', awarded: num(r.awarded), awardedStr: fmt(r.awarded) };
-    const aw = num(f.awarded);
-    return { known: false, cluster: f.cluster.trim() || '—', awarded: aw, awardedStr: aw ? fmt(aw) : '—' };
-  }
-  function calc(f) {
-    const gen = num(f.rdfGen); let disposed = 0, certified = 0;
-    f.dispatches.forEach(d => { const q = num(d.qty); disposed += q; if (d.hasCert === 'yes') certified += Math.min(num(d.certQty), q); });
-    return { gen, disposed, certified, pending: disposed - certified, atSite: Math.max(gen - disposed, 0), pct: gen ? disposed / gen * 100 : 0 };
-  }
-  function dStatus(d) {
-    const q = num(d.qty), cq = num(d.certQty);
-    if (d.hasCert === 'no') return [q ? `${fmt(q)} MT added to Certificate pending automatically. Attach the certificate later from this site.` : 'Will be added to Certificate pending automatically.', 'warn'];
-    if (d.hasCert !== 'yes') return null;
-    if (!d.certQty) return ['Enter the quantity printed on the certificate.', 'mute'];
-    if (cq > q) return [`Certificate (${fmt(cq)} MT) is more than RDF disposed (${fmt(q)} MT). Check the numbers.`, 'bad'];
-    if (cq < q) return [`Certificate covers ${fmt(cq)} of ${fmt(q)} MT — ${fmt(q - cq)} MT moves to Certificate pending.`, 'warn'];
-    if (!d.file) return ['Quantities match — attach the certificate.', 'mute'];
-    return ['Certified — quantities match.', 'ok'];
-  }
-  function validateAll(f) {
-    for (let s = 0; s < 4; s++) { const e = validate(s, f); if (e) return [s, e]; }
-    return null;
-  }
-  function validate(step, f = S.f) {
-    if (step === 0) {
-      if (!f.site.trim()) return 'Enter the site.';
-      if (!f.phase.trim()) return 'Enter the phase.';
-      if (!siteMeta(f).known && num(f.awarded) <= 0) return 'Enter awarded legacy quantity for this new site.';
-    }
-    if (step === 1) {
-      if (!f.startDate) return 'Enter the date work started.';
-      if (f.endDate && f.endDate < f.startDate) return 'Work ended date is before work started.';
-      if (num(f.rdfGen) <= 0) return 'Enter RDF generated (MT).';
-    }
-    if (step === 2) {
-      for (let i = 0; i < f.dispatches.length; i++) {
-        const d = f.dispatches[i], n = `Destination ${i + 1}: `, q = num(d.qty), cq = num(d.certQty);
-        if (!d.dest.trim()) return n + 'enter the cement / WtE plant.';
-        if (q <= 0) return n + 'enter RDF disposed.';
-        if (!d.date) return n + 'enter date disposed.';
-        if (!d.hasCert) return n + 'choose Yes or No for certificate.';
-        if (d.hasCert === 'yes') {
-          if (cq <= 0) return n + 'enter certificate quantity.';
-          if (cq > q) return n + 'certificate quantity is more than RDF disposed.';
-          if (!d.file) return n + 'attach the certificate.';
-        }
-      }
-      const c = calc(f);
-      if (c.disposed > c.gen + 1e-9) return `RDF disposed (${fmt(c.disposed)} MT) is more than RDF generated (${fmt(c.gen)} MT).`;
-    }
-    if (step === 3) {
-      if (!f.uploader.trim()) return 'Enter your name.';
-      if (!/^[6-9]\d{9}$/.test(f.phone)) return 'Enter a valid 10-digit mobile number.';
-    }
-    return '';
-  }
-
-  // ---------------------------------------------------------------- combobox options
-  function comboOptions(key) {
-    const f = S.f;
-    if (key === 'site') {
-      const ms = mySites(), count = {};
-      ms.forEach(r => { count[r.site] = (count[r.site] || 0) + 1; });
-      return Object.keys(count).sort((a, b) => a.localeCompare(b)).map(s => ({ label: s, tag: count[s] > 1 ? count[s] + ' phases' : '' }));
-    }
-    if (key === 'phase') {
-      const here = mySites().filter(r => lc(r.site) === lc(f.site)).map(r => r.phase);
-      const all = [...new Set([...here, ...S.phases, ...store.get('phases', [])].filter(Boolean))];
-      return all.map(p => ({ label: p, tag: here.includes(p) ? 'this site' : '' }))
-        .sort((a, b) => (b.tag ? 1 : 0) - (a.tag ? 1 : 0) || a.label.localeCompare(b.label));
-    }
-    const used = new Set(S.dests.map(lc));
-    return [...new Set([...S.dests, ...store.get('dests', [])].filter(Boolean))].sort((a, b) => a.localeCompare(b))
-      .map(x => ({ label: x, tag: used.has(lc(x)) ? '' : 'this phone' }));
-  }
-  function comboValue(key) {
-    if (key === 'site') return S.f.site;
-    if (key === 'phase') return S.f.phase;
-    const d = S.f.dispatches.find(x => 'd:' + x.id === key); return d ? d.dest : '';
-  }
-  const EMPTY = { site: 'No saved sites — type a name', phase: 'Type a phase', d: 'No saved plants yet — type a name' };
-  function comboList(key) {
-    const value = comboValue(key), v = lc(value);
-    const items = comboOptions(key).filter(o => !v || o.label.toLowerCase().includes(v)).slice(0, 40);
-    if (!items.length) return `<div class="opt-empty">${v ? '“' + esc(value) + '” will be saved as new' : EMPTY[key.startsWith('d:') ? 'd' : key]}</div>`;
-    return items.map(o => `<button type="button" class="opt${o.label === value ? ' sel' : ''}" data-pick="${esc(key)}" data-val="${esc(o.label)}"><b style="font-weight:400">${esc(o.label)}</b><span>${esc(o.tag)}</span></button>`).join('');
-  }
-  function combo(key, value, placeholder, attrs) {
-    const open = S.focus === key;
-    return `<div class="combo" data-combo="${esc(key)}">
-      <input class="in" autocomplete="off" autocapitalize="words" placeholder="${esc(placeholder)}" value="${esc(value)}" data-combo-in="${esc(key)}" ${attrs || ''}>
-      <button type="button" class="tg" tabindex="-1" data-combo-tg="${esc(key)}" aria-label="Show list">▾</button>
-      <div class="list" id="list-${esc(key)}" ${open ? '' : 'hidden'}>${open ? comboList(key) : ''}</div>
-    </div>`;
-  }
-  function openCombo(key) {
-    if (S.focus && S.focus !== key) closeCombo();
-    S.focus = key;
-    const el = byId('list-' + key); if (el) { el.innerHTML = comboList(key); el.hidden = false; }
-  }
-  function closeCombo() {
-    const el = S.focus && byId('list-' + S.focus); if (el) { el.hidden = true; el.innerHTML = ''; }
-    S.focus = '';
-  }
-  function refreshCombo(key) { const el = byId('list-' + key); if (el && !el.hidden) el.innerHTML = comboList(key); }
-
-  // ---------------------------------------------------------------- screens
+  // ---------------------------------------------------------------- views
   function header() {
-    const f = S.f, authed = S.screen === 'form' || S.screen === 'done';
-    const more = S.screen === 'form' && S.batch.length ? ` (+${S.batch.length} site${S.batch.length > 1 ? 's' : ''})` : '';
-    const sub = !authed ? 'Legacy waste remediation' : (f && f.site ? `${S.agency} · ${f.site}` : S.agency) + more;
-    const ctr = S.screen === 'login' ? 'LOG IN' : S.screen === 'done' ? 'DONE' : S.screen === 'form' ? `STEP ${S.step + 1}/5` : '';
-    const stepper = S.screen === 'form' ? `<div class="stepper">${LABELS.map((l, i) => `<div class="${i <= S.step ? 'on' : ''} ${i === S.step ? 'cur' : ''}"><i></i><span>${l}</span></div>`).join('')}</div>` : '';
-    return `<header class="top"><div class="top-row"><div class="top-t"><span class="t">RDF Planning</span><span class="s" id="hsub">${esc(sub)}</span></div><span class="ctr">${ctr}</span></div>${stepper}</header>`;
+    const ctr = { login: 'LOG IN', home: 'MY SITES', done: 'DONE', form: `STEP ${S.step + 1}/4` }[S.view] || '';
+    const stepper = S.view === 'form' ? `<div class="stepper">${STEPS.map((s, i) => `<div class="${i <= S.step ? 'on' : ''} ${i === S.step ? 'cur' : ''}"><i></i><span>${esc(s.name)}</span></div>`).join('')}</div>` : '';
+    return `<header class="top"><div class="top-row"><div class="top-t"><span class="t">RDF Planning</span><span class="s">${esc(S.agency || 'Legacy waste remediation')}</span></div><span class="ctr">${ctr}</span></div>${stepper}</header>`;
   }
 
   function loginView() {
-    return `<div class="h big"><h2>Agency log in</h2><p>Select your agency and enter the PIN or password shared by the Swachh Andhra team.</p></div>
+    return `<div class="h big"><h2>Agency log in</h2><p>Type your agency name and the 4-digit PIN shared by the Swachh Andhra team.</p></div>
       <label class="fld"><span class="lbl">Agency name</span>
-        <select class="in" data-login="agency"><option value="">${S.agencies.length ? 'Select agency' : 'Loading agencies…'}</option>${S.agencies.map(a => `<option value="${esc(a)}" ${a === S.loginAgency ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label>
-      <label class="fld"><span class="lbl">PIN / password</span>
-        <input class="in pin ${S.loginErr ? 'bad' : ''}" type="password" maxlength="32" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••" value="${esc(S.pin)}" data-login="pin"></label>
-      ${S.loginErr ? `<div class="err">${esc(S.loginErr)}</div>` : ''}
-      <button type="button" class="btn" data-act="login" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Checking…' : 'Log in'}</button>
-      <div class="note c">Forgot PIN? Contact the district RDF coordinator.</div>`;
+        <input class="in" autocomplete="organization" autocapitalize="words" placeholder="Type your agency name" value="${esc(S.agIn)}" data-login="agency">
+        <span class="hint">As registered, e.g. Tharuni Associates. Capital letters don’t matter.</span></label>
+      <label class="fld"><span class="lbl">PIN</span>
+        <input class="in pin" style="${S.loginErr ? 'border-color:var(--err-line)' : ''}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" value="${esc(S.pinIn)}" data-login="pin"></label>
+      ${S.loginErr ? `<div class="err-box">${esc(S.loginErr)}</div>` : ''}
+      <button type="button" class="btn" data-act="login" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Checking…' : 'Log in'}</button>`;
   }
 
-  function metaRegion() {
-    const f = S.f, m = siteMeta();
-    if (!f.site.trim() || !f.phase.trim()) return '';
-    if (m.known) {
-      return `<div class="g2"><div class="card meta"><span class="cap">Cluster</span><b>${esc(m.cluster)}</b></div><div class="card meta"><span class="cap">Awarded legacy qty</span><b>${m.awardedStr} MT</b></div></div>`;
-    }
-    return `<div class="warnbox">New site/phase — enter cluster and awarded quantity. It will be remembered.</div>
-      <div class="g2">
-        <label class="fld"><span class="lbl">Cluster</span><input class="in" placeholder="Package…" value="${esc(f.cluster)}" data-f="cluster"></label>
-        <label class="fld"><span class="lbl">Awarded qty (MT)</span><input class="in" inputmode="decimal" placeholder="0" value="${esc(f.awarded)}" data-f="awarded" data-num></label>
-      </div>`;
+  function homeView() {
+    const d = getDraft();
+    const list = S.entries.map((e, i) => `<div class="entry"><div><b>${esc(e.site)} · ${esc(e.phase)}</b><span>Updated ${fd(String(e.submitted).split(' ')[0])} · RDF at site ${fmt(e.RDF_bal)} MT</span></div><button type="button" class="sm g" data-act="edit-entry" data-i="${i}">Edit</button></div>`).join('');
+    return `<div class="row"><h2 class="title">My sites</h2><button type="button" class="sm" data-act="logout">Log out</button></div>
+      ${S.err ? `<div class="err-box">${esc(S.err)}</div>` : ''}
+      ${d ? `<div class="warnbox"><span>There’s an unsaved entry on this phone (${esc(d.site || 'no site yet')}).</span><div class="acts"><button type="button" class="sm p" data-act="draft-restore">Continue it</button><button type="button" class="sm" data-act="draft-discard">Discard</button></div></div>` : ''}
+      <button type="button" class="btn" data-act="new">+ New site / phase entry</button>
+      ${list || '<div class="empty">No entries yet. Tap “New site / phase entry” to add your first site.</div>'}
+      ${S.entries.length ? '<button type="button" class="btn ghost" data-act="csv">Download all my data (CSV)</button>' : ''}`;
   }
 
-  function batchBanner() {
-    if (!S.batch.length) return '';
-    const names = S.batch.map(b => esc(b.site)).join(', ');
-    return `<div class="info batch-note"><b>${S.batch.length} site${S.batch.length > 1 ? 's' : ''} ready:</b> ${names}. They are submitted together with this one.
-      ${S.step === 0 && !S.f.site.trim() ? '<button type="button" class="link-btn" data-act="site-cancel">Cancel this new site</button>' : ''}</div>`;
+  function fieldHtml(f, E) {
+    const e = show(E, f.k), v = S.x[f.k] == null ? '' : S.x[f.k];
+    let input;
+    if (f.t === 'num') input = `<div class="unit"><input inputmode="decimal" placeholder="0" value="${esc(v)}" data-k="${f.k}" data-num><span>MT</span></div>`;
+    else if (f.t.startsWith('date')) input = `<input class="in" type="date" ${f.t === 'dateMax' ? `max="${today()}"` : ''} value="${esc(v)}" data-k="${f.k}">`;
+    else if (f.t === 'area') input = `<textarea class="in" rows="3" placeholder="${esc(f.ph || '')}" data-k="${f.k}">${esc(v)}</textarea>`;
+    else input = `<input class="in" list="dl_${f.k}" autocomplete="off" autocapitalize="words" placeholder="${esc(f.ph || '')}" value="${esc(v)}" data-k="${f.k}">`;
+    return `<div class="fld ${f.half ? '' : 'full'} ${lookCls(e)}" data-w="${f.k}"><span class="lbl">${esc(f.l)}</span>${input}<span class="${hintCls(e)}" data-h="${f.k}">${esc(e ? e[0] : f.h)}</span></div>`;
   }
 
-  function step0() {
-    const f = S.f;
-    return `${batchBanner()}<div class="h"><h2>Site details</h2><p>Type the site and phase — pick from the list to reuse a saved name.</p></div>
-      <div class="card who"><span class="av">${esc((S.agency || '?')[0])}</span><div class="nm"><span class="cap">Agency</span><b>${esc(S.agency)}</b></div><button type="button" class="sm" data-act="logout">Log out</button></div>
-      <div class="fld"><span class="lbl">Site</span>${combo('site', f.site, 'Type site name')}</div>
-      <div class="fld"><span class="lbl">Phase</span>${combo('phase', f.phase, 'Type phase, e.g. Phase 3')}</div>
-      <div id="r-meta" style="display:flex;flex-direction:column;gap:16px">${metaRegion()}</div>`;
-  }
-
-  function step1() {
-    const f = S.f;
-    return `${batchBanner()}<div class="h"><h2>Work progress</h2><p>${esc(f.site)} · ${esc(f.phase)}</p></div>
-      <div class="g2">
-        <label class="fld"><span class="lbl">Work started on</span><input class="in" type="date" value="${esc(f.startDate)}" data-f="startDate"></label>
-        <label class="fld"><span class="lbl">Work ended on</span><input class="in" type="date" value="${esc(f.endDate)}" data-f="endDate"></label>
-      </div>
-      <div class="note" style="margin-top:-8px;font-size:12.5px">Leave “ended on” empty if work is ongoing.</div>
-      <label class="fld"><span class="lbl">Land reclaimed (acres)</span><input class="in" inputmode="decimal" placeholder="0.00" value="${esc(f.land)}" data-f="land" data-num></label>
-      <label class="fld"><span class="lbl">RDF generated (MT)</span><input class="in" inputmode="decimal" placeholder="Total RDF produced at site" value="${esc(f.rdfGen)}" data-f="rdfGen" data-num></label>
-      <div class="info">RDF generated = RDF already sent to cement plants + RDF still at site waiting to be sent. You’ll record where it went on the next step.</div>`;
-  }
-
-  function totalsRegion() {
-    const c = calc(S.f);
-    const t = [['Generated', fmt(c.gen), ''], ['Disposed', fmt(c.disposed), ''], ['At site', fmt(c.atSite), ''],
-      ['Disposed %', c.pct.toFixed(1) + '%', c.disposed > c.gen ? 'c-bad' : 'c-green'], ['Certified', fmt(c.certified), 'c-green'],
-      ['Cert pending', fmt(c.pending), c.pending > 0 ? 'c-warn' : '']];
-    return t.map(([k, v, cl]) => `<div><span>${k}</span><b class="${cl}">${v}</b></div>`).join('');
-  }
-
-  function pendingRegion() {
-    if (S.pendLoading) return `<div class="note">Checking earlier entries for ${esc(S.f.site)}…</div>`;
-    if (!S.pending.length) return '';
-    const items = S.pending.map(p => {
-      const key = p.recordId + '|' + p.line, open = S.pendOpen === key;
-      return `<div class="pi">
-        <div class="row"><div><b>${esc(p.dest)}</b><span>${fmt(p.pending)} MT pending · sent ${esc(fd(p.date))} · ${esc(p.recordId)}</span></div>${open ? '' : `<button type="button" class="sm" data-act="pend-open" data-key="${esc(key)}">Add certificate</button>`}</div>
-        ${open ? `<div class="g2"><input class="in" inputmode="decimal" placeholder="Cert qty (MT)" value="${esc(S.pendQty)}" data-pend="qty" data-num>
-            <label class="pfile">${esc(S.pendFile ? S.pendFile.name : 'Attach file')}<input type="file" class="hide" accept="application/pdf,image/*" data-file="pend"></label></div>
-          ${S.pendErr ? `<div class="perr">${esc(S.pendErr)}</div>` : ''}
-          <div class="acts"><button type="button" class="sm t" data-act="pend-cancel">Cancel</button><button type="button" class="sm p" data-act="pend-save" ${S.pendBusy ? 'disabled' : ''}>${S.pendBusy ? 'Saving…' : 'Save certificate'}</button></div>` : ''}
-      </div>`;
+  function factoriesHtml(E) {
+    const only = S.x.factories.length === 1;
+    const rows = S.x.factories.map((f, i) => {
+      const e = show(E, 'fac' + i);
+      return `<div class="fac ${lookCls(e)}" data-w="fac${i}"><div class="fr">
+          <input class="in" list="dl_fac" autocomplete="off" placeholder="Factory name" value="${esc(f.name)}" data-fac="name" data-i="${i}">
+          <div class="unit"><input inputmode="decimal" placeholder="0" value="${esc(f.qty)}" data-fac="qty" data-i="${i}" data-num><span>MT</span></div>
+          <button type="button" class="x" data-act="fac-remove" data-i="${i}" ${only ? 'disabled' : ''} aria-label="Remove factory">×</button></div>
+        <span class="${hintCls(e)}" data-h="fac${i}" ${e ? '' : 'hidden'}>${esc(e ? e[0] : '')}</span></div>`;
     }).join('');
-    return `<div class="pend"><div class="ph"><b>Waiting for co-processing certificate</b><span>Earlier entries for ${esc(S.f.site)}. Attach the certificate when the plant issues it.</span></div>${items}</div>`;
+    const n = show(E, 'fac');
+    return rows + `<button type="button" class="add" data-act="fac-add">+ Add another factory</button>
+      <span class="fac-note ${hintCls(n)}" data-h="fac">${esc(n ? n[0] : FAC_HINT)}</span>`;
   }
 
-  function badge(d) {
-    const st = dStatus(d);
-    return st ? `<div class="badge ${st[1]}">${esc(st[0])}</div>` : '';
+  function summaryRows(x) {
+    return STEPS.map((s, i) => ({ name: s.name, i, rows: s.cards.flatMap(c => c.factories
+      ? x.factories.filter(f => f.name.trim()).map(f => ({ k: f.name, v: fmt(f.qty) + ' MT' }))
+      : c.f.map(f => ({ k: f.l, v: f.t === 'num' ? fmt(x[f.k]) + ' MT' : f.t.startsWith('date') ? fd(x[f.k]) : (String(x[f.k] || '').trim() || '—') }))) }));
   }
 
-  function dCard(d, i, many) {
-    const yes = d.hasCert === 'yes', no = d.hasCert === 'no';
-    return `<div class="dcard" data-i="${i}">
-      <div class="dh"><span>Destination ${i + 1}</span>${many ? `<button type="button" class="sm x" data-act="d-remove" data-i="${i}">Remove</button>` : ''}</div>
-      <div class="fld"><span class="lbl">Destination (cement / WtE plant)</span>${combo('d:' + d.id, d.dest, 'Type plant name, location')}<span class="note">New names are remembered for next time.</span></div>
-      <div class="g2">
-        <label class="fld"><span class="lbl">RDF disposed (MT)</span><input class="in" inputmode="decimal" placeholder="0.00" value="${esc(d.qty)}" data-d="qty" data-i="${i}" data-num></label>
-        <label class="fld"><span class="lbl">Date disposed</span><input class="in" type="date" value="${esc(d.date)}" data-d="date" data-i="${i}"></label>
-      </div>
-      <div class="fld"><span class="lbl">Co-processing certificate received?</span>
-        <div class="seg"><button type="button" class="yes ${yes ? 'on' : ''}" data-act="d-yes" data-i="${i}">Yes</button><button type="button" class="no ${no ? 'on' : ''}" data-act="d-no" data-i="${i}">No</button></div></div>
-      ${yes ? `<label class="fld"><span class="lbl">Quantity on certificate (MT)</span><input class="in" inputmode="decimal" placeholder="As printed on certificate" value="${esc(d.certQty)}" data-d="certQty" data-i="${i}" data-num></label>
-        <label class="cfile ${d.file ? 'has' : ''}"><span class="ic">${d.file ? '✓' : '↑'}</span><span class="tx"><b>${esc(d.file ? d.file.name : 'Attach co-processing certificate')}</b><span>PDF or photo · saved to RDF Certificates</span></span>
-          <input type="file" class="hide" accept="application/pdf,image/*" data-file="cert" data-i="${i}"></label>` : ''}
-      <div id="badge-${i}">${badge(d)}</div>
-    </div>`;
-  }
-
-  function step2() {
-    const f = S.f;
-    return `${batchBanner()}<div class="h"><h2>RDF disposed</h2><p>Add each cement / WtE plant the RDF was sent to.</p></div>
-      <div class="totals" id="r-totals">${totalsRegion()}</div>
-      <div id="r-pending">${pendingRegion()}</div>
-      ${f.dispatches.map((d, i) => dCard(d, i, f.dispatches.length > 1)).join('')}
-      <button type="button" class="add" data-act="d-add"><b>+</b>Add another destination</button>`;
-  }
-
-  function step3() {
-    const f = S.f;
-    return `${batchBanner()}<div class="h"><h2>Attachments &amp; contact</h2><p>Site photos, weighbridge slips or any other document.</p></div>
-      ${f.attachments.map((a, i) => `<div class="card att"><span class="ext">${esc((a.name.split('.').pop() || '').slice(0, 4).toUpperCase())}</span><span class="nm">${esc(a.name)}</span><button type="button" data-act="att-remove" data-i="${i}" aria-label="Remove">×</button></div>`).join('')}
-      <label class="addfile"><b>+</b>Add attachments<input type="file" class="hide" multiple data-file="att"></label>
-      <div class="rule"></div>
-      <label class="fld"><span class="lbl">Uploaded by</span><input class="in" placeholder="Full name" autocomplete="name" value="${esc(f.uploader)}" data-f="uploader"></label>
-      <label class="fld"><span class="lbl">Uploader phone number</span>
-        <span class="phone"><span>+91</span><input type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile" value="${esc(f.phone)}" data-f="phone"></span></label>`;
-  }
-
-  function step4() {
-    const f = S.f, c = calc(f), m = siteMeta();
-    const green = 'c-green', warn = 'c-warn';
-    const sec = (title, n, rows) => `<div class="rv"><div class="rh"><b>${title}</b><button type="button" class="sm g" data-act="edit" data-step="${n}">Edit</button></div>
-      <div class="rb">${rows.map(([k, v, cl]) => `<div class="kv"><span>${esc(k)}</span><b class="${cl || ''}">${esc(v)}</b></div>`).join('')}</div></div>`;
-    return `<div class="h"><h2>Review &amp; submit</h2><p>Tap Edit on any section to change it.</p></div>
-      ${sec('Site details', 0, [['Agency', S.agency], ['Site', f.site], ['Cluster', m.cluster], ['Phase', f.phase], ['Awarded legacy qty', m.awardedStr + ' MT']])}
-      ${sec('Work progress', 1, [['Work started on', fd(f.startDate)], ['Work ended on', fd(f.endDate) || 'Ongoing'], ['Land reclaimed', fmt(f.land) + ' acres'], ['RDF generated', fmt(c.gen) + ' MT']])}
-      ${sec('RDF disposed', 2, [
-        ...f.dispatches.map(d => {
-          const full = d.hasCert === 'yes' && num(d.certQty) >= num(d.qty);
-          return [d.dest || '—', `${fmt(d.qty)} MT · ${fd(d.date)} · ${d.hasCert === 'yes' ? (full ? 'cert ✓' : 'part cert') : 'cert pending'}`, full ? green : warn];
-        }),
-        ['RDF disposed %', c.pct.toFixed(1) + '%'], ['Certified RDF', fmt(c.certified) + ' MT', green],
-        ['Certificate pending', fmt(c.pending) + ' MT', c.pending > 0 ? warn : ''], ['RDF at site', fmt(c.atSite) + ' MT']])}
-      ${sec('Attachments & contact', 3, [['Attachments', f.attachments.length ? f.attachments.length + ' file(s)' : 'None'], ['Uploaded by', f.uploader], ['Phone', '+91 ' + f.phone]])}
-      ${batchList()}
-      <button type="button" class="add" data-act="add-site"><b>+</b>Add another site</button>
-      <div class="note c">Submitting several sites? Add each one here and submit them together.</div>`;
-  }
-
-  function batchList() {
-    if (!S.batch.length) return '';
-    const rows = S.batch.map((b, i) => {
-      const c = calc(b);
-      return `<div class="bi"><div><b>${esc(b.site)}</b><span>${esc(b.phase)} · ${fmt(c.disposed)} MT disposed · ${b.dispatches.length} destination${b.dispatches.length > 1 ? 's' : ''}</span></div>
-        <div class="acts"><button type="button" class="sm" data-act="b-edit" data-i="${i}">Edit</button><button type="button" class="sm x" data-act="b-remove" data-i="${i}">Remove</button></div></div>`;
-    }).join('');
-    return `<div class="rv"><div class="rh"><b>Other sites in this submission (${S.batch.length})</b></div><div class="rb">${rows}</div></div>`;
+  function formView() {
+    const E = check(S.x);
+    const cards = STEPS[S.step].cards.map(c => `<div class="card"><div class="ch"><span class="dot" style="background:var(--dot-${c.dot})"></span><div><b>${esc(c.t)}</b>${c.d ? `<span>${esc(c.d)}</span>` : ''}</div></div>
+      ${c.factories ? factoriesHtml(E) : c.f.map(f => fieldHtml(f, E)).join('')}</div>`).join('');
+    const review = S.step === 3 ? summaryRows(S.x).map(s => `<div class="rv"><div class="rh"><b>${esc(s.name)}</b><button type="button" class="sm g" data-act="edit-step" data-step="${s.i}">Edit</button></div>
+      <div class="rb">${s.rows.map(r => `<div class="kv"><span>${esc(r.k)}</span><b>${esc(r.v)}</b></div>`).join('')}</div></div>`).join('') : '';
+    return `<h2 class="title">${esc(STEPS[S.step].name)}</h2>${cards}${review}`;
   }
 
   function doneView() {
-    const list = S.done.results, many = list.length > 1;
-    const pend = list.filter(d => d.pending > 0);
-    const msg = pend.length
-      ? `${fmt(pend.reduce((a, d) => a + d.pending, 0))} MT is in Certificate pending (${pend.map(d => d.site).join(', ')}). Open this form for that site when the plant issues the certificate.`
-      : `All RDF disposed in ${many ? 'these entries' : 'this entry'} is certified.`;
-    const block = (d, i) => {
-      const rows = [['RDF_plan', `1 row · status ${d.pending > 0 ? 'Certificate pending' : 'Complete'}`], ['RDF_dispatch', `${d.dispatchCount} row(s)`],
-        ['Records folder', d.recordsPath], ['Certificates folder', d.certsPath]];
-      return `<div class="dl">${many ? `<div class="dsite"><b>${esc(d.site)}</b><span class="rid">${esc(d.id)}</span></div>` : ''}
-        ${rows.map(([k, v]) => `<div><span class="cap">${esc(k)}</span><code>${esc(v)}</code></div>`).join('')}</div>
-        <button type="button" class="btn" data-act="pdf" data-i="${i}">Download PDF${many ? ' — ' + esc(d.site) : ''}</button>`;
-    };
-    return `<div class="done"><div class="ok">✓</div><h2>${many ? list.length + ' sites submitted' : 'Submitted'}</h2>${many ? '' : `<span class="rid">${esc(list[0].id)}</span>`}<p>${esc(msg)}</p></div>
-      ${list.map(block).join('')}
-      <button type="button" class="btn sec" data-act="csv"><span>Download all my data (CSV)</span><small>${S.done.csvRows} rows · all ${esc(S.agency)} entries</small></button>
-      <button type="button" class="btn ghost" data-act="new">New entry</button>`;
+    return `<div class="done"><div class="ok">✓</div><h2>${S.last.edited ? 'Changes saved' : 'Submitted'}</h2><span class="rid">${esc(S.last.id)}</span>
+        <p>Saved in the RDF Planning sheet. Your CSV in Drive has been updated too.</p></div>
+      <button type="button" class="btn" data-act="csv">Download all my data (CSV)</button>
+      <button type="button" class="btn ghost" data-act="pdf">Download PDF</button>
+      <button type="button" class="btn ghost" data-act="new">+ Add another site / phase</button>
+      <button type="button" class="btn plain" data-act="home">Back to my sites</button>`;
   }
 
   function nav() {
-    if (S.screen !== 'form') return '';
-    const n = S.batch.length + 1;
-    const label = S.busy ? (S.progress || 'Submitting…') : S.step === 4 ? (n > 1 ? `Submit ${n} sites` : 'Submit') : S.fromReview ? 'Save & back to review' : 'Continue';
-    return `<div class="nav"><div id="r-err">${S.err ? `<div class="err">${esc(S.err)}</div>` : ''}</div>
-      <div class="bar">${S.step > 0 ? `<button type="button" class="btn back" data-act="back" ${S.busy ? 'disabled' : ''}>Back</button>` : ''}<button type="button" class="btn grow" data-act="next" ${S.busy ? 'disabled' : ''}>${label}</button></div></div>`;
+    if (S.view !== 'form') return '';
+    const label = S.busy ? 'Submitting…' : S.step === 3 ? (S.x.id ? 'Save changes' : 'Submit') : S.fromReview ? 'Save & back to review' : 'Continue';
+    return `<div class="nav"><div id="r-err">${S.err ? `<div class="err-box">${esc(S.err)}</div>` : ''}</div>
+      <div class="bar"><button type="button" class="btn back" data-act="back" ${S.busy ? 'disabled' : ''}>Back</button><button type="button" class="btn grow" data-act="next" ${S.busy ? 'disabled' : ''}>${label}</button></div></div>`;
   }
 
-  function render(scrollTop) {
-    let body;
-    if (S.screen === 'loading') body = '<div class="loading">Loading…</div>';
-    else if (S.screen === 'login') body = loginView();
-    else if (S.screen === 'done') body = doneView();
-    else body = [step0, step1, step2, step3, step4][S.step]();
-    const y = window.scrollY;
-    app.innerHTML = header() + `<main class="body">${body}</main>` + nav();
-    window.scrollTo(0, scrollTop ? 0 : y);
+  function datalists() {
+    const uniq = a => [...new Set(a.filter(Boolean))].sort((p, q) => p.localeCompare(q));
+    const dl = (id, list) => `<datalist id="${id}">${list.map(o => `<option value="${esc(o)}"></option>`).join('')}</datalist>`;
+    return dl('dl_site', uniq(S.entries.map(e => e.site))) + dl('dl_phase', uniq(S.entries.map(e => e.phase)))
+      + dl('dl_fac', uniq([...S.factories, ...S.x.factories.map(f => f.name.trim())]));
   }
-  function paint(id, html) { const el = byId(id); if (el) el.innerHTML = html; }
-  function setErr(msg) { S.err = msg; paint('r-err', msg ? `<div class="err">${esc(msg)}</div>` : ''); }
+
+  function render(top) {
+    const body = { loading: () => '<div class="loading">Loading…</div>', login: loginView, home: homeView, form: formView, done: doneView }[S.view]();
+    const y = window.scrollY;
+    app.innerHTML = header() + `<main class="body">${S.view === 'form' ? datalists() : ''}${body}</main>` + nav();
+    window.scrollTo(0, top ? 0 : y);
+  }
+
+  // Refresh borders + hints in place while typing.
+  function refreshLooks() {
+    const E = check(S.x);
+    app.querySelectorAll('[data-w]').forEach(w => {
+      const k = w.dataset.w, e = show(E, k), isFac = k.startsWith('fac');
+      w.classList.remove('is-err', 'is-warn'); const c = lookCls(e); if (c) w.classList.add(c);
+      const h = app.querySelector(`[data-h="${k}"]`);
+      if (h) { h.className = hintCls(e); h.textContent = e ? e[0] : isFac ? '' : def(k).h; h.hidden = isFac && !e; }
+    });
+    const n = app.querySelector('[data-h="fac"]');
+    if (n) { const e = show(E, 'fac'); n.className = 'fac-note ' + hintCls(e); n.textContent = e ? e[0] : FAC_HINT; }
+  }
+  function setErr(m) { S.err = m; const el = document.getElementById('r-err'); if (el) el.innerHTML = m ? `<div class="err-box">${esc(m)}</div>` : ''; }
 
   // ---------------------------------------------------------------- network
   async function api(url, opts) {
     let r;
     try { r = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...opts }); }
-    catch (e) { throw new Error('No connection. Check your signal and try again.'); }
+    catch (e) { throw new Error('No internet connection. Check your signal and try again.'); }
     let data = null; try { data = await r.json(); } catch (e) { /* not JSON */ }
     if (r.status === 401 && data && data.auth === false) throw Object.assign(new Error(data.error || 'Please log in again.'), { auth: true });
-    if (r.status === 413) throw new Error((data && data.error) || 'Files are too large. Remove some or use smaller photos.');
     if (!data) throw new Error('Server error (' + r.status + '). Try again.');
     if (!data.ok) throw new Error(data.error || 'Something went wrong.');
     return data;
   }
   const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-  function signedIn(data) {
-    S.agency = data.agency; S.sites = data.sites || []; S.phases = data.phases || []; S.dests = data.destinations || [];
-    store.set('lastAgency', S.agency);
-    S.f = blank(); S.batch = []; S.results = []; S.step = 0; S.fromReview = false; S.err = ''; S.done = null;
-    S.pending = []; S.pendingFor = ''; S.pendOpen = '';
-    if (loadDraft()) {
-      const files = [S.f, ...S.batch].some(f => f.dispatches.some(d => d.hasCert === 'yes'));
-      S.err = 'Your unsent entry was restored.' + (files ? ' Attach the certificates again before submitting.' : '');
-    }
-    S.screen = 'form'; render(true);
-    if (S.step === 2) loadPending();
+  function signedIn(d) {
+    S.agency = d.agency; S.entries = d.entries || []; S.factories = d.factories || [];
+    S.agIn = d.agency; store.set('lastAgency', d.agency);
+    S.view = 'home'; S.err = ''; render(true);
   }
   function signedOut(msg) {
-    S.screen = 'login'; S.agency = ''; S.f = null; S.pin = ''; S.loginErr = msg || ''; S.busy = false; S.focus = '';
+    Object.assign(S, { view: 'login', agency: '', entries: [], pinIn: '', loginErr: msg || '', busy: false, err: '' });
     render(true);
-    if (!S.agencies.length) loadAgencies();
-  }
-  async function loadAgencies() {
-    try { const d = await api(CFG.api.agencies); S.agencies = d.agencies || []; if (!S.agencies.includes(S.loginAgency)) S.loginAgency = ''; }
-    catch (e) { S.loginErr = e.message; }
-    if (S.screen === 'login') render();
   }
   async function boot() {
     try { signedIn(await api(CFG.api.me)); }
     catch (e) { signedOut(e.auth ? '' : e.message); }
   }
   async function login() {
-    const a = S.loginAgency, pin = S.pin;
-    if (!a) { S.loginErr = 'Select your agency.'; return render(); }
-    if (pin.length < 4) { S.loginErr = 'Enter your PIN or password.'; return render(); }
+    const a = S.agIn.trim().replace(/\s+/g, ' ');
+    if (!a || !/^\d{4}$/.test(S.pinIn)) { S.loginErr = 'Enter your agency name and 4-digit PIN.'; return render(); }
     S.busy = true; S.loginErr = ''; render();
-    try { const d = await post(CFG.api.login, { agency: a, pin }); S.busy = false; S.pin = ''; signedIn(d); }
-    catch (e) { S.busy = false; S.pin = ''; S.loginErr = e.message; render(); }
+    try { const d = await post(CFG.api.login, { agency: a, pin: S.pinIn }); S.busy = false; S.pinIn = ''; signedIn(d); }
+    catch (e) { S.busy = false; S.pinIn = ''; S.loginErr = e.message; render(); }
   }
   async function logout() {
     try { await post(CFG.api.logout, {}); } catch (e) { /* signed out locally anyway */ }
     signedOut('');
   }
 
-  async function loadPending() {
-    const site = S.f.site.trim(), key = lc(site);
-    if (!site || S.pendingFor === key) return;
-    S.pendingFor = key; S.pendLoading = true; S.pending = []; paint('r-pending', pendingRegion());
-    try { const d = await api(CFG.api.pending + '?site=' + encodeURIComponent(site)); if (S.pendingFor === key) S.pending = d.pending || []; }
-    catch (e) { if (e.auth) return signedOut(e.message); S.pendingFor = ''; }
-    S.pendLoading = false;
-    if (S.screen === 'form' && S.step === 2) paint('r-pending', pendingRegion());
+  // ---------------------------------------------------------------- form flow
+  function openForm(x) {
+    S.x = { ...blank(), ...x, factories: x.factories && x.factories.length ? x.factories.map(f => ({ name: String(f.name || ''), qty: String(f.qty == null ? '' : f.qty) })) : [{ name: '', qty: '' }] };
+    Object.assign(S, { view: 'form', step: 0, tried: {}, err: '', fromReview: false });
+    render(true);
   }
-  async function savePending() {
-    const p = S.pending.find(x => x.recordId + '|' + x.line === S.pendOpen), q = num(S.pendQty);
-    if (!p) return;
-    if (q <= 0) S.pendErr = 'Enter the certificate quantity.';
-    else if (q > p.pending + 1e-9) S.pendErr = `Only ${fmt(p.pending)} MT is pending for this entry.`;
-    else if (!S.pendFile) S.pendErr = 'Attach the certificate.';
-    else S.pendErr = '';
-    if (S.pendErr) return paint('r-pending', pendingRegion());
-    S.pendBusy = true; paint('r-pending', pendingRegion());
-    try {
-      const file = await toPayload(S.pendFile);
-      const d = await post(CFG.api.certificate, { recordId: p.recordId, line: p.line, certQty: q, file });
-      S.pending = d.pending || []; S.pendOpen = ''; S.pendQty = ''; S.pendFile = null;
-    } catch (e) {
-      if (e.auth) { S.pendBusy = false; return signedOut(e.message); }
-      S.pendErr = e.message;
-    }
-    S.pendBusy = false; paint('r-pending', pendingRegion());
-  }
+  function goStep(n, fromReview) { S.step = n; S.fromReview = !!fromReview; S.err = ''; render(true); }
 
-  // Photos are shrunk on the phone (max 1600px JPEG) so uploads work on weak signal.
-  function readB64(blob) {
-    return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(new Error('Could not read ' + (blob.name || 'file'))); r.readAsDataURL(blob); });
-  }
-  function shrink(file) {
-    return new Promise(resolve => {
-      const url = URL.createObjectURL(file), img = new Image();
-      img.onload = () => {
-        const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-        const cv = document.createElement('canvas'); cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
-        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
-        cv.toBlob(b => resolve(b && b.size < file.size ? b : null), 'image/jpeg', 0.82);
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-      img.src = url;
-    });
-  }
-  async function toPayload(file) {
-    let blob = file, name = file.name, type = file.type || 'application/octet-stream';
-    if (/^image\/(jpeg|png|webp|heic|heif)$/.test(type) && file.size > 400 * 1024) {
-      const small = await shrink(file);
-      if (small) { blob = small; type = 'image/jpeg'; name = name.replace(/\.[^.]+$/, '') + '.jpg'; }
-    }
-    return { name, mimeType: type, data: await readB64(blob) };
-  }
-
-  async function buildRecord(f) {
-    const m = siteMeta(f), dispatches = [], attachments = [];
-    for (const d of f.dispatches) {
-      dispatches.push({ dest: d.dest.trim(), qty: d.qty, date: d.date, hasCert: d.hasCert,
-        certQty: d.hasCert === 'yes' ? d.certQty : '', certFile: d.hasCert === 'yes' && d.file ? await toPayload(d.file) : null });
-    }
-    for (const a of f.attachments) attachments.push(await toPayload(a));
-    return { site: f.site.trim(), phase: f.phase.trim(), cluster: m.known ? '' : f.cluster.trim(), awarded: m.known ? '' : f.awarded,
-      startDate: f.startDate, endDate: f.endDate, land: f.land, rdfGen: f.rdfGen, uploader: f.uploader.trim(), phone: f.phone, dispatches, attachments };
-  }
-
-  function remember(f, rec, res) {
-    const m = siteMeta(f);
-    store.set('uploader', rec.uploader); store.set('phone', rec.phone);
-    store.set('dests', [...new Set([...store.get('dests', []), ...rec.dispatches.map(d => d.dest)])]);
-    store.set('phases', [...new Set([...store.get('phases', []), res.phase])]);
-    const k = x => lc(x.site) + '|' + lc(x.phase);
-    const ns = { site: res.site, phase: res.phase, cluster: m.cluster === '—' ? '' : m.cluster, awarded: m.awarded };
-    store.set('sites_' + S.agency, [...store.get('sites_' + S.agency, []).filter(x => k(x) !== k(ns)), ns]);
-    S.dests = [...new Set([...S.dests, ...rec.dispatches.map(d => d.dest)])];
-  }
-
-  // Opens a site from the batch for editing; the site on screen goes back into the batch.
-  function openFromBatch(i, step, err) {
-    const item = S.batch[i];
-    S.batch.splice(i, 1, S.f);
-    S.f = item; S.pendingFor = ''; S.pending = [];
-    S.step = step; S.fromReview = step !== 4; S.err = err || '';
-    render(true); saveDraft();
-    if (step === 2) loadPending();
-  }
-
-  // Every site in the batch is its own submission (own Record ID, PDF and folder),
-  // sent one after another so a large batch never hits the upload size limit.
-  async function submit() {
-    const e = validateAll(S.f);
-    if (e) { S.step = e[0]; S.fromReview = false; S.err = e[1]; return render(true); }
-    for (let i = 0; i < S.batch.length; i++) {
-      const be = validateAll(S.batch[i]);
-      if (be) return openFromBatch(i, be[0], `${S.batch[i].site}: ${be[1]}`);
-    }
-    const queue = [...S.batch, S.f], total = queue.length + S.results.length;
-    S.busy = true; S.err = ''; render();
-    let csvRows = 0;
-    while (queue.length) {
-      const f = queue[0];
-      S.progress = total > 1 ? `Submitting ${S.results.length + 1} of ${total}…` : 'Submitting…'; render();
-      try {
-        const record = await buildRecord(f);
-        const body = JSON.stringify({ record });
-        if (body.length > CFG.maxBodyBytes) throw new Error(`Files are too large together (${(body.length / 1048576).toFixed(1)} MB). Remove some or use smaller photos.`);
-        const res = await api(CFG.api.submit, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
-        remember(f, record, res);
-        S.results.push({ ...res, dispatchCount: record.dispatches.length });
-        csvRows = res.csvRows;
-        queue.shift();
-        if (queue.length) { S.batch = queue.slice(0, -1); S.f = queue[queue.length - 1]; }
-        writeDraft();
-      } catch (err) {
-        S.busy = false; S.progress = '';
-        if (err.auth) return signedOut(err.message);
-        // Failed site goes on screen; the rest stay in the batch.
-        S.f = queue.shift(); S.batch = queue; S.step = 4; S.fromReview = false;
-        const done = S.results.length ? ` ${S.results.length} site${S.results.length > 1 ? 's were' : ' was'} already submitted.` : '';
-        S.err = `${S.f.site}: ${err.message}${done}`;
-        writeDraft(); return render(true);
-      }
-    }
-    store.del('draft_' + S.agency);
-    S.done = { results: S.results, csvRows };
-    S.results = []; S.batch = [];
-    S.busy = false; S.progress = ''; S.screen = 'done'; render(true);
-  }
-
-  function download(href, name) {
-    const a = document.createElement('a'); a.href = href; if (name) a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-  }
-  function downloadPdf(i) {
-    const d = S.done.results[i] || S.done.results[0];
-    const bin = atob(d.pdfData || ''), bytes = new Uint8Array(bin.length);
-    for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-    download(url, d.pdfName || d.id + '.pdf');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  }
-
-  // ---------------------------------------------------------------- navigation
-  function goStep(n, fromReview) {
-    S.step = n; S.fromReview = !!fromReview; S.err = ''; S.focus = ''; S.pendOpen = '';
-    render(true); saveDraft();
-    if (n === 2) loadPending();
-  }
   function next() {
-    if (S.step === 4) return submit();
-    const e = validate(S.step);
-    if (e) return setErr(e);
-    goStep(S.fromReview ? 4 : S.step + 1);
+    if (S.step === 0) { S.x.site = S.x.site.trim().replace(/\s+/g, ' '); S.x.phase = S.x.phase.trim().replace(/\s+/g, ' '); }
+    const E = check(S.x);
+    if (S.step === 3) return submit(E);
+    const bad = Object.keys(E).filter(k => !E[k][1] && stepOf(k) === S.step);
+    if (bad.length) {
+      S.tried[S.step] = true;
+      S.err = bad.length === 1 ? E[bad[0]][0].replace(/\.$/, '') + ' — see the red note.' : `${bad.length} fields need attention. See the red notes.`;
+      return render();
+    }
+    goStep(S.fromReview ? 3 : S.step + 1);
   }
-  function back() { goStep(S.fromReview ? 4 : S.step - 1); }
-
-  function pickCombo(key, val) {
-    const input = document.querySelector(`[data-combo-in="${CSS.escape(key)}"]`);
-    if (input) input.value = val;
-    setComboValue(key, val);
-    closeCombo();
-  }
-  function setComboValue(key, val) {
-    const f = S.f;
-    if (key === 'site') {
-      f.site = val;
-      const ph = mySites().filter(r => lc(r.site) === lc(val)).map(r => r.phase);
-      if (ph.length === 1 && f.phase !== ph[0]) { f.phase = ph[0]; const pi = document.querySelector('[data-combo-in="phase"]'); if (pi) pi.value = ph[0]; }
-      paint('hsub', esc(val.trim() ? `${S.agency} · ${val.trim()}` : S.agency));
-      S.pendingFor = '';
-    } else if (key === 'phase') f.phase = val;
-    else { const d = f.dispatches.find(x => 'd:' + x.id === key); if (d) d.dest = val; }
-    if (key === 'site' || key === 'phase') paint('r-meta', metaRegion());
-    setErr(''); saveDraft();
+  function back() {
+    if (S.fromReview) return goStep(3);
+    if (S.step === 0) { S.view = 'home'; S.err = ''; return render(true); }
+    goStep(S.step - 1);
   }
 
-  function addFiles(files) {
-    const list = [...(files || [])];
-    const big = list.find(fl => fl.size > MAX_FILE && !/^image\//.test(fl.type));
-    if (big) { alert(`${big.name} is larger than 10 MB. Use a smaller file.`); return list.filter(fl => fl !== big); }
-    return list;
+  async function submit(E) {
+    const bad = Object.keys(E).filter(k => !E[k][1]);
+    if (bad.length) { const st = stepOf(bad[0]); S.tried[st] = true; S.step = st; S.fromReview = false; S.err = 'Please fix the fields in red.'; return render(true); }
+    if (navigator.onLine === false) return setErr('No internet connection. Your entry is saved on this phone. Tap Submit again when you’re back online.');
+    S.busy = true; S.err = ''; render();
+    const entry = { ...S.x, factories: S.x.factories.filter(f => f.name.trim()) };
+    try {
+      const r = await post(CFG.api.submit, { entry });
+      if (!entry.id) { clearTimeout(draftTimer); store.del('draft_' + S.agency); }
+      S.entries = r.entries || S.entries; S.factories = r.factories || S.factories;
+      S.x = { ...entry, id: r.id };
+      S.last = { id: r.id, edited: !!r.edited };
+      S.busy = false; S.view = 'done'; render(true);
+    } catch (e) {
+      S.busy = false;
+      if (e.auth) return signedOut(e.message);
+      S.err = e.message; render();
+    }
+  }
+
+  function download(href) { const a = document.createElement('a'); a.href = href; document.body.appendChild(a); a.click(); a.remove(); }
+
+  // Printable summary — "Save as PDF" in the phone's print dialog.
+  function printPdf() {
+    const x = S.x;
+    const body = summaryRows(x).map(s => `<h3>${esc(s.name)}</h3><table>${s.rows.map(r => `<tr><th>${esc(r.k)}</th><td>${esc(r.v)}</td></tr>`).join('')}</table>`).join('');
+    const html = `<html><head><title>${esc(x.id)}</title><style>body{font-family:Arial,sans-serif;font-size:10.5pt;color:#222;margin:28px}h1{font-size:16pt;margin:0}h3{margin:18px 0 6px;font-size:11.5pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;vertical-align:top;white-space:pre-wrap}th{width:45%;background:#f1f6f2;font-weight:600}</style></head><body><h1>RDF Planning — ${esc(x.site)} · ${esc(x.phase)}</h1><div>${esc(S.agency)} · ${esc(x.id)} · ${esc(new Date().toLocaleString('en-IN'))}</div>${body}</body></html>`;
+    const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0'; document.body.appendChild(fr);
+    fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
+    setTimeout(() => { fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(() => fr.remove(), 1500); }, 250);
   }
 
   // ---------------------------------------------------------------- events
   app.addEventListener('input', e => {
     const t = e.target;
-    if (t.dataset.num !== undefined) { const v = decimal(t.value); if (v !== t.value) t.value = v; }
-    if (t.dataset.login === 'pin') { S.pin = t.value.trim(); return; }
-    if (t.dataset.comboIn) { setComboValue(t.dataset.comboIn, t.value); if (S.focus !== t.dataset.comboIn) openCombo(t.dataset.comboIn); else refreshCombo(t.dataset.comboIn); return; }
-    if (t.dataset.f) {
-      let v = t.value;
-      if (t.dataset.f === 'phone') { v = mobile(v); if (v !== t.value) t.value = v; }
-      S.f[t.dataset.f] = v; setErr(''); saveDraft(); return;
-    }
-    if (t.dataset.d) {
-      const i = Number(t.dataset.i), d = S.f.dispatches[i]; if (!d) return;
-      d[t.dataset.d] = t.value;
-      paint('r-totals', totalsRegion()); paint('badge-' + i, badge(d)); setErr(''); saveDraft(); return;
-    }
-    if (t.dataset.pend === 'qty') { S.pendQty = t.value; return; }
+    if (t.dataset.login === 'agency') { S.agIn = t.value.slice(0, 80); return; }
+    if (t.dataset.login === 'pin') { t.value = t.value.replace(/\D/g, '').slice(0, 4); S.pinIn = t.value; return; }
+    if (t.dataset.num !== undefined) { const v = cleanNum(t.value); if (v !== t.value) t.value = v; }
+    if (t.dataset.k) S.x[t.dataset.k] = t.value;
+    else if (t.dataset.fac) S.x.factories[Number(t.dataset.i)][t.dataset.fac] = t.value;
+    else return;
+    setErr(''); refreshLooks(); saveDraft();
   });
-
-  app.addEventListener('change', e => {
-    const t = e.target;
-    if (t.dataset.login === 'agency') { S.loginAgency = t.value; S.loginErr = ''; return; }
-    if (!t.dataset.file) return;
-    const files = addFiles(t.files);
-    t.value = '';
-    if (!files.length) return;
-    if (t.dataset.file === 'cert') { S.f.dispatches[Number(t.dataset.i)].file = files[0]; setErr(''); render(); }
-    else if (t.dataset.file === 'att') { S.f.attachments = [...S.f.attachments, ...files].slice(0, 10); render(); }
-    else if (t.dataset.file === 'pend') { S.pendFile = files[0]; S.pendErr = ''; paint('r-pending', pendingRegion()); }
-  });
-
   app.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.dataset.login === 'pin') { e.preventDefault(); login(); }
-    if (e.key === 'Escape' && S.focus) closeCombo();
+    if (e.key === 'Enter' && e.target.dataset.login) { e.preventDefault(); login(); }
   });
-
-  // Combobox: open on focus, close shortly after blur; picks use mousedown so the input keeps focus.
-  app.addEventListener('focusin', e => { const k = e.target.dataset && e.target.dataset.comboIn; if (k) openCombo(k); });
-  app.addEventListener('focusout', e => {
-    const k = e.target.dataset && e.target.dataset.comboIn; if (!k) return;
-    setTimeout(() => { if (S.focus === k && !(document.activeElement && document.activeElement.dataset.comboIn === k)) closeCombo(); }, 150);
-  });
-  app.addEventListener('mousedown', e => {
-    const pick = e.target.closest('[data-pick]');
-    if (pick) { e.preventDefault(); pickCombo(pick.dataset.pick, pick.dataset.val); return; }
-    const tg = e.target.closest('[data-combo-tg]');
-    if (tg) {
-      e.preventDefault(); const k = tg.dataset.comboTg;
-      if (S.focus === k) closeCombo(); else { const inp = document.querySelector(`[data-combo-in="${CSS.escape(k)}"]`); if (inp) inp.focus(); openCombo(k); }
-    }
-  });
-
   app.addEventListener('click', e => {
     const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
-    const i = Number(b.dataset.i), f = S.f;
+    const i = Number(b.dataset.i);
     switch (b.dataset.act) {
       case 'login': return login();
       case 'logout': return logout();
+      case 'new': return openForm(blank());
+      case 'home': S.view = 'home'; S.err = ''; return render(true);
+      case 'edit-entry': return openForm(JSON.parse(JSON.stringify(S.entries[i])));
+      case 'draft-restore': return openForm(getDraft() || blank());
+      case 'draft-discard': store.del('draft_' + S.agency); return render();
       case 'next': return next();
       case 'back': return back();
-      case 'edit': return goStep(Number(b.dataset.step), true);
-      case 'd-add': {
-        f.dispatches.push(newD()); render(); saveDraft();
-        const cards = app.querySelectorAll('.dcard'); const last = cards[cards.length - 1];
-        if (last) last.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      case 'edit-step': return goStep(Number(b.dataset.step), true);
+      case 'fac-add': {
+        S.x.factories.push({ name: '', qty: '' }); render(); saveDraft();
+        const f = app.querySelectorAll('[data-fac="name"]'); if (f.length) f[f.length - 1].focus();
         return;
       }
-      case 'd-remove': f.dispatches.splice(i, 1); S.err = ''; render(); return saveDraft();
-      case 'd-yes': f.dispatches[i].hasCert = 'yes'; S.err = ''; render(); return saveDraft();
-      case 'd-no': Object.assign(f.dispatches[i], { hasCert: 'no', certQty: '', file: null }); S.err = ''; render(); return saveDraft();
-      case 'att-remove': f.attachments.splice(i, 1); return render();
-      case 'pend-open': {
-        const p = S.pending.find(x => x.recordId + '|' + x.line === b.dataset.key);
-        S.pendOpen = b.dataset.key; S.pendQty = p ? String(p.pending) : ''; S.pendFile = null; S.pendErr = '';
-        return paint('r-pending', pendingRegion());
-      }
-      case 'pend-cancel': S.pendOpen = ''; S.pendErr = ''; return paint('r-pending', pendingRegion());
-      case 'pend-save': return savePending();
-      case 'pdf': return downloadPdf(i || 0);
-      case 'add-site': {
-        const e = validateAll(f);
-        if (e) { S.step = e[0]; S.fromReview = false; S.err = e[1]; return render(true); }
-        S.batch.push(f);
-        S.f = { ...blank(), uploader: f.uploader, phone: f.phone };
-        S.pendingFor = ''; S.pending = [];
-        return goStep(0);
-      }
-      case 'site-cancel': {
-        if (!S.batch.length) return;
-        S.f = S.batch.pop(); S.pendingFor = '';
-        return goStep(4);
-      }
-      case 'b-edit': return openFromBatch(i, 4);
-      case 'b-remove':
-        if (!confirm(`Remove ${S.batch[i].site} from this submission?`)) return;
-        S.batch.splice(i, 1); render(); return saveDraft();
+      case 'fac-remove': if (S.x.factories.length > 1) { S.x.factories.splice(i, 1); render(); saveDraft(); } return;
       case 'csv': return download(CFG.api.csv);
-      case 'new': S.f = blank(); S.batch = []; S.results = []; S.step = 0; S.done = null; S.err = ''; S.fromReview = false; S.pendingFor = ''; S.screen = 'form'; return render(true);
+      case 'pdf': return printPdf();
     }
   });
-
   window.addEventListener('beforeunload', () => { clearTimeout(draftTimer); writeDraft(); });
 
   render();

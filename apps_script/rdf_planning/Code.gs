@@ -1,61 +1,53 @@
-// RDF Planning — Apps Script backend (bound to the "Haritha RDF Planning" sheet).
+// RDF Planning v2 — Apps Script backend (bound to the "Haritha RDF Planning" sheet).
 // Called ONLY by advitiaum.com (views/rdf.py) over HTTPS POST with a shared TOKEN.
 //
-// The PIN is checked once, at login. After that Flask keeps the agency in its
-// signed session and sends it with the TOKEN, so `agency` on every other action
-// can be trusted — only Flask knows TOKEN.
+// The agency types its name and PIN once, at login. After that Flask keeps the
+// agency in its signed session and sends it with the TOKEN, so `agency` on every
+// other action can be trusted — only Flask knows TOKEN.
 //
-// Sheet tabs:
-//   Sites         Phase_data.csv imported as-is (agency_name, site_name, phase, cluster, target_mt …)
-//   RDF_plan      one row per submission          (created by setup)
-//   RDF_dispatch  one row per destination          (created by setup)
-//   All_RDF_data  every agency, one row per destination, the 20 CSV columns (rebuilt on every change)
-// Drive (under ROOT_FOLDER_ID):
-//   RDF Planning Records/All_agencies_RDF_data.csv  same rows as All_RDF_data
-//   RDF Planning Records/<Agency>/<Agency>_RDF_data.csv
-//   RDF Planning Records/<Agency>/<Phase>/<Site>/   submission PDF + other attachments
-//   RDF Certificates/<Agency>/<Site>/<Phase>/       co-processing certificates
+// Sheet tab:
+//   RDF_plan_v2   one row per site + phase entry (30 columns). Editing an entry
+//                 rewrites its row. Created automatically on first submit.
+//                 (The v1 tabs RDF_plan / RDF_dispatch / All_RDF_data are left as they are.)
+// Drive (under ROOT_FOLDER_ID), rewritten on every submit:
+//   RDF Planning/<Agency>/<Agency>_RDF_plan.csv   ← the file the agency downloads
+//   RDF Planning/All_agencies_RDF_plan.csv
 
 const CONFIG = {
   TOKEN: 'CHANGE-ME-long-random-string',   // must equal RDF_SCRIPT_TOKEN in app.yaml
   ROOT_FOLDER_ID: '',                      // Drive folder "Haritha RDF" — the part after /folders/ in its URL
   TZ: 'Asia/Kolkata',
-  MAX_PIN_TRIES: 5,                        // wrong PINs before the agency is locked out …
+  SHEET: 'RDF_plan_v2',
+  MAX_PIN_TRIES: 5,                        // wrong PINs before that agency name is locked out …
   LOCK_MINUTES: 15,                        // … for this long
-  MAX_FILE_MB: 15,
 };
 
 // One PIN or password per agency (4–32 characters, no spaces, keep the quotes).
-// Run makePins() once, paste the logged block over this one, then
-// Deploy › Manage deployments › Edit › New version.
-// Only agencies listed here appear in the login dropdown.
+// Change one here, then Deploy › Manage deployments › Edit › New version.
 const AGENCY_PINS = {
   // 'Tharuni Associates': '1234',
 };
 
-const PLAN_HEAD = ['Record ID', 'Submitted at', 'Agency Name', 'Site', 'Cluster', 'Phase',
-  'Awarded Legacy Qty (MT)', 'Work started on', 'Work ended on', 'Land reclaimed (acres)',
-  'RDF generated (MT)', 'RDF disposed (MT)', 'RDF disposed %', 'Certified RDF (MT)',
-  'Certificate pending (MT)', 'RDF at site (MT)', 'RDF sent to', 'Status',
-  'Records folder', 'Submission PDF', 'Other attachments', 'Uploaded by', 'Uploader phone'];
-const DISP_HEAD = ['Record ID', 'Agency', 'Site', 'Phase', 'Destination',
-  'RDF disposed (MT)', 'Date disposed', 'Certificate', 'Cert qty (MT)',
-  'Pending qty (MT)', 'Cert status', 'Certificate file', 'Entered at', 'Line'];
-const CSV_HEAD = ['Record ID', 'Submitted at', 'Agency', 'Site', 'Cluster', 'Phase',
-  'Awarded Legacy Qty (MT)', 'Work started on', 'Work ended on', 'Land reclaimed (acres)',
-  'RDF generated (MT)', 'Destination', 'RDF disposed (MT)', 'Date disposed', 'Certificate',
-  'Cert qty (MT)', 'Pending qty (MT)', 'Cert status', 'Uploaded by', 'Uploader phone'];
+const BUILD = '2026-09-28-v2';   // shown by doGet — bump when you change this file
 
-const PENDING = 'Certificate pending';
-const BUILD = '2026-09-26c';   // shown by doGet — bump when you change this file
+const MATERIALS = ['RDF', 'Soil', 'Inert', 'CnD'];
+const LABEL = { RDF: 'RDF', Soil: 'Soil', Inert: 'Inert', CnD: 'C&D' };
+const HEADERS = [
+  'Record ID', 'Submitted at', 'Agency', 'Site', 'Phase', 'Start date', 'End date',
+  'Total qty awarded by ULB (MT)', 'Total qty processed by ULB (MT)', 'Site 100% remediation date',
+  'Last date of RDF disposal', 'RDF disposed per day (MT)',
+  'Cumulative RDF disposed (MT)', 'Cumulative Soil disposed (MT)', 'Cumulative Inert disposed (MT)', 'Cumulative C&D disposed (MT)',
+  'RDF disposed factory name(s)',
+  'Balance RDF at site (MT)', 'Balance Soil at site (MT)', 'Balance Inert at site (MT)', 'Balance C&D at site (MT)',
+  'Timeline RDF disposal', 'Timeline Soil disposal', 'Timeline Inert disposal', 'Timeline C&D disposal',
+  'Issues RDF', 'Issues Soil', 'Issues Inert', 'Issues C&D', 'Other remarks',
+];
+const DATE_COLS = [5, 6, 9, 10, 21, 22, 23, 24];   // 0-based: start, end, remDate, rdfLast, 4 timelines
 
 // ---------- HTTP ----------
 function doGet() {
   // Open the /exec URL in a browser to see which code the live deployment runs.
-  const has = n => { try { return typeof eval(n) === 'function'; } catch (e) { return false; } };
-  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only',
-    functions: ['agencies_', 'checkPin_', 'submit_', 'allData_'].filter(n => !has(n)).length ? 'MISSING — paste the whole Code.gs again' : 'all present',
-    agencies: has('agencies_') ? agencies_().length : 0 });
+  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only', agencies: agencyNames_().length });
 }
 
 function doPost(e) {
@@ -65,15 +57,11 @@ function doPost(e) {
     if (!CONFIG.TOKEN || CONFIG.TOKEN.indexOf('CHANGE-ME') === 0 || body.token !== CONFIG.TOKEN) {
       throw new Error('Unauthorised.');
     }
-    const agency = String(body.agency || '');
     switch (body.action) {
-      case 'agencies':    out = { agencies: agencies_() }; break;
-      case 'login':       checkPin_(agency, body.pin); out = bootstrap_(agency); break;
-      case 'bootstrap':   knownAgency_(agency); out = bootstrap_(agency); break;
-      case 'pending':     knownAgency_(agency); out = { pending: pending_(agency, body.site) }; break;
-      case 'submit':      knownAgency_(agency); out = submit_(agency, body.record || {}); break;
-      case 'certificate': knownAgency_(agency); out = addCertificate_(agency, body); break;
-      case 'csv':         knownAgency_(agency); out = { csv: agencyCsv_(agency) }; break;
+      case 'login':  { const a = checkPin_(body.agency, body.pin); out = bootstrap_(a); break; }
+      case 'list':   out = bootstrap_(known_(body.agency)); break;
+      case 'submit': { const a = known_(body.agency); out = save_(a, body.entry || {}); break; }
+      case 'csv':    out = { csv: writeCsv_(known_(body.agency)) }; break;
       default: throw new Error('Unknown action.');
     }
     out.ok = true;
@@ -87,411 +75,246 @@ function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// ---------- PIN login ----------
+// ---------- login: typed agency name (any capitalisation) + PIN ----------
 const PIN_RE = /^\S{4,32}$/;
-function pinOf_(agency) {
-  return Object.prototype.hasOwnProperty.call(AGENCY_PINS, agency) ? String(AGENCY_PINS[agency]) : '';
+function agencyNames_() {
+  return Object.keys(AGENCY_PINS).filter(a => PIN_RE.test(String(AGENCY_PINS[a])));
+}
+function norm_(s) { return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase(); }
+function find_(name) { const n = norm_(name); return agencyNames_().filter(a => norm_(a) === n)[0] || ''; }
+
+function known_(agency) {
+  const a = find_(agency);
+  if (!a || a !== agency) throw new Error('Unknown agency.');
+  return a;
 }
 
-function agencies_() {
-  return Object.keys(AGENCY_PINS).filter(a => PIN_RE.test(pinOf_(a))).sort();
-}
-
-function knownAgency_(agency) {
-  if (!PIN_RE.test(pinOf_(agency))) {
-    throw new Error('Unknown agency.');
-  }
-}
-
-function checkPin_(agency, pin) {
-  knownAgency_(agency);
+// Same message for an unknown name and a wrong PIN, so names can't be probed.
+function checkPin_(name, pin) {
   const cache = CacheService.getScriptCache();
-  const key = 'pinfail_' + Utilities.base64EncodeWebSafe(agency);
+  const key = 'pinfail_' + Utilities.base64EncodeWebSafe(norm_(name)).slice(0, 200);
   const fails = Number(cache.get(key) || 0);
   if (fails >= CONFIG.MAX_PIN_TRIES) {
-    throw new Error('Too many wrong PINs. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
+    throw new Error('Too many wrong attempts. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
   }
-  if (String(pin) !== pinOf_(agency)) {
+  const a = find_(name);
+  if (!a || String(pin) !== String(AGENCY_PINS[a])) {
+    const left = CONFIG.MAX_PIN_TRIES - fails - 1;
     cache.put(key, String(fails + 1), CONFIG.LOCK_MINUTES * 60);
-    throw new Error('Wrong PIN for ' + agency + '. Try again.');
+    throw new Error(left > 0
+      ? 'Agency name or PIN is wrong. ' + left + ' attempt' + (left === 1 ? '' : 's') + ' left.'
+      : 'Too many wrong attempts. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
   }
   cache.remove(key);
+  return a;
 }
 
-// Everything the form needs after login — only this agency's sites.
+// What the form needs: this agency's entries + factory names anyone has used.
 function bootstrap_(agency) {
-  return { agency: agency, sites: sitesFor_(agency), phases: phases_(), destinations: destinations_() };
+  const all = rows_();
+  const fac = {};
+  all.forEach(r => parseFactories_(r['RDF disposed factory name(s)']).forEach(f => { fac[f.name] = 1; }));
+  return { agency: agency, entries: all.filter(r => r['Agency'] === agency).map(toEntry_), factories: Object.keys(fac).sort() };
 }
 
-// ---------- masters ----------
-// Sites tab (Phase_data.csv) plus any new site/phase this agency entered before.
-function sitesFor_(agency) {
-  const out = [], seen = {};
-  const add = (site, phase, cluster, awarded) => {
-    site = clean_(site); phase = clean_(phase);
-    const k = lc_(site) + '|' + lc_(phase);
-    if (!site || !phase || seen[k]) return;
-    seen[k] = true;
-    out.push({ site: site, phase: phase, cluster: clean_(cluster), awarded: num_(awarded) });
+// ---------- validation (same rules as the form) ----------
+function clean_(x) {
+  const today = Utilities.formatDate(new Date(), CONFIG.TZ, 'yyyy-MM-dd');
+  const e = [];
+  const str = k => String(x[k] == null ? '' : x[k]).trim();
+  const out = {};
+  const num = (k, label) => {
+    const s = str(k).replace(/,/g, '');
+    if (s === '') { e.push(label + ' is required (enter 0 if none).'); return; }
+    const n = Number(s);
+    if (!isFinite(n) || n < 0) { e.push(label + ' must be 0 or more.'); return; }
+    out[k] = Math.round(n * 100) / 100;
   };
-  rows_('Sites').forEach(r => { if (clean_(r.agency_name) === agency) add(r.site_name, r.phase, r.cluster, r.target_mt); });
-  rows_('RDF_plan').forEach(r => { if (r['Agency Name'] === agency) add(r['Site'], r['Phase'], r['Cluster'], r['Awarded Legacy Qty (MT)']); });
+  const date = (k, label) => {
+    const s = str(k);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) { e.push(label + ': pick a date.'); return; }
+    out[k] = s;
+  };
+  const text = (k, max) => { out[k] = str(k).slice(0, max || 2000); };
+
+  out.id = str('id').slice(0, 40);
+  out.site = str('site').replace(/\s+/g, ' ').slice(0, 150);
+  out.phase = str('phase').replace(/\s+/g, ' ').slice(0, 100);
+  if (!out.site) e.push('Site name is required.');
+  if (!out.phase) e.push('Phase is required.');
+  date('start', 'Start date');
+  date('end', 'End date');                       // may be in the future
+  date('remDate', '100% remediation date');      // past or future
+  date('rdfLast', 'Last date of RDF disposal');
+  if (out.start && out.end && out.end < out.start) e.push('End date is before the start date.');
+  if (out.rdfLast && out.rdfLast > today) e.push('Last date of RDF disposal cannot be in the future.');
+  if (out.start && out.rdfLast && out.rdfLast < out.start) e.push('Last date of RDF disposal is before work started.');
+  if (out.start && out.remDate && out.remDate < out.start) e.push('100% remediation date is before the start date.');
+  num('awarded', 'Total qty awarded by ULB');
+  num('processed', 'Total qty processed by ULB');
+  num('rdfDaily', 'RDF disposed per day');
+  MATERIALS.forEach(m => {
+    num(m + '_cum', 'Cumulative ' + LABEL[m] + ' disposed');
+    num(m + '_bal', 'Balance ' + LABEL[m] + ' at site');
+    date(m + '_tl', LABEL[m] + ' disposal timeline');
+    text(m + '_iss');
+  });
+  text('remarks');
+
+  out.factories = (Array.isArray(x.factories) ? x.factories : []).slice(0, 30)
+    // ; ( ) would break the "Name (qty MT); Name (qty MT)" cell format, so they become spaces.
+    .map(f => ({ name: String((f && f.name) || '').replace(/[;()]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150),
+                 qty: Math.round((Number(String((f && f.qty) || 0).replace(/,/g, '')) || 0) * 100) / 100 }))
+    .filter(f => f.name);
+  if (out.factories.some(f => f.qty < 0)) e.push('Factory quantities must be 0 or more.');
+  const names = out.factories.map(f => f.name.toLowerCase());
+  if (names.length !== Object.keys(names.reduce((o, n) => (o[n] = 1, o), {})).length) e.push('The same factory is added twice.');
+  if (out.RDF_cum > 0 && !out.factories.length) e.push('Add the factory the RDF was sent to.');
+  if (out.factories.reduce((s, f) => s + f.qty, 0) > (out.RDF_cum || 0) + 0.01) e.push('Factory quantities add up to more than cumulative RDF disposed.');
+
+  if (e.length) throw new Error(e.join(' '));
   return out;
 }
 
-function phases_() {
-  const s = {};
-  rows_('Sites').forEach(r => { const p = clean_(r.phase); if (p) s[p] = 1; });
-  rows_('RDF_plan').forEach(r => { const p = clean_(r['Phase']); if (p) s[p] = 1; });
-  return Object.keys(s).sort();
-}
-
-function destinations_() {
-  const s = {};
-  rows_('RDF_dispatch').forEach(r => { const d = clean_(r['Destination']); if (d) s[d] = 1; });
-  return Object.keys(s).sort();
-}
-
-// Earlier destinations for this site still waiting for a co-processing certificate.
-function pending_(agency, site) {
-  const want = lc_(site);
-  return rows_('RDF_dispatch')
-    .filter(r => r['Agency'] === agency && lc_(r['Site']) === want && num_(r['Pending qty (MT)']) > 0)
-    .map(r => ({
-      recordId: String(r['Record ID']), line: Number(r['Line']) || 0, dest: String(r['Destination']),
-      qty: num_(r['RDF disposed (MT)']), pending: num_(r['Pending qty (MT)']), date: iso_(r['Date disposed']),
-    }));
-}
-
-// ---------- submit ----------
-function submit_(agency, r) {
-  const site0 = clean_(r.site), phase0 = clean_(r.phase);
-  if (!site0) throw new Error('Enter the site.');
-  if (!phase0) throw new Error('Enter the phase.');
-  // Reuse the saved spelling so "kadapa" and "Kadapa" land in one folder.
-  const known = sitesFor_(agency).filter(x => lc_(x.site) === lc_(site0) && lc_(x.phase) === lc_(phase0))[0];
-  const site = known ? known.site : site0, phase = known ? known.phase : phase0;
-  const cluster = known ? known.cluster : clean_(r.cluster);
-  const awarded = known ? known.awarded : positive_(r.awarded, 'Awarded legacy quantity');
-
-  const start = date_(r.startDate, 'Work started on');
-  const end = r.endDate ? date_(r.endDate, 'Work ended on') : null;
-  if (end && end < start) throw new Error('Work ended date is before work started.');
-  const land = nonNeg_(r.land, 'Land reclaimed');
-  const gen = positive_(r.rdfGen, 'RDF generated');
-  const uploader = clean_(r.uploader), phone = clean_(r.phone).replace(/\D/g, '');
-  if (!uploader) throw new Error('Enter your name.');
-  if (!/^[6-9]\d{9}$/.test(phone)) throw new Error('Enter a valid 10-digit mobile number.');
-
-  const list = Array.isArray(r.dispatches) ? r.dispatches : [];
-  if (!list.length) throw new Error('Add at least one destination.');
-  if (list.length > 30) throw new Error('Too many destinations in one entry.');
-  const ds = list.map((d, i) => {
-    const n = 'Destination ' + (i + 1) + ': ';
-    const dest = clean_(d.dest).slice(0, 150);
-    if (!dest) throw new Error(n + 'enter the plant name.');
-    const qty = positive_(d.qty, n + 'RDF disposed');
-    const date = date_(d.date, n + 'date disposed');
-    const hasCert = d.hasCert === 'yes';
-    if (!hasCert && d.hasCert !== 'no') throw new Error(n + 'choose Yes or No for certificate.');
-    const certQty = hasCert ? positive_(d.certQty, n + 'certificate quantity') : 0;
-    if (certQty > qty + 1e-9) throw new Error(n + 'certificate quantity is more than RDF disposed.');
-    if (hasCert && !(d.certFile && d.certFile.data)) throw new Error(n + 'attach the certificate.');
-    return { dest: dest, qty: qty, date: date, hasCert: hasCert, certQty: certQty, file: hasCert ? d.certFile : null };
-  });
-  const disposed = ds.reduce((s, d) => s + d.qty, 0);
-  const certified = ds.reduce((s, d) => s + d.certQty, 0);
-  if (disposed > gen + 1e-9) throw new Error('RDF disposed (' + disposed + ' MT) is more than RDF generated (' + gen + ' MT).');
-  const pending = disposed - certified, atSite = Math.max(gen - disposed, 0);
-  const others = Array.isArray(r.attachments) ? r.attachments.slice(0, 10) : [];
-
-  // Short lock: a unique ID and the folders (two first-time uploads must not
-  // create twin folders). Drive uploads happen outside the lock.
-  const res = reserve_(agency, site, phase);
-  const id = res.id;
-
-  const dRows = ds.map((d, i) => {
-    const url = d.file ? save_(res.certDir, d.file, id + '_D' + (i + 1)) : '';
-    const left = d.qty - d.certQty;
-    return [id, txt_(agency), txt_(site), txt_(phase), txt_(d.dest), d.qty, d.date,
-      d.hasCert ? 'Yes' : 'No', d.certQty, left, left > 0 ? PENDING : 'Certified', url, new Date(), i + 1];
-  });
-  const otherUrls = others.map(f => save_(res.recDir, f, id)).join('\n');
-
-  const when = Utilities.formatDate(new Date(), CONFIG.TZ, 'dd MMM yyyy, HH:mm');
-  const pdf = pdf_(res.recDir, id, when, {
-    agency: agency, site: site, phase: phase, cluster: cluster || '—', awarded: awarded,
-    start: fmtDate_(start), end: end ? fmtDate_(end) : 'Ongoing', land: land, gen: gen,
-    disposed: disposed, pct: gen ? disposed / gen * 100 : 0, certified: certified, pending: pending, atSite: atSite,
-    uploader: uploader, phone: phone,
-    dispatches: ds.map(d => ({ dest: d.dest, qty: d.qty, date: fmtDate_(d.date), cert: d.hasCert ? 'Yes' : 'Pending', certQty: d.certQty })),
-    attachments: others.map(f => clean_(f.name)).join(', ') || 'None',
-  });
-
+// ---------- save: new row, or rewrite the agency's own row when entry.id is set ----------
+function save_(agency, entry) {
+  const x = clean_(entry);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
-  let csv;
+  let id, csv;
   try {
-    append_('RDF_dispatch', DISP_HEAD, dRows);
-    append_('RDF_plan', PLAN_HEAD, [[
-      id, new Date(), txt_(agency), txt_(site), txt_(cluster), txt_(phase), awarded,
-      start, end || 'Ongoing', land, gen, disposed, gen ? disposed / gen : 0, certified, pending, atSite,
-      txt_(ds.map(d => d.dest).join('; ')), pending > 0 ? PENDING : 'Complete',
-      res.recDir.getUrl(), pdf.getUrl(), otherUrls, txt_(uploader), "'" + phone,
-    ]]);
-    csv = agencyCsv_(agency);
-    allData_();
-  } finally {
-    lock.releaseLock();
-  }
-  return {
-    id: id, pending: pending, pdfName: pdf.getName(),
-    pdfData: Utilities.base64Encode(pdf.getBlob().getBytes()),
-    csvRows: Math.max(csv.split('\r\n').length - 1, 0),
-    recordsPath: ['RDF Planning Records', agency, phase, site].join(' / '),
-    certsPath: ['RDF Certificates', agency, site, phase].join(' / '),
-    site: site, phase: phase,
-  };
-}
-
-function reserve_(agency, site, phase) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try {
-    const props = PropertiesService.getScriptProperties();
-    let id = 'RDF-' + Utilities.formatDate(new Date(), CONFIG.TZ, 'yyMMdd-HHmmss');
-    const last = props.getProperty('lastId') || '';
-    if (last === id || last.indexOf(id + '-') === 0) id += '-' + (Number(last.split('-')[3] || 1) + 1);
-    props.setProperty('lastId', id);
-    return {
-      id: id,
-      recDir: path_(['RDF Planning Records', agency, phase, site]),
-      certDir: path_(['RDF Certificates', agency, site, phase]),
-    };
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-// ---------- certificate that arrives days after the RDF ----------
-function addCertificate_(agency, b) {
-  const recordId = clean_(b.recordId), line = Number(b.line);
-  const q = positive_(b.certQty, 'Certificate quantity');
-  if (!b.file || !b.file.data) throw new Error('Attach the certificate.');
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try {
-    const sh = sheet_('RDF_dispatch');
-    const v = sh.getDataRange().getValues(), h = v[0];
-    const c = name => h.indexOf(name);
-    for (let r = 1; r < v.length; r++) {
-      const row = v[r];
-      if (String(row[c('Record ID')]) !== recordId || Number(row[c('Line')]) !== line || row[c('Agency')] !== agency) continue;
-      const pend = num_(row[c('Pending qty (MT)')]);
-      if (pend <= 0) throw new Error('This entry is already certified.');
-      if (q > pend + 1e-9) throw new Error('Only ' + pend + ' MT is pending for this entry.');
-      const site = String(row[c('Site')]), phase = String(row[c('Phase')]);
-      const url = save_(path_(['RDF Certificates', agency, site, phase]), b.file, recordId + '_D' + line + '_late');
-      const left = Math.max(pend - q, 0);
-      const set = (name, val) => sh.getRange(r + 1, c(name) + 1).setValue(val);
-      set('Certificate', 'Yes');
-      set('Cert qty (MT)', num_(row[c('Cert qty (MT)')]) + q);
-      set('Pending qty (MT)', left);
-      set('Cert status', left > 0 ? PENDING : 'Certified');
-      set('Certificate file', [row[c('Certificate file')], url].filter(String).join('\n'));
-      SpreadsheetApp.flush();
-      refreshPlan_(recordId);
-      agencyCsv_(agency);
-      allData_();
-      return { left: left, pending: pending_(agency, site) };
+    const sh = sheet_();
+    let row;
+    if (x.id) {
+      const ids = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
+      const i = ids.findIndex(r => String(r[0]) === x.id && r[2] === agency);
+      if (i < 0) throw new Error('Entry not found for this agency.');
+      id = x.id; row = i + 2;
+    } else {
+      id = newId_();
+      row = sh.getLastRow() + 1;
     }
+    sh.getRange(row, 1, 1, HEADERS.length).setValues([toRow_(id, agency, x)]);
+    SpreadsheetApp.flush();
+    csv = writeCsv_(agency);
   } finally {
     lock.releaseLock();
   }
-  throw new Error('Entry not found.');
+  const b = bootstrap_(agency);
+  return { id: id, edited: !!x.id, csvRows: Math.max(csv.split('\r\n').length - 1, 0), entries: b.entries, factories: b.factories };
 }
 
-function refreshPlan_(id) {
-  const d = rows_('RDF_dispatch').filter(x => String(x['Record ID']) === id);
-  const cert = d.reduce((s, x) => s + num_(x['Cert qty (MT)']), 0);
-  const pend = d.reduce((s, x) => s + num_(x['Pending qty (MT)']), 0);
-  const sh = sheet_('RDF_plan');
-  const h = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-  const row = sh.getRange('A:A').getValues().map(x => String(x[0])).indexOf(id) + 1;
-  if (row < 2) return;
-  sh.getRange(row, h.indexOf('Certified RDF (MT)') + 1).setValue(cert);
-  sh.getRange(row, h.indexOf('Certificate pending (MT)') + 1).setValue(pend);
-  sh.getRange(row, h.indexOf('Status') + 1).setValue(pend > 0 ? PENDING : 'Complete');
+function newId_() {   // caller holds the script lock
+  const props = PropertiesService.getScriptProperties();
+  let id = 'RDF-' + Utilities.formatDate(new Date(), CONFIG.TZ, 'yyMMdd-HHmmss');
+  const last = props.getProperty('lastId') || '';
+  if (last === id || last.indexOf(id + '-') === 0) id += '-' + (Number(last.split('-')[3] || 1) + 1);
+  props.setProperty('lastId', id);
+  return id;
 }
 
-// ---------- CSV rows: one per destination, joined with its RDF_plan row ----------
-// agency = null → every agency. Values are raw (numbers, Dates) for the sheet tab.
-function dataRows_(agency) {
-  const plan = {};
-  rows_('RDF_plan').forEach(p => { plan[String(p['Record ID'])] = p; });
-  return rows_('RDF_dispatch').filter(d => !agency || d['Agency'] === agency).map(d => {
-    const p = plan[String(d['Record ID'])] || {};
-    return [d['Record ID'], p['Submitted at'], d['Agency'], d['Site'], p['Cluster'], d['Phase'],
-      p['Awarded Legacy Qty (MT)'], p['Work started on'], p['Work ended on'],
-      p['Land reclaimed (acres)'], p['RDF generated (MT)'], d['Destination'],
-      d['RDF disposed (MT)'], d['Date disposed'], d['Certificate'], d['Cert qty (MT)'],
-      d['Pending qty (MT)'], d['Cert status'], p['Uploaded by'], p['Uploader phone']];
+function toRow_(id, agency, x) {
+  const d = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : ''; };
+  return [
+    id, new Date(), txt_(agency), txt_(x.site), txt_(x.phase), d(x.start), d(x.end), x.awarded, x.processed,
+    d(x.remDate), d(x.rdfLast), x.rdfDaily,
+    ...MATERIALS.map(m => x[m + '_cum']),
+    txt_(x.factories.map(f => f.name + ' (' + f.qty + ' MT)').join('; ')),
+    ...MATERIALS.map(m => x[m + '_bal']),
+    ...MATERIALS.map(m => d(x[m + '_tl'])),
+    ...MATERIALS.map(m => txt_(x[m + '_iss'])),
+    txt_(x.remarks),
+  ];
+}
+
+// ---------- read back (for "My sites" and Edit) ----------
+function parseFactories_(s) {
+  return String(s || '').split('; ').filter(String).map(p => {
+    const m = /^(.*) \(([\d.]+) MT\)$/.exec(p);
+    return m ? { name: m[1], qty: m[2] } : { name: p, qty: '' };
   });
 }
 
-function toCsv_(rows) {
+function toEntry_(r) {
+  const iso = v => (v instanceof Date ? Utilities.formatDate(v, CONFIG.TZ, 'yyyy-MM-dd') : String(v == null ? '' : v));
+  const s = v => String(v == null ? '' : v);
+  const x = {
+    id: s(r['Record ID']),
+    submitted: r['Submitted at'] instanceof Date ? Utilities.formatDate(r['Submitted at'], CONFIG.TZ, 'yyyy-MM-dd HH:mm') : s(r['Submitted at']),
+    site: s(r['Site']), phase: s(r['Phase']), start: iso(r['Start date']), end: iso(r['End date']),
+    awarded: s(r['Total qty awarded by ULB (MT)']), processed: s(r['Total qty processed by ULB (MT)']),
+    remDate: iso(r['Site 100% remediation date']), rdfLast: iso(r['Last date of RDF disposal']),
+    rdfDaily: s(r['RDF disposed per day (MT)']), remarks: s(r['Other remarks']),
+    factories: parseFactories_(r['RDF disposed factory name(s)']),
+  };
+  MATERIALS.forEach(m => {
+    x[m + '_cum'] = s(r['Cumulative ' + LABEL[m] + ' disposed (MT)']);
+    x[m + '_bal'] = s(r['Balance ' + LABEL[m] + ' at site (MT)']);
+    x[m + '_tl'] = iso(r['Timeline ' + LABEL[m] + ' disposal']);
+    x[m + '_iss'] = s(r['Issues ' + LABEL[m]]);
+  });
+  return x;
+}
+
+// ---------- CSV in Drive: one per agency + one for all agencies ----------
+function writeCsv_(agency) {
+  const sh = sheet_();
+  const vals = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, HEADERS.length).getValues();
   const cell = (v, i) => {
     if (v instanceof Date) v = Utilities.formatDate(v, CONFIG.TZ, i === 1 ? 'dd-MM-yyyy HH:mm' : 'dd-MM-yyyy');
-    v = String(v == null ? '' : v).replace(/^'/, '');
+    v = String(v == null ? '' : v);
     if (/^[=+\-@]/.test(v) && isNaN(Number(v))) v = "'" + v;   // no formulas when opened in Excel
     return '"' + v.replace(/"/g, '""') + '"';
   };
-  return [CSV_HEAD].concat(rows).map(r => r.map(cell).join(',')).join('\r\n');
+  const toCsv = rows => [HEADERS].concat(rows).map(r => r.map(cell).join(',')).join('\r\n');
+  const mine = toCsv(vals.filter(r => r[2] === agency));
+  const root = folder_(DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID), 'RDF Planning');
+  put_(folder_(root, folderName_(agency)), agency + '_RDF_plan.csv', mine);
+  put_(root, 'All_agencies_RDF_plan.csv', toCsv(vals));
+  return mine;
 }
-
-function writeCsv_(dir, name, csv) {
-  const old = dir.getFilesByName(name);
-  if (old.hasNext()) old.next().setContent(csv);
-  else dir.createFile(name, csv, MimeType.CSV);
-}
-
-// One CSV per agency — rewritten on every change. Same file as "Download all my data".
-function agencyCsv_(agency) {
-  const csv = toCsv_(dataRows_(agency));
-  writeCsv_(path_(['RDF Planning Records', agency]), agency + '_RDF_data.csv', csv);
-  return csv;
-}
-
-// Every agency: the All_RDF_data tab and All_agencies_RDF_data.csv — rebuilt on every change.
-// Also safe to Run by hand after editing RDF_plan / RDF_dispatch directly.
-function allData_() {
-  const rows = dataRows_(null);
-  const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName('All_RDF_data');
-  if (!sh) {
-    sh = ss.insertSheet('All_RDF_data');
-    sh.setFrozenRows(1);
-  }
-  sh.clearContents();
-  const phone = CSV_HEAD.indexOf('Uploader phone');
-  // Text read back from the sheet must stay text: no formulas, phone keeps its leading digits.
-  const vals = rows.map(r => r.map((v, i) => i === phone ? "'" + String(v).replace(/^'/, '') : (typeof v === 'string' ? txt_(v) : v)));
-  sh.getRange(1, 1, 1, CSV_HEAD.length).setValues([CSV_HEAD]).setFontWeight('bold').setBackground('#e6f4ea');
-  if (vals.length) sh.getRange(2, 1, vals.length, CSV_HEAD.length).setValues(vals);
-  sh.getRange('B:B').setNumberFormat('dd-MM-yyyy HH:mm');
-  sh.getRange('H:I').setNumberFormat('dd-MM-yyyy');
-  sh.getRange('N:N').setNumberFormat('dd-MM-yyyy');
-  writeCsv_(path_(['RDF Planning Records']), 'All_agencies_RDF_data.csv', toCsv_(rows));
-}
-
-function rebuildAllData() { allData_(); }
 
 // ---------- helpers ----------
-function sheet_(n) { return SpreadsheetApp.getActive().getSheetByName(n); }
-
-function rows_(n) {
-  const sh = sheet_(n);
-  if (!sh || sh.getLastRow() < 2) return [];
-  const v = sh.getDataRange().getValues();
-  const h = v.shift().map(k => String(k).trim());
-  return v.map(r => { const o = {}; h.forEach((k, i) => { o[k] = r[i]; }); return o; });
-}
-
-function append_(n, head, rows) {
-  if (!rows.length) return;
-  const sh = ensureSheet_(n, head);
-  sh.getRange(sh.getLastRow() + 1, 1, rows.length, head.length).setValues(rows);
-}
-
-// Get a tab, creating it with its header row if it is missing or empty (no need to run setup first).
-function ensureSheet_(n, head) {
+function sheet_() {
   const ss = SpreadsheetApp.getActive();
-  const sh = ss.getSheetByName(n) || ss.insertSheet(n);
+  let sh = ss.getSheetByName(CONFIG.SHEET);
+  if (!sh) sh = ss.insertSheet(CONFIG.SHEET);
   if (sh.getLastRow() === 0) {
-    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#e6f4ea');
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold').setBackground('#e6f4ea').setWrap(true);
     sh.setFrozenRows(1);
-    if (n === 'RDF_plan') {
-      sh.getRange('M:M').setNumberFormat('0.0%');
-      sh.getRange('B:B').setNumberFormat('dd-MM-yyyy HH:mm');
-      sh.getRange('H:I').setNumberFormat('dd-MM-yyyy');
-    } else if (n === 'RDF_dispatch') {
-      sh.getRange('G:G').setNumberFormat('dd-MM-yyyy');
-      sh.getRange('M:M').setNumberFormat('dd-MM-yyyy HH:mm');
-    }
+    sh.setFrozenColumns(5);
+    DATE_COLS.forEach(c => sh.getRange(2, c + 1, sh.getMaxRows() - 1).setNumberFormat('dd-mm-yyyy'));
+    sh.getRange(2, 2, sh.getMaxRows() - 1).setNumberFormat('dd-mm-yyyy hh:mm');
   }
   return sh;
 }
 
-function path_(names) {                       // get-or-create nested folders
-  if (!CONFIG.ROOT_FOLDER_ID) throw new Error('ROOT_FOLDER_ID is not set in Code.gs.');
-  return names.reduce((dir, n) => {
-    n = folderName_(n);
-    const it = dir.getFoldersByName(n);
-    return it.hasNext() ? it.next() : dir.createFolder(n);
-  }, DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID));
+function rows_() {
+  const sh = sheet_();
+  if (sh.getLastRow() < 2) return [];
+  const v = sh.getRange(1, 1, sh.getLastRow(), HEADERS.length).getValues();
+  const h = v.shift().map(k => String(k).trim());
+  return v.map(r => { const o = {}; h.forEach((k, i) => { o[k] = r[i]; }); return o; });
 }
 
-function save_(dir, f, prefix) {              // f = {name, mimeType, data(base64)}
-  const bytes = Utilities.base64Decode(String(f.data || ''));
-  if (!bytes.length) throw new Error('Empty file: ' + f.name);
-  if (bytes.length > CONFIG.MAX_FILE_MB * 1024 * 1024) throw new Error('File too large: ' + f.name);
-  const name = prefix + '_' + (clean_(f.name).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120) || 'file');
-  const blob = Utilities.newBlob(bytes, String(f.mimeType || 'application/octet-stream'), name);
-  return dir.createFile(blob).getUrl();
+function folder_(parent, name) {
+  const it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
 }
-
-function pdf_(dir, id, when, p) {
-  const tpl = HtmlService.createTemplateFromFile('Pdf');
-  tpl.p = p; tpl.id = id; tpl.when = when;
-  tpl.fmt = (n, d) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: d == null ? 2 : d });
-  const blob = tpl.evaluate().getBlob().getAs(MimeType.PDF).setName(id + '_' + folderName_(p.site) + '.pdf');
-  return dir.createFile(blob);
+function put_(dir, name, text) {
+  const it = dir.getFilesByName(name);
+  if (it.hasNext()) it.next().setContent(text);
+  else dir.createFile(name, text, MimeType.CSV);
 }
-
-function clean_(s) { return String(s == null ? '' : s).trim(); }
-function lc_(s) { return clean_(s).toLowerCase(); }
-function num_(v) { return typeof v === 'number' ? v : (parseFloat(String(v == null ? '' : v).replace(/,/g, '')) || 0); }
-function folderName_(s) { return clean_(s).replace(/[\\/]/g, '-').slice(0, 100) || '_'; }
+function folderName_(s) { return String(s).trim().replace(/[\\/]/g, '-').slice(0, 100) || '_'; }
 // User text written to the sheet: a leading = + - @ would otherwise become a formula.
-function txt_(s) { s = clean_(s); return /^[=+\-@]/.test(s) ? "'" + s : s; }
+function txt_(s) { s = String(s == null ? '' : s).trim(); return /^[=+\-@]/.test(s) ? "'" + s : s; }
 
-function positive_(v, label) {
-  const n = Number(v);
-  if (v === '' || v == null || !isFinite(n) || n <= 0) throw new Error(label + ': enter a number above 0.');
-  return n;
-}
-function nonNeg_(v, label) {
-  if (v === '' || v == null) return 0;
-  const n = Number(v);
-  if (!isFinite(n) || n < 0) throw new Error(label + ': enter a number.');
-  return n;
-}
-function date_(s, label) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(clean_(s));
-  if (!m) throw new Error(label + ': enter a date.');
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
-function iso_(v) { return v instanceof Date ? Utilities.formatDate(v, CONFIG.TZ, 'yyyy-MM-dd') : clean_(v); }
-function fmtDate_(d) { return Utilities.formatDate(d, CONFIG.TZ, 'dd-MM-yyyy'); }
-
-// ---------- run once ----------
+// ---------- optional: run once to check setup ----------
 function setup() {
+  if (!CONFIG.ROOT_FOLDER_ID) throw new Error('Set ROOT_FOLDER_ID in CONFIG first.');
   DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID);   // fails loudly if the ID is wrong
-  const ss = SpreadsheetApp.getActive();
-  ensureSheet_('RDF_plan', PLAN_HEAD);
-  ensureSheet_('RDF_dispatch', DISP_HEAD);
-  allData_();
-  if (!ss.getSheetByName('Sites')) Logger.log('WARNING: no "Sites" tab. Import Phase_data.csv and rename the tab to Sites.');
+  sheet_();                                          // creates RDF_plan_v2 with its header row
   Logger.log('Build ' + BUILD);
-  Logger.log('Agencies that can log in: ' + (agencies_().join(', ') || 'none — run makePins() and paste AGENCY_PINS'));
-}
-
-// Logs a fresh AGENCY_PINS block (keeps existing PINs/passwords, random 4-digit PIN for new agencies).
-// Copy it from View › Logs (Execution log) over the AGENCY_PINS block above.
-function makePins() {
-  const names = {};
-  rows_('Sites').forEach(r => { const a = clean_(r.agency_name); if (a) names[a] = 1; });
-  const lines = Object.keys(names).sort().map(a =>
-    "  '" + a.replace(/'/g, "\\'") + "': '" + (AGENCY_PINS[a] || String(1000 + Math.floor(Math.random() * 9000))) + "',");
-  Logger.log('const AGENCY_PINS = {\n' + lines.join('\n') + '\n};');
+  Logger.log('Agencies that can log in: ' + (agencyNames_().join(', ') || 'none — fill AGENCY_PINS'));
 }
