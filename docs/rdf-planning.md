@@ -38,7 +38,7 @@ session, so an agency can only see and edit its own entries.
    `ROOT_FOLDER_ID`, and the `AGENCY_PINS` block (keep the quotes).
 3. Optional: run **setup** once — it checks the folder and creates `RDF_plan_v2`.
 4. **Deploy › Manage deployments › ✎ › Version: New version › Deploy.** The `/exec` URL stays the same.
-5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-28-v2b"`.
+5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-28-v2c"` and `"sheet":"RDF_plan_v2"`.
    If the website says *"The RDF server (Apps Script) is an older version than this form"*, the
    new Code.gs was pasted but not deployed as a **New version** (or not pasted at all).
 6. Deploy the website: `git pull origin main` then `gcloud app deploy app.yaml --quiet`.

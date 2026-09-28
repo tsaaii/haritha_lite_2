@@ -7,7 +7,7 @@
 //
 // Sheet tab:
 //   RDF_plan_v2   one row per site + phase entry (32 columns). Editing an entry
-//                 rewrites its row. Created automatically on first submit.
+//                 rewrites its row. Created automatically the first time it's needed.
 //                 (The v1 tabs RDF_plan / RDF_dispatch / All_RDF_data are left as they are.)
 // Drive (under ROOT_FOLDER_ID), rewritten on every submit:
 //   RDF Planning/<Agency>/<Agency>_RDF_plan.csv   ← the file the agency downloads
@@ -17,7 +17,6 @@ const CONFIG = {
   TOKEN: 'CHANGE-ME-long-random-string',   // must equal RDF_SCRIPT_TOKEN in app.yaml
   ROOT_FOLDER_ID: '',                      // Drive folder "Haritha RDF" — the part after /folders/ in its URL
   TZ: 'Asia/Kolkata',
-  SHEET: 'RDF_plan_v2',
   MAX_PIN_TRIES: 5,                        // wrong PINs before that agency name is locked out …
   LOCK_MINUTES: 15,                        // … for this long
 };
@@ -28,8 +27,14 @@ const AGENCY_PINS = {
   // 'Tharuni Associates': '1234',
 };
 
-const BUILD = '2026-09-28-v2b';   // shown by doGet — bump when you change this file
+// ---------- nothing below this line needs editing ----------
+const BUILD = '2026-09-28-v2c';   // shown by doGet — bump when you change this file
 const API_VERSION = 2;            // the website refuses to log in if this doesn't match
+const SHEET = 'RDF_plan_v2';      // the one tab this script writes to
+// Defaults, so an older CONFIG block (kept from a previous version) still works.
+const TZ = CONFIG.TZ || 'Asia/Kolkata';
+const MAX_PIN_TRIES = CONFIG.MAX_PIN_TRIES || 5;
+const LOCK_MINUTES = CONFIG.LOCK_MINUTES || 15;
 
 const MATERIALS = ['RDF', 'Soil', 'Inert', 'CnD'];
 const LABEL = { RDF: 'RDF', Soil: 'Soil', Inert: 'Inert', CnD: 'C&D' };
@@ -50,7 +55,7 @@ const DATE_COLS = [5, 6, 9, 10, 21, 22, 23, 24];   // 0-based: start, end, remDa
 // ---------- HTTP ----------
 function doGet() {
   // Open the /exec URL in a browser to see which code the live deployment runs.
-  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only', agencies: agencyNames_().length });
+  return json_({ ok: true, service: 'rdf_planning', build: BUILD, note: 'POST only', agencies: agencyNames_().length, sheet: SHEET });
 }
 
 function doPost(e) {
@@ -97,16 +102,16 @@ function checkPin_(name, pin) {
   const cache = CacheService.getScriptCache();
   const key = 'pinfail_' + Utilities.base64EncodeWebSafe(norm_(name)).slice(0, 200);
   const fails = Number(cache.get(key) || 0);
-  if (fails >= CONFIG.MAX_PIN_TRIES) {
-    throw new Error('Too many wrong attempts. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
+  if (fails >= MAX_PIN_TRIES) {
+    throw new Error('Too many wrong attempts. Try again in ' + LOCK_MINUTES + ' minutes.');
   }
   const a = find_(name);
   if (!a || String(pin) !== String(AGENCY_PINS[a])) {
-    const left = CONFIG.MAX_PIN_TRIES - fails - 1;
-    cache.put(key, String(fails + 1), CONFIG.LOCK_MINUTES * 60);
+    const left = MAX_PIN_TRIES - fails - 1;
+    cache.put(key, String(fails + 1), LOCK_MINUTES * 60);
     throw new Error(left > 0
       ? 'Agency name or PIN is wrong. ' + left + ' attempt' + (left === 1 ? '' : 's') + ' left.'
-      : 'Too many wrong attempts. Try again in ' + CONFIG.LOCK_MINUTES + ' minutes.');
+      : 'Too many wrong attempts. Try again in ' + LOCK_MINUTES + ' minutes.');
   }
   cache.remove(key);
   return a;
@@ -122,7 +127,7 @@ function bootstrap_(agency) {
 
 // ---------- validation (same rules as the form) ----------
 function clean_(x) {
-  const today = Utilities.formatDate(new Date(), CONFIG.TZ, 'yyyy-MM-dd');
+  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
   const e = [];
   const str = k => String(x[k] == null ? '' : x[k]).trim();
   const out = {};
@@ -217,7 +222,7 @@ function save_(agency, entry) {
 
 function newId_() {   // caller holds the script lock
   const props = PropertiesService.getScriptProperties();
-  let id = 'RDF-' + Utilities.formatDate(new Date(), CONFIG.TZ, 'yyMMdd-HHmmss');
+  let id = 'RDF-' + Utilities.formatDate(new Date(), TZ, 'yyMMdd-HHmmss');
   const last = props.getProperty('lastId') || '';
   if (last === id || last.indexOf(id + '-') === 0) id += '-' + (Number(last.split('-')[3] || 1) + 1);
   props.setProperty('lastId', id);
@@ -248,11 +253,11 @@ function parseFactories_(s) {
 }
 
 function toEntry_(r) {
-  const iso = v => (v instanceof Date ? Utilities.formatDate(v, CONFIG.TZ, 'yyyy-MM-dd') : String(v == null ? '' : v));
+  const iso = v => (v instanceof Date ? Utilities.formatDate(v, TZ, 'yyyy-MM-dd') : String(v == null ? '' : v));
   const s = v => String(v == null ? '' : v);
   const x = {
     id: s(r['Record ID']),
-    submitted: r['Submitted at'] instanceof Date ? Utilities.formatDate(r['Submitted at'], CONFIG.TZ, 'yyyy-MM-dd HH:mm') : s(r['Submitted at']),
+    submitted: r['Submitted at'] instanceof Date ? Utilities.formatDate(r['Submitted at'], TZ, 'yyyy-MM-dd HH:mm') : s(r['Submitted at']),
     site: s(r['Site']), phase: s(r['Phase']), start: iso(r['Start date']), end: iso(r['End date']),
     awarded: s(r['Total qty awarded by ULB (MT)']), processed: s(r['Total qty processed by ULB (MT)']),
     remDate: iso(r['Site 100% remediation date']), rdfLast: iso(r['Last date of RDF disposal']),
@@ -275,7 +280,7 @@ function writeCsv_(agency) {
   const sh = sheet_();
   const vals = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, HEADERS.length).getValues();
   const cell = (v, i) => {
-    if (v instanceof Date) v = Utilities.formatDate(v, CONFIG.TZ, i === 1 ? 'dd-MM-yyyy HH:mm' : 'dd-MM-yyyy');
+    if (v instanceof Date) v = Utilities.formatDate(v, TZ, i === 1 ? 'dd-MM-yyyy HH:mm' : 'dd-MM-yyyy');
     v = String(v == null ? '' : v);
     if (/^[=+\-@]/.test(v) && isNaN(Number(v))) v = "'" + v;   // no formulas when opened in Excel
     return '"' + v.replace(/"/g, '""') + '"';
@@ -291,8 +296,8 @@ function writeCsv_(agency) {
 // ---------- helpers ----------
 function sheet_() {
   const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName(CONFIG.SHEET);
-  if (!sh) sh = ss.insertSheet(CONFIG.SHEET);
+  let sh = ss.getSheetByName(SHEET);
+  if (!sh) sh = ss.insertSheet(SHEET);
   const head = sh.getLastRow() === 0 ? [] : sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
   if (head.length && head.length < HEADERS.length && head.every((h, i) => h === HEADERS[i])) {
     // Tab made by an earlier build: add the new column names at the end.
