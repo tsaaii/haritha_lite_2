@@ -106,7 +106,8 @@ def _s(v, n: int = 200) -> str:
 
 
 MATERIALS = ("RDF", "Soil", "Inert", "CnD")
-TEXT_FIELDS = ("id", "site", "phase", "start", "end", "awarded", "processed", "remDate", "rdfLast", "rdfDaily")
+TEXT_FIELDS = ("id", "site", "phase", "start", "end", "awarded", "processed", "remDate", "rdfLast", "rdfDaily",
+               "reclaimed", "freshDump")
 LONG_FIELDS = ("remarks",) + tuple(m + "_iss" for m in MATERIALS)
 SHORT_FIELDS = tuple(m + s for m in MATERIALS for s in ("_cum", "_bal", "_tl"))
 
@@ -119,6 +120,13 @@ def _entry(raw: dict) -> dict:
         for f in (raw.get("factories") or [])[:30] if isinstance(f, dict)
     ]
     return e
+
+
+# Code.gs reports API_VERSION; a mismatch means the Apps Script deployment is
+# older than this form (e.g. new version not deployed) and submits would fail oddly.
+API_VERSION = 2
+_OUTDATED = ("The RDF server (Apps Script) is an older version than this form. "
+             "Paste the latest Code.gs and deploy it as a New version.")
 
 
 def _too_big():
@@ -169,6 +177,8 @@ def api_login():
     except UpstreamError as exc:
         # Wrong name / PIN / lockout come back as a 400 from _call; surface as 401.
         return (jsonify(ok=False, error=str(exc)), 401) if exc.status == 400 else _err(exc)
+    if data.get("api") != API_VERSION:
+        return jsonify(ok=False, error=_OUTDATED), 503
     # Apps Script returns the registered spelling of the agency name.
     session[SESSION_KEY] = data["agency"]
     session.permanent = True
@@ -194,6 +204,8 @@ def api_me():
             session.pop(SESSION_KEY, None)
             return _signed_out()
         return _err(exc)
+    if data.get("api") != API_VERSION:
+        return jsonify(ok=False, error=_OUTDATED), 503
     data.pop("ok", None)
     return jsonify(ok=True, **data)
 
