@@ -1,23 +1,20 @@
 """
-RDF_planning — mobile form agencies use to report RDF generated, where it was
-sent, and the co-processing certificates cement / WtE plants issue for it.
+RDF_planning (v2) — mobile form agencies use to report, per site and phase,
+quantities awarded / processed and the disposal of RDF, Soil, Inert and C&D.
 
     GET  /rdf_planning                  -> 301 to /rdf_planning/
-    GET  /rdf_planning/                 -> the form (PIN login until signed in)
-    GET  /rdf_planning/api/agencies     -> agency names for the login dropdown
+    GET  /rdf_planning/                 -> the form (log in with agency name + PIN)
     POST /rdf_planning/api/login        -> {agency, pin}; signs the agency in
     POST /rdf_planning/api/logout
-    GET  /rdf_planning/api/me           -> this agency's sites / phases / destinations
-    GET  /rdf_planning/api/pending      -> ?site=  earlier entries missing a certificate
-    POST /rdf_planning/api/submit       -> one RDF_plan row + one RDF_dispatch row per destination
-    POST /rdf_planning/api/certificate  -> late co-processing certificate for a pending entry
-    GET  /rdf_planning/api/csv          -> <Agency>_RDF_data.csv (the same file kept in Drive)
+    GET  /rdf_planning/api/me           -> this agency's entries + factory suggestions
+    POST /rdf_planning/api/submit       -> {entry}; new row, or rewrites the entry's row if entry.id
+    GET  /rdf_planning/api/csv          -> <Agency>_RDF_plan.csv (the same file kept in Drive)
 
 Same shape as views/field.py: Flask is a thin proxy and the Apps Script
-(apps_script/rdf_planning/Code.gs) owns the sheet and the Drive folders.
-One difference: the PIN is checked once at login, then the agency lives in
-the signed Flask session — the browser never keeps the PIN, and one agency
-cannot read or write another agency's rows.
+(apps_script/rdf_planning/Code.gs) owns the sheet and the Drive CSVs.
+The PIN is checked once at login, then the agency lives in the signed Flask
+session — the browser never keeps the PIN, and one agency cannot read or
+write another agency's rows.
 """
 from __future__ import annotations
 
@@ -36,10 +33,9 @@ SESSION_KEY = "rdf_agency"
 
 SCRIPT_URL = os.environ.get("RDF_SCRIPT_URL", "").strip()
 SCRIPT_TOKEN = os.environ.get("RDF_SCRIPT_TOKEN", "").strip()
-# Submissions upload files and render a PDF in Apps Script — allow longer than field reports.
-UPSTREAM_TIMEOUT_S = int(os.environ.get("RDF_UPSTREAM_TIMEOUT_S", "120"))
-# App Engine rejects bodies over 32 MB; stay under it with a readable error.
-MAX_BODY_BYTES = 30 * 1024 * 1024
+UPSTREAM_TIMEOUT_S = int(os.environ.get("RDF_UPSTREAM_TIMEOUT_S", "60"))
+# One entry is a few KB of text; anything much bigger is not from the form.
+MAX_BODY_BYTES = 256 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -109,27 +105,20 @@ def _s(v, n: int = 200) -> str:
     return str(v if v is not None else "")[:n]
 
 
-def _file(f) -> dict | None:
-    if not isinstance(f, dict) or not isinstance(f.get("data"), str) or not f["data"]:
-        return None
-    return {"name": _s(f.get("name"), 200), "mimeType": _s(f.get("mimeType"), 100), "data": f["data"]}
+MATERIALS = ("RDF", "Soil", "Inert", "CnD")
+TEXT_FIELDS = ("id", "site", "phase", "start", "end", "awarded", "processed", "remDate", "rdfLast", "rdfDaily")
+LONG_FIELDS = ("remarks",) + tuple(m + "_iss" for m in MATERIALS)
+SHORT_FIELDS = tuple(m + s for m in MATERIALS for s in ("_cum", "_bal", "_tl"))
 
 
-def _record(raw: dict) -> dict:
-    dispatches = []
-    for d in (raw.get("dispatches") or [])[:30]:
-        if not isinstance(d, dict):
-            continue
-        dispatches.append({
-            "dest": _s(d.get("dest"), 150), "qty": _s(d.get("qty"), 20), "date": _s(d.get("date"), 10),
-            "hasCert": _s(d.get("hasCert"), 3), "certQty": _s(d.get("certQty"), 20),
-            "certFile": _file(d.get("certFile")),
-        })
-    attachments = [f for f in (_file(x) for x in (raw.get("attachments") or [])[:10]) if f]
-    rec = {k: _s(raw.get(k)) for k in (
-        "site", "phase", "cluster", "awarded", "startDate", "endDate", "land", "rdfGen", "uploader", "phone")}
-    rec.update(dispatches=dispatches, attachments=attachments)
-    return rec
+def _entry(raw: dict) -> dict:
+    e = {k: _s(raw.get(k), 150) for k in TEXT_FIELDS + SHORT_FIELDS}
+    e.update({k: _s(raw.get(k), 2000) for k in LONG_FIELDS})
+    e["factories"] = [
+        {"name": _s(f.get("name"), 150), "qty": _s(f.get("qty"), 20)}
+        for f in (raw.get("factories") or [])[:30] if isinstance(f, dict)
+    ]
+    return e
 
 
 def _too_big():
@@ -152,7 +141,7 @@ def root():
 def form_view():
     cfg = {
         "api": {k: url_for(f"rdf.api_{k}") for k in (
-            "agencies", "login", "logout", "me", "pending", "submit", "certificate", "csv")},
+            "login", "logout", "me", "submit", "csv")},
         "maxBodyBytes": MAX_BODY_BYTES,
     }
     resp = Response(render_template(
@@ -169,27 +158,19 @@ def form_view():
 # JSON API (thin proxy)
 # ---------------------------------------------------------------------------
 
-@bp.route(URL_PREFIX + "/api/agencies")
-def api_agencies():
-    try:
-        data = _call("agencies")
-    except UpstreamError as exc:
-        return _err(exc)
-    return jsonify(ok=True, agencies=data.get("agencies") or [])
-
-
 @bp.route(URL_PREFIX + "/api/login", methods=["POST"])
 def api_login():
     raw = request.get_json(silent=True) or {}
-    agency, pin = _s(raw.get("agency")), _s(raw.get("pin"), 64)
+    agency, pin = _s(raw.get("agency"), 100).strip(), _s(raw.get("pin"), 64)
     if not agency or not pin:
-        return jsonify(ok=False, error="Select your agency and enter the PIN or password."), 400
+        return jsonify(ok=False, error="Enter your agency name and PIN."), 400
     try:
         data = _call("login", {"agency": agency, "pin": pin})
     except UpstreamError as exc:
-        # Wrong PIN / lockout come back as a 400 from _call; surface as 401.
+        # Wrong name / PIN / lockout come back as a 400 from _call; surface as 401.
         return (jsonify(ok=False, error=str(exc)), 401) if exc.status == 400 else _err(exc)
-    session[SESSION_KEY] = agency
+    # Apps Script returns the registered spelling of the agency name.
+    session[SESSION_KEY] = data["agency"]
     session.permanent = True
     data.pop("ok", None)
     return jsonify(ok=True, **data)
@@ -207,7 +188,7 @@ def api_me():
     if not agency:
         return _signed_out()
     try:
-        data = _call("bootstrap", {"agency": agency})
+        data = _call("list", {"agency": agency})
     except UpstreamError as exc:
         if exc.status == 400:           # agency removed from AGENCY_PINS since login
             session.pop(SESSION_KEY, None)
@@ -217,59 +198,21 @@ def api_me():
     return jsonify(ok=True, **data)
 
 
-@bp.route(URL_PREFIX + "/api/pending")
-def api_pending():
-    agency = _agency()
-    if not agency:
-        return _signed_out()
-    site = _s(request.args.get("site"))
-    if not site:
-        return jsonify(ok=True, pending=[])
-    try:
-        data = _call("pending", {"agency": agency, "site": site})
-    except UpstreamError as exc:
-        return _err(exc)
-    return jsonify(ok=True, pending=data.get("pending") or [])
-
-
 @bp.route(URL_PREFIX + "/api/submit", methods=["POST"])
 def api_submit():
     agency = _agency()
     if not agency:
         return _signed_out()
     if _too_big():
-        return jsonify(ok=False, error="Files are too large together. Remove some or use smaller photos."), 413
+        return jsonify(ok=False, error="Entry is too large."), 413
     raw = request.get_json(silent=True) or {}
-    record = _record(raw.get("record") or {})
-    if not record["site"] or not record["dispatches"]:
-        return jsonify(ok=False, error="Site and at least one destination are required."), 400
+    entry = _entry(raw.get("entry") if isinstance(raw.get("entry"), dict) else {})
     try:
-        data = _call("submit", {"agency": agency, "record": record})
+        data = _call("submit", {"agency": agency, "entry": entry})
     except UpstreamError as exc:
         return _err(exc)
     data.pop("ok", None)
     return jsonify(ok=True, **data)
-
-
-@bp.route(URL_PREFIX + "/api/certificate", methods=["POST"])
-def api_certificate():
-    agency = _agency()
-    if not agency:
-        return _signed_out()
-    if _too_big():
-        return jsonify(ok=False, error="File is too large."), 413
-    raw = request.get_json(silent=True) or {}
-    file = _file(raw.get("file"))
-    if not file:
-        return jsonify(ok=False, error="Attach the certificate."), 400
-    try:
-        data = _call("certificate", {
-            "agency": agency, "recordId": _s(raw.get("recordId"), 40),
-            "line": _s(raw.get("line"), 4), "certQty": _s(raw.get("certQty"), 20), "file": file,
-        })
-    except UpstreamError as exc:
-        return _err(exc)
-    return jsonify(ok=True, left=data.get("left"), pending=data.get("pending") or [])
 
 
 @bp.route(URL_PREFIX + "/api/csv")
@@ -281,7 +224,7 @@ def api_csv():
         data = _call("csv", {"agency": agency})
     except UpstreamError as exc:
         return _err(exc)
-    name = (secure_filename(agency) or "agency") + "_RDF_data.csv"
+    name = (secure_filename(agency) or "agency") + "_RDF_plan.csv"
     # BOM so Excel opens it as UTF-8.
     return Response("﻿" + (data.get("csv") or ""), mimetype="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="{name}"',
