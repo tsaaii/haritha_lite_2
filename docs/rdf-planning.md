@@ -22,7 +22,8 @@ session, so an agency can only see and edit its own entries.
   reclaimed site*, Yes/No). A tab made by the earlier 30-column build gets the two headers added
   automatically; its old rows show them blank. Created automatically on the first submit. **Editing** an entry from "My sites"
   rewrites that same row (Submitted at is updated).
-- **Drive** (under the "Haritha RDF" folder), rewritten on every submit:
+- **Drive** (under the "Haritha RDF" folder), rewritten by a 5-minute timer after a submit
+  (installed by running `setup()` once; without it they're rewritten during the submit, which is slower):
   ```
   RDF Planning/<Agency>/<Agency>_RDF_plan.csv   ← "Download all my data (CSV)"
   RDF Planning/All_agencies_RDF_plan.csv
@@ -36,9 +37,10 @@ session, so an agency can only see and edit its own entries.
    `apps_script/rdf_planning/Code.gs`. Delete `Pdf.html` (not used any more).
 2. At the top of `Code.gs` set `TOKEN` (same as `RDF_SCRIPT_TOKEN` in `app.yaml`),
    `ROOT_FOLDER_ID`, and the `AGENCY_PINS` block (keep the quotes).
-3. Optional: run **setup** once — it checks the folder and creates `RDF_plan_v2`.
+3. Run **setup** once — it checks the folder, creates `RDF_plan_v2`, and installs the timer that
+   keeps the Drive CSVs up to date so submits don't wait for Drive (approve the new permission).
 4. **Deploy › Manage deployments › ✎ › Version: New version › Deploy.** The `/exec` URL stays the same.
-5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-28-v2c"` and `"sheet":"RDF_plan_v2"`.
+5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-28-v2d"` and `"sheet":"RDF_plan_v2"`.
    If the website says *"The RDF server (Apps Script) is an older version than this form"*, the
    new Code.gs was pasted but not deployed as a **New version** (or not pasted at all).
 6. Deploy the website: `git pull origin main` then `gcloud app deploy app.yaml --quiet`.
@@ -56,6 +58,10 @@ session, so an agency can only see and edit its own entries.
 - **Site status:** *Site is 100% reclaimed, with no disposals pending* (tick box) — when ticked, every
   balance at site must be 0 and a future 100% date gets a warning. *Is fresh waste being dumped on the
   site you reclaimed?* — Yes/No, required.
+- **Several sites:** after a submit, *+ Add another site / phase* starts the next entry; the agency
+  stays logged in. My sites lists every entry with Edit.
+- **Speed:** a submit only writes the sheet row. "Download all my data (CSV)" is built from the sheet,
+  so it always includes the latest entry; the Drive copies catch up within 5 minutes.
 - **Drafts:** an unfinished new entry is kept on the phone; "My sites" offers *Continue it* / *Discard*.
 - **Suggestions:** site and phase names from the agency's own entries; factory names from all
   agencies' entries.
