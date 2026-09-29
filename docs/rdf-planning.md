@@ -18,9 +18,10 @@ session, so an agency can only see and edit its own entries.
 ## What gets written
 
 - **Tab `RDF_plan_v2`** in the "Haritha RDF Planning" sheet — one row per site + phase entry,
-  32 columns (the last two: *Site 100% reclaimed, no disposals pending* and *Fresh waste dumped on
+  34 columns (columns 31–32: *Site 100% reclaimed, no disposals pending* and *Fresh waste dumped on
   reclaimed site*, Yes/No). A tab made by the earlier 30-column build gets the two headers added
-  automatically; its old rows show them blank. Created automatically on the first submit. **Editing** an entry from "My sites"
+  automatically; its old rows show them blank. Columns 33–34: *Plan to dispose RDF* and
+  *Where the remaining RDF goes*. Created automatically on the first submit. **Editing** an entry from "My sites"
   rewrites that same row (Submitted at is updated).
 - **Drive** (under the "Haritha RDF" folder), rewritten by a 5-minute timer after a submit
   (installed by running `setup()` once; without it they're rewritten during the submit, which is slower):
@@ -40,7 +41,7 @@ session, so an agency can only see and edit its own entries.
 3. Run **setup** once — it checks the folder, creates `RDF_plan_v2`, and installs the timer that
    keeps the Drive CSVs up to date so submits don't wait for Drive (approve the new permission).
 4. **Deploy › Manage deployments › ✎ › Version: New version › Deploy.** The `/exec` URL stays the same.
-5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-28-v2d"` and `"sheet":"RDF_plan_v2"`.
+5. Open the `/exec` URL in a browser: it must show `"build":"2026-09-29-v2e"` and `"sheet":"RDF_plan_v2"`.
    If the website says *"The RDF server (Apps Script) is an older version than this form"*, the
    new Code.gs was pasted but not deployed as a **New version** (or not pasted at all).
 6. Deploy the website: `git pull origin main` then `gcloud app deploy app.yaml --quiet`.
@@ -58,6 +59,8 @@ session, so an agency can only see and edit its own entries.
 - **Site status:** *Site is 100% reclaimed, with no disposals pending* (tick box) — when ticked, every
   balance at site must be 0 and a future 100% date gets a warning. *Is fresh waste being dumped on the
   site you reclaimed?* — Yes/No, required.
+- **RDF plan:** *What is your plan to dispose RDF?* and *Where does the remaining RDF go?* (free text,
+  RDF step) are required while Balance RDF at site is above 0, optional once it is 0.
 - **Several sites:** after a submit, *+ Add another site / phase* starts the next entry; the agency
   stays logged in. My sites lists every entry with Edit.
 - **Speed:** a submit only writes the sheet row. "Download all my data (CSV)" is built from the sheet,

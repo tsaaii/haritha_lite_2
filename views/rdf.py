@@ -108,7 +108,7 @@ def _s(v, n: int = 200) -> str:
 MATERIALS = ("RDF", "Soil", "Inert", "CnD")
 TEXT_FIELDS = ("id", "site", "phase", "start", "end", "awarded", "processed", "remDate", "rdfLast", "rdfDaily",
                "reclaimed", "freshDump")
-LONG_FIELDS = ("remarks",) + tuple(m + "_iss" for m in MATERIALS)
+LONG_FIELDS = ("remarks", "rdfPlan", "rdfRest") + tuple(m + "_iss" for m in MATERIALS)
 SHORT_FIELDS = tuple(m + s for m in MATERIALS for s in ("_cum", "_bal", "_tl"))
 
 

@@ -6,7 +6,7 @@
 // other action can be trusted — only Flask knows TOKEN.
 //
 // Sheet tab:
-//   RDF_plan_v2   one row per site + phase entry (32 columns). Editing an entry
+//   RDF_plan_v2   one row per site + phase entry (34 columns). Editing an entry
 //                 rewrites its row. Created automatically the first time it's needed.
 //                 (The v1 tabs RDF_plan / RDF_dispatch / All_RDF_data are left as they are.)
 // Drive (under ROOT_FOLDER_ID), rewritten in the background a few minutes after a submit
@@ -29,7 +29,7 @@ const AGENCY_PINS = {
 };
 
 // ---------- nothing below this line needs editing ----------
-const BUILD = '2026-09-28-v2d';   // shown by doGet — bump when you change this file
+const BUILD = '2026-09-29-v2e';   // shown by doGet — bump when you change this file
 const API_VERSION = 2;            // the website refuses to log in if this doesn't match
 const SHEET = 'RDF_plan_v2';      // the one tab this script writes to
 // Defaults, so an older CONFIG block (kept from a previous version) still works.
@@ -51,6 +51,7 @@ const HEADERS = [
   'Issues RDF', 'Issues Soil', 'Issues Inert', 'Issues C&D', 'Other remarks',
   // Added later — kept at the end so rows already in the tab stay aligned.
   'Site 100% reclaimed, no disposals pending', 'Fresh waste dumped on reclaimed site',
+  'Plan to dispose RDF', 'Where the remaining RDF goes',
 ];
 const DATE_COLS = [5, 6, 9, 10, 21, 22, 23, 24];   // 0-based: start, end, remDate, rdfLast, 4 timelines
 
@@ -170,6 +171,11 @@ function clean_(x) {
     text(m + '_iss');
   });
   text('remarks');
+  text('rdfPlan'); text('rdfRest');
+  if ((out.RDF_bal || 0) > 0) {
+    if (!out.rdfPlan) e.push('What is your plan to dispose RDF? is required while RDF is still at site.');
+    if (!out.rdfRest) e.push('Where does the remaining RDF go? is required while RDF is still at site.');
+  }
   out.reclaimed = str('reclaimed') === 'yes' ? 'Yes' : 'No';
   const fresh = str('freshDump');
   if (fresh !== 'yes' && fresh !== 'no') e.push('Answer Yes or No: is fresh waste being dumped on the reclaimed site?');
@@ -246,6 +252,7 @@ function toRow_(id, agency, x) {
     ...MATERIALS.map(m => txt_(x[m + '_iss'])),
     txt_(x.remarks),
     x.reclaimed, x.freshDump,
+    txt_(x.rdfPlan), txt_(x.rdfRest),
   ];
 }
 
@@ -270,6 +277,7 @@ function toEntry_(r) {
     factories: parseFactories_(r['RDF disposed factory name(s)']),
     reclaimed: r['Site 100% reclaimed, no disposals pending'] === 'Yes' ? 'yes' : '',
     freshDump: ({ Yes: 'yes', No: 'no' })[r['Fresh waste dumped on reclaimed site']] || '',
+    rdfPlan: s(r['Plan to dispose RDF']), rdfRest: s(r['Where the remaining RDF goes']),
   };
   MATERIALS.forEach(m => {
     x[m + '_cum'] = s(r['Cumulative ' + LABEL[m] + ' disposed (MT)']);
