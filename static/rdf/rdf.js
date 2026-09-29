@@ -41,7 +41,9 @@
     { name: 'RDF', cards: [
       { t: 'RDF disposal', d: 'Refuse-derived fuel sent to cement or waste-to-energy (WtE) plants.', dot: 'RDF', f: [F('rdfLast', 'Last date of RDF disposal', 'dateMax', 'Today or earlier', 1), F('rdfDaily', 'RDF disposed every day', 'num', 'Average per day. 0 if stopped.', 1), F('RDF_cum', 'Cumulative RDF disposed', 'num', 'Total sent so far', 1), F('RDF_bal', 'Balance RDF at site', 'num', 'Still waiting at site', 1)] },
       { t: 'Factories', d: 'Where the RDF went. One row per factory.', dot: 'RDF', factories: true },
-      { t: 'RDF timeline & issues', d: '', dot: 'RDF', f: [F('RDF_tl', 'Timeline to complete RDF disposal', 'date', 'Past or future'), F('RDF_iss', 'Any issues in disposing RDF?', 'area', 'Optional. Write as much as you need.', 0, 'e.g. Plant accepting only 2 trucks a day')] },
+      { t: 'RDF timeline & issues', d: '', dot: 'RDF', f: [F('RDF_tl', 'Timeline to complete RDF disposal', 'date', 'Past or future'),
+        F('rdfPlan', 'What is your plan to dispose RDF?', 'area', 'Required while RDF is still at site.', 0, 'e.g. 2 trucks a day to Dalmia Cement until the balance is cleared'),
+        F('rdfRest', 'Where does the remaining RDF go?', 'area', 'Required while RDF is still at site.', 0, 'e.g. Stored under cover at site, then to Jindal WtE'), F('RDF_iss', 'Any issues in disposing RDF?', 'area', 'Optional. Write as much as you need.', 0, 'e.g. Plant accepting only 2 trucks a day')] },
     ] },
     { name: 'Soil · Inert · C&D', cards: ['Soil', 'Inert', 'CnD'].map(m => ({ t: M[m], d: '', dot: m, f: [
       F(m + '_cum', 'Cumulative ' + M[m] + ' disposed', 'num', '0 or more', 1), F(m + '_bal', 'Balance ' + M[m] + ' at site', 'num', '0 or more', 1),
@@ -54,7 +56,7 @@
   const FAC_HINT = 'Cement or WtE plant, with the quantity sent there. Factories you used before are suggested.';
 
   function blank() {
-    const x = { id: '', site: '', phase: '', start: '', end: '', awarded: '', processed: '', remDate: '', reclaimed: '', freshDump: '', rdfLast: '', rdfDaily: '', factories: [{ name: '', qty: '' }], remarks: '' };
+    const x = { id: '', site: '', phase: '', start: '', end: '', awarded: '', processed: '', remDate: '', reclaimed: '', freshDump: '', rdfLast: '', rdfPlan: '', rdfRest: '', rdfDaily: '', factories: [{ name: '', qty: '' }], remarks: '' };
     MK.forEach(m => Object.assign(x, { [m + '_cum']: '', [m + '_bal']: '', [m + '_tl']: '', [m + '_iss']: '' }));
     return x;
   }
@@ -75,6 +77,7 @@
     ['start', 'end', 'remDate', 'rdfLast', ...MK.map(m => m + '_tl')].forEach(k => empty(k) && err(k, 'Pick a date.'));
     ['awarded', 'processed', 'rdfDaily', ...MK.flatMap(m => [m + '_cum', m + '_bal'])].forEach(k => empty(k) && err(k, 'Required. Enter 0 if none.'));
     if (x.freshDump !== 'yes' && x.freshDump !== 'no') err('freshDump', 'Choose Yes or No.');
+    if (num(x.RDF_bal) > 0) ['rdfPlan', 'rdfRest'].forEach(k => empty(k) && err(k, 'Required while RDF is still at site.'));
     if (x.reclaimed === 'yes') {
       MK.forEach(m => { if (num(x[m + '_bal']) > 0) err(m + '_bal', 'Site is marked 100% reclaimed with no disposals pending, so this must be 0.'); });
       if (x.remDate > t) warn('remDate', 'Site is marked 100% reclaimed, but this date is in the future.');
