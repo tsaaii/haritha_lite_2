@@ -1,16 +1,24 @@
 # RDF disposal report — rdf.advitiaum.com
 
 The daily RDF disposal report for Swachha Andhra Corporation, built from the Claude Design
-handoff ("RDF Disposal Report"). You open it with a PIN. The **gear icon** uploads each day's
-tracker CSV, and **Save as PDF** prints the A4 report. Every upload adds a day to the
-"Disposed so far" graph, so the graph grows as the days go by.
+handoff ("RDF Disposal Report"). You open it with a PIN.
+
+**Daily use: one step.** Sign in, click the **gear icon**, and pick (or drop) the day's tracker CSV.
+That single action does everything:
+1. The sheet is checked, then stored under its "as on" date.
+2. The report on screen updates in place: figures, graph (one more point) and tables.
+3. The export-ready A4 PDF downloads (`RDF_disposal_report_<date>.pdf`).
+
+If a file isn't a tracker, the panel stays open and says why, and nothing changes.
+**Save as PDF** downloads the same PDF again at any time.
 
 | Piece | File |
 | --- | --- |
 | Routes, PIN login, upload API | `views/rdf_report.py` (registered in `main.py`) |
 | CSV parsing + storage (local or GCS) + CLI | `data/rdf_tracker.py` |
-| Figures, statuses, chart SVG | `data/rdf_report.py` |
-| Page / PIN page / styles / gear panel | `templates/rdf_report/`, `static/rdf_report/` |
+| Figures, statuses, chart (SVG + shared marks) | `data/rdf_report.py` |
+| Export-ready A4 PDF (ReportLab, vector) | `data/rdf_report_pdf.py` |
+| Page / sheet partial / PIN page / styles / gear panel | `templates/rdf_report/`, `static/rdf_report/` |
 | The 12 trackers from the design session (1–13 Oct) | `data/rdf_seed/` |
 
 URLs: `https://rdf.advitiaum.com/` (the report is served at `/` on any `rdf.*` host) and
@@ -32,7 +40,10 @@ URLs: `https://rdf.advitiaum.com/` (the report is served at `/` on any `rdf.*` h
   disposed" column. Nothing is estimated.
 - **Graph**: one point per day on file: MT disposed each day (green), MT a day needed to clear
   by the deadline (red dashed), and MT left (dark).
-- **Removing a day**: gear icon › Remove. The raw upload stays in `uploads/`.
+- **Removing a day**: gear icon › Remove. The report updates in place. The raw upload stays in `uploads/`.
+- **PDF**: generated on the server from the same figures and chart geometry as the page. It is
+  ink-light like the design (colour only in text and lines) and has page numbers. The PDF uses
+  Times because the Palatino files are not shipped, so its typeface differs slightly from the page.
 - Every page load lists `trackers/` and re-reads only the files that changed, so an upload
   shows up immediately on every App Engine instance.
 
