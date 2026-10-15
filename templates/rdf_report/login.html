@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0B3D22">
+<title>RDF disposal report · Sign in</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='rdf_report/report.css') }}">
+</head>
+<body>
+<main class="pin-shell">
+  <section class="pin-card" aria-labelledby="pin-title">
+    <div class="rh__left">
+      <span class="rh__org">Swachha Andhra Corporation</span>
+      <span class="rh__title" id="pin-title">RDF disposal report</span>
+    </div>
+    {% if error %}<div class="msg msg--err" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="{{ url_for('rdf_report.login') }}" autocomplete="off">
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <label>Enter PIN
+        <input class="pin-input" type="password" name="pin" inputmode="numeric" autocomplete="current-password"
+               required autofocus{% if not configured %} disabled{% endif %}>
+      </label>
+      <button type="submit" class="btn btn--primary"{% if not configured %} disabled{% endif %}>Open report</button>
+    </form>
+  </section>
+</main>
+</body>
+</html>
