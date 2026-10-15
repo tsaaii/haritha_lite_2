@@ -17,3 +17,6 @@
 __pycache__/
 # Ignored by the build system
 /setup.cfg
+# Local RDF report store
+rdf_tracker_data/
+.venv/

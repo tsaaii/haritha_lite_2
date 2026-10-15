@@ -45,3 +45,7 @@ GET /admin/refresh-cache
 | `data/aggregate.py` `main_cards()` | The 8 agency cards |
 | `static/css/dashboard.css` `:root` | Theme colours / spacing tokens |
 | `overrides.csv` | Hard-override any metric value |
+
+## RDF disposal report
+
+`rdf.advitiaum.com` (also `/rdf_report/`): PIN-gated daily report; upload the tracker CSV from the gear icon. See [docs/rdf-report.md](docs/rdf-report.md).

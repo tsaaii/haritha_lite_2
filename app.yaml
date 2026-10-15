@@ -40,6 +40,10 @@ env_variables:
   RDF_SCRIPT_URL: ""
   RDF_SCRIPT_TOKEN: ""
 
+  # /rdf_report (rdf.advitiaum.com) — daily tracker CSVs + PIN hash live here (docs/rdf-report.md).
+  RDF_TRACKER_DIR: "gs://advitia-weighbridge-data/rdf_report"
+  RDF_DEADLINE: "2026-11-15"
+
 automatic_scaling:
   min_instances: 1
   max_instances: 4

@@ -10,6 +10,7 @@ Routes:
     GET/POST /sites/<slug> -> per-site dashboard gate (sites blueprint)
     GET  /record-images/... -> weighbridge image proxy + 2x2 viewer
     GET  /rdf_planning/ + /rdf_planning/api/* -> agency RDF form (views/rdf.py)
+    GET  /rdf_report/ (and / on rdf.advitiaum.com) -> RDF disposal report (views/rdf_report.py)
 """
 from __future__ import annotations
 
@@ -35,6 +36,7 @@ from views.sites import bp as sites_bp
 from views.record_images import bp as record_images_bp
 from views.field import bp as field_bp 
 from views.rdf import bp as rdf_bp
+from views.rdf_report import bp as rdf_report_bp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -90,6 +92,8 @@ def create_app() -> Flask:
     app.register_blueprint(record_images_bp)
     app.register_blueprint(field_bp) 
     app.register_blueprint(rdf_bp)
+    # Before overview(): on rdf.* it answers "/" with the report.
+    app.register_blueprint(rdf_report_bp)
 
     @app.route("/")
     def overview():

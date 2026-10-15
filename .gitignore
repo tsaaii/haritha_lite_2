@@ -8,3 +8,5 @@ venv/
 .idea/
 .vscode/
 *.log
+# Local RDF report store (RDF_TRACKER_DIR default)
+rdf_tracker_data/
