@@ -40,6 +40,12 @@ a:hover { color: var(--green-900); }
   align-items: center; gap: 12px; flex-wrap: wrap; }
 .toolbar__right { display: flex; align-items: center; gap: 10px; }
 .toolbar a { font-size: 15px; white-space: nowrap; }
+.sheet-slot { width: 100%; display: flex; justify-content: center; }
+.sheet-slot.is-busy { opacity: .45; transition: opacity 150ms ease-out; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10; max-width: calc(100vw - 32px);
+  padding: 10px 18px; border-radius: var(--radius-pill); background: var(--green-900); color: var(--white);
+  font-size: 15px; box-shadow: 0 12px 32px rgba(11, 61, 34, 0.14); }
+.toast--err { background: var(--red-600); }
 .sheet { width: 100%; max-width: 794px; background: var(--white); padding: 36px 40px; border-radius: 4px;
   box-shadow: 0 8px 30px rgba(11, 61, 34, 0.10); display: flex; flex-direction: column; gap: 18px; }
 .alert { width: 100%; max-width: 794px; padding: 12px 16px; border-radius: var(--radius-md);
@@ -153,7 +159,7 @@ dialog.panel::backdrop { background: rgba(18, 26, 20, 0.35); }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #FFFFFF; }
   .page { padding: 0; }
-  [data-noprint], dialog { display: none !important; }
+  [data-noprint], dialog, .toast { display: none !important; }
   .sheet { box-shadow: none !important; padding: 0 !important; margin: 0 !important; max-width: none !important; border-radius: 0 !important; }
   .scroll-x { overflow: visible !important; }
   .scroll-x > * { min-width: 0 !important; }

@@ -119,10 +119,21 @@ def _nice(v: float) -> float:
     return math.ceil(v / p * 2) / 2 * p
 
 
-def chart_svg(pts: list[Point], dl: date) -> str:
+CHART_W, CHART_H = 640, 280
+
+
+def chart_marks(pts: list[Point], dl: date) -> list[tuple]:
+    """Chart as drawing primitives, top-left origin, in a 640x280 box.
+
+    ("line", x1, y1, x2, y2, stroke)
+    ("path", [(x, y), ...], stroke, width, dash)   dash "" or "6 4"
+    ("dot", cx, cy, r, fill, ring)
+    ("text", x, y, s, fill, anchor, bold)          y is the baseline, 11px
+    Colours are CSS vars (var(--green-700)); rdf_report_pdf maps them to hex.
+    """
     if not pts:
-        return ""
-    W, H, L, R, T, B = 640, 280, 54, 58, 22, 34
+        return []
+    W, H, L, R, T, B = CHART_W, CHART_H, 54, 58, 22, 34
     n = len(pts)
     slot = (W - L - R) / n
 
@@ -141,26 +152,20 @@ def chart_svg(pts: list[Point], dl: date) -> str:
     def y2(v):
         return T + (1 - v / m2) * (H - T - B)
 
-    out: list[str] = []
+    out: list[tuple] = []
 
     def txt(xx, yy, s, fill, anchor="middle", bold=False):
-        out.append(f'<text x="{xx:.1f}" y="{yy:.1f}" text-anchor="{anchor}" '
-                   f'style="font-size:11px;font-family:var(--font-serif);fill:{fill};'
-                   f'{"font-weight:700;" if bold else ""}">{escape(s)}</text>')
+        out.append(("text", xx, yy, s, fill, anchor, bold))
 
     def path(vals, stroke, width, dash=""):
-        d = " ".join(f"{'L' if i else 'M'}{x(i):.1f},{v:.1f}" for i, v in enumerate(vals))
-        out.append(f'<path d="{d}" style="fill:none;stroke:{stroke};stroke-width:{width};'
-                   f'stroke-linejoin:round;{"stroke-dasharray:" + dash + ";" if dash else ""}"/>')
+        out.append(("path", [(x(i), v) for i, v in enumerate(vals)], stroke, width, dash))
 
     def dots(vals, fill, r, ring=True):
-        for i, v in enumerate(vals):
-            out.append(f'<circle cx="{x(i):.1f}" cy="{v:.1f}" r="{r}" style="fill:{fill};'
-                       f'{"stroke:var(--white);stroke-width:1.2;" if ring else ""}"/>')
+        out.extend(("dot", x(i), v, r, fill, ring) for i, v in enumerate(vals))
 
-    for i, fr in enumerate((0, 0.25, 0.5, 0.75, 1)):
+    for fr in (0, 0.25, 0.5, 0.75, 1):
         yy = T + (1 - fr) * (H - T - B)
-        out.append(f'<line x1="{L}" x2="{W - R}" y1="{yy:.1f}" y2="{yy:.1f}" style="stroke:var(--ink-100)"/>')
+        out.append(("line", L, yy, W - R, yy, "var(--ink-100)"))
         txt(L - 6, yy + 4, fk(m1 * fr), GREEN, "end")
         txt(W - R + 6, yy + 4, fk(m2 * fr), INK5, "start")
     txt(2, T - 8, "MT disposed", GREEN, "start")
@@ -192,8 +197,32 @@ def chart_svg(pts: list[Point], dl: date) -> str:
     txt(x(n - 1), y1(lp.today) - 6, fk(lp.today), GREEN, bold=True)
     txt(x(n - 1) - 8, y2(lp.bal) + 18 if clash and ry <= by else y2(lp.bal) - 10,
         fk(lp.bal) + " left", INK9, "end", bold=True)
+    return out
 
-    return (f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Disposed so far, all agencies" '
+
+def chart_svg(pts: list[Point], dl: date) -> str:
+    out = []
+    for m in chart_marks(pts, dl):
+        if m[0] == "line":
+            _, x1, y1, x2, y2, st = m
+            out.append(f'<line x1="{x1}" x2="{x2}" y1="{y1:.1f}" y2="{y2:.1f}" style="stroke:{st}"/>')
+        elif m[0] == "path":
+            _, xy, st, w, dash = m
+            d = " ".join(f"{'L' if i else 'M'}{a:.1f},{b:.1f}" for i, (a, b) in enumerate(xy))
+            out.append(f'<path d="{d}" style="fill:none;stroke:{st};stroke-width:{w};'
+                       f'stroke-linejoin:round;{"stroke-dasharray:" + dash + ";" if dash else ""}"/>')
+        elif m[0] == "dot":
+            _, cx, cy, r, fill, ring = m
+            out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r}" style="fill:{fill};'
+                       f'{"stroke:var(--white);stroke-width:1.2;" if ring else ""}"/>')
+        else:
+            _, tx, ty, s, fill, anchor, bold = m
+            out.append(f'<text x="{tx:.1f}" y="{ty:.1f}" text-anchor="{anchor}" '
+                       f'style="font-size:11px;font-family:var(--font-serif);fill:{fill};'
+                       f'{"font-weight:700;" if bold else ""}">{escape(s)}</text>')
+    if not out:
+        return ""
+    return (f'<svg viewBox="0 0 {CHART_W} {CHART_H}" role="img" aria-label="Disposed so far, all agencies" '
             f'style="width:100%;height:auto;display:block">{"".join(out)}</svg>')
 
 
@@ -288,6 +317,7 @@ def build(hist: list[Tracker]) -> dict | None:
         "range_label": f"{day(series[0].d)} to {day(rep)}",
         "k": {"today": fmt(today), "need": fmt(need), "cum": fmt(cum), "bal": fmt(bal),
               "pct": _pct_s(cum, bal), "sites": len(S), "verdict": verdict, "status_color": status_color},
-        "chart": chart_svg(series, dl), "proj_text": proj_text,
+        "chart": chart_svg(series, dl), "chart_marks": chart_marks(series, dl), "proj_text": proj_text,
+        "rep_iso": rep.isoformat(),
         "ag_rows": ag_rows, "least": least_rows, "groups": groups,
     }

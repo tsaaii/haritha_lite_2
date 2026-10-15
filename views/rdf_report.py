@@ -4,8 +4,11 @@ RDF disposal report — the daily, printable report for Swachha Andhra Corporati
     GET  /rdf_report/                 -> the report (PIN page if not signed in)
     POST /rdf_report/login            -> {pin} form post
     GET  /rdf_report/logout
+    GET  /rdf_report/report.pdf       -> export-ready A4 PDF of the latest report
     GET  /rdf_report/api/trackers     -> days on file (gear panel)
-    POST /rdf_report/api/upload       -> multipart "files": one or more daily tracker CSVs
+    POST /rdf_report/api/upload       -> multipart "files": one or more daily tracker CSVs;
+                                         replies with the re-rendered report sheet + PDF link
+                                         so one upload updates the page and downloads the PDF
     POST /rdf_report/api/delete       -> {date: "YYYY-MM-DD"}
 
 On the rdf.* host (rdf.advitiaum.com) the report is also served at "/".
@@ -19,11 +22,11 @@ from __future__ import annotations
 import logging
 from functools import wraps
 
-from flask import Blueprint, jsonify, make_response, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, jsonify, make_response, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 import captcha
-from data import rdf_report, rdf_tracker
+from data import rdf_report, rdf_report_pdf, rdf_tracker
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("rdf_report", __name__, template_folder="../templates")
@@ -77,20 +80,27 @@ def root():
     return redirect(url_for("rdf_report.report_view"), code=301)
 
 
+def _report() -> tuple[dict | None, str]:
+    """(report view model or None if no days on file, error message)."""
+    try:
+        return rdf_report.build(rdf_tracker.history()), ""
+    except Exception:
+        logger.exception("rdf_report: could not load trackers")
+        return None, "Could not read the uploaded trackers. Try again in a minute."
+
+
+def _pdf_url(r: dict) -> str:
+    # ?d= makes each day's PDF a distinct URL so nothing serves a stale cached copy.
+    return url_for("rdf_report.report_pdf", d=r["rep_iso"])
+
+
 @bp.route(URL_PREFIX + "/")
 def report_view():
     if not _signed_in():
         return _login_page()
-    try:
-        hist = rdf_tracker.history()
-    except Exception:
-        logger.exception("rdf_report: could not load trackers")
-        hist = []
-        load_error = "Could not read the uploaded trackers. Try again in a minute."
-    else:
-        load_error = ""
+    r, load_error = _report()
     return _no_cache(render_template(
-        "rdf_report/report.html", r=rdf_report.build(hist), load_error=load_error,
+        "rdf_report/report.html", r=r, load_error=load_error, pdf_url=_pdf_url(r) if r else "",
         cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in ("trackers", "upload", "delete")},
              "maxBytes": MAX_UPLOAD_BYTES},
     ))
@@ -143,6 +153,18 @@ def logout():
     return redirect("/" if request.host.lower().startswith(HOST_PREFIX) else url_for("rdf_report.report_view"))
 
 
+@bp.route(URL_PREFIX + "/report.pdf")
+def report_pdf():
+    if not _signed_in():
+        return redirect(url_for("rdf_report.report_view"))
+    r, err = _report()
+    if not r:
+        return (err or "No daily trackers uploaded yet."), 404
+    resp = Response(rdf_report_pdf.build_pdf(r), mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = f'attachment; filename="{rdf_report_pdf.filename(r)}"'
+    return _no_cache(resp)
+
+
 # ---------------------------------------------------------------------------
 # Gear panel API
 # ---------------------------------------------------------------------------
@@ -176,7 +198,19 @@ def api_upload():
         results.append({"file": name, "ok": True, "date": t.date.isoformat(),
                         "label": rdf_report.day(t.date) + f" {t.date.year}",
                         "sites": len(t.sites), "replaced": replaced})
-    return jsonify(ok=any(r["ok"] for r in results), results=results)
+    ok = any(x["ok"] for x in results)
+    out = {"ok": ok, "results": results}
+    if ok:
+        out.update(_sheet_payload())
+    return jsonify(out)
+
+
+def _sheet_payload() -> dict:
+    """Fresh report sheet HTML + where to fetch its PDF, for in-place page updates."""
+    r, _ = _report()
+    return {"sheet_html": render_template("rdf_report/_sheet.html", r=r),
+            "rep_label": r["rep_label"] if r else "", "pdf_url": _pdf_url(r) if r else "",
+            "pdf_name": rdf_report_pdf.filename(r) if r else ""}
 
 
 @bp.route(URL_PREFIX + "/api/delete", methods=["POST"])
@@ -187,4 +221,4 @@ def api_delete():
         rdf_tracker.remove(d)
     except rdf_tracker.TrackerError as exc:
         return jsonify(ok=False, error=str(exc)), 400
-    return jsonify(ok=True)
+    return jsonify(ok=True, **_sheet_payload())
