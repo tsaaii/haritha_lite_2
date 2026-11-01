@@ -13,11 +13,14 @@ const CONFIG = {
   AUTO_REPLY: true,           // send the person who filled the form a short "we've got your message" email
   REPLY_TO: 'wecare@advitiaum.com', // where their replies to the auto-reply go
   RETENTION_MONTHS: 12,       // Visits older than this are deleted daily (run setup() once)
+  DAILY_SUMMARY: true,        // one short traffic email a day to NOTIFY_TO …
+  SUMMARY_HOUR: 9,            // … at this hour (Google fires it within that hour) …
+  SUMMARY_TZ: 'America/New_York', // … in this time zone (US Eastern, follows EST/EDT). Re-run setup() after changing.
   TZ: 'Asia/Kolkata',
 };
 
 // ---------- nothing below this line needs editing ----------
-const BUILD = '2026-11-01-v2';
+const BUILD = '2026-11-01-v3';
 const LEADS = 'Leads', VISITS = 'Visits';
 const LEAD_COLS = [
   ['Received (IST)', 'received_at'], ['Name', 'name'], ['Email', 'email'], ['Looking for', 'interest'], ['Details', 'details'],
@@ -160,8 +163,10 @@ function visit_(d) {
 // ---------- Housekeeping ----------
 // Run once from the editor: installs the daily retention cleanup.
 function setup() {
-  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'purgeOldVisits').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.getProjectTriggers().filter(t => ['purgeOldVisits', 'dailySummary'].indexOf(t.getHandlerFunction()) >= 0)
+    .forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('purgeOldVisits').timeBased().everyDays(1).atHour(3).inTimezone(CONFIG.TZ).create();
+  if (CONFIG.DAILY_SUMMARY) ScriptApp.newTrigger('dailySummary').timeBased().everyDays(1).atHour(CONFIG.SUMMARY_HOUR).inTimezone(CONFIG.SUMMARY_TZ).create();
   sheet_(LEADS, LEAD_COLS); sheet_(VISITS, VISIT_COLS);
   buildSummary();
 }
@@ -218,6 +223,58 @@ function purgeOldVisits() {
   // Rows are appended in time order: delete the leading block that is older than the cutoff.
   let n = 0; while (n < started.length && started[n][0] && started[n][0] < stamp) n++;
   if (n) withLock_(() => sh.deleteRows(2, n));
+}
+
+// ---------- Daily traffic summary ----------
+// Last 24 hours of human visits (datacenter traffic excluded) and leads, in one short email.
+// Run it from the editor any time to get one immediately.
+function dailySummary() {
+  const now = new Date(), since = new Date(now.getTime() - 24 * 3600 * 1000);
+  const cutoff = Utilities.formatDate(since, CONFIG.TZ, 'yyyy-MM-dd HH:mm:ss');   // sheet times are IST text
+  const visits = rows_(VISITS).filter(v => v['Started (IST)'] >= cutoff && v['Datacenter?'] !== 'yes');
+  const leads = rows_(LEADS).filter(l => l['Received (IST)'] >= cutoff);
+
+  const people = new Set(visits.map(v => v['Visitor ID'] || v['Visit ID'])).size;
+  const returning = new Set(visits.filter(v => +v['Visit # (this browser)'] > 1).map(v => v['Visitor ID'])).size;
+  const secs = visits.map(v => +v['Engaged (s)'] || 0).filter(x => x > 0);
+  const avg = secs.length ? Math.round(secs.reduce((a, b) => a + b, 0) / secs.length) : 0;
+  const top = (vals, n) => {
+    const m = {}; vals.filter(String).forEach(x => { m[x] = (m[x] || 0) + 1; });
+    return Object.keys(m).sort((a, b) => m[b] - m[a]).slice(0, n || 5).map(k => k + ' (' + m[k] + ')');
+  };
+  const host = u => { const x = /^https?:\/\/([^\/?#]+)/i.exec(u || ''); return x ? x[1].replace(/^www\./, '') : ''; };
+  const source = v => v['Link (?r=)'] ? 'link: ' + v['Link (?r=)'] : v['UTM source'] ? 'utm: ' + v['UTM source'] : host(v['Referrer']) || 'direct';
+  const mins = s => s >= 60 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : s + 's';
+
+  const lines = [
+    ['Visits', visits.length + ' from ' + people + ' ' + (people === 1 ? 'person' : 'people') + (returning ? ' (' + returning + ' returning)' : '')],
+    ['Avg time on site', secs.length ? mins(avg) : '—'],
+    ['Top locations', top(visits.map(v => [v['City'], v['Country']].filter(String).join(', '))).join(' · ') || '—'],
+    ['Devices', top(visits.map(v => v['Device'] + (v['OS'] ? ' ' + v['OS'] : '')), 4).join(' · ') || '—'],
+    ['Sources', top(visits.map(source)).join(' · ') || '—'],
+    ['Links opened', top(visits.map(v => v['Link (?r=)']), 10).join(' · ') || 'none'],
+    ['Leads', leads.length ? leads.map(l => l['Name'] + ' — ' + l['Looking for']).join(' · ') : 'none'],
+  ];
+  if (!CONFIG.DAILY_SUMMARY) return lines;
+  const subject = 'advitiaum.com · last 24h: ' + visits.length + ' visit' + (visits.length === 1 ? '' : 's')
+    + (leads.length ? ', ' + leads.length + ' lead' + (leads.length === 1 ? '' : 's') : '');
+  const html = '<div style="font-family:Georgia,serif;color:#121A14;max-width:560px">'
+    + '<p style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#0F7A3E;margin:0 0 12px">Daily traffic · advitiaum.com</p>'
+    + '<table style="border-collapse:collapse;width:100%;font-size:15px">'
+    + lines.map(r => '<tr><td style="padding:8px 14px 8px 0;color:#5C6B62;vertical-align:top;white-space:nowrap">' + esc_(r[0])
+      + '</td><td style="padding:8px 0;border-bottom:1px solid #E8EDEA">' + esc_(r[1]) + '</td></tr>').join('')
+    + '</table><p style="color:#5C6B62;font-size:13px;margin-top:18px">Last 24 hours, bots and cloud-server traffic excluded. '
+    + 'Every visit is in the Visits tab; the map is in Summary: <a href="' + SpreadsheetApp.getActive().getUrl() + '" style="color:#0F7A3E">open the sheet</a>.</p></div>';
+  tryMail_('daily summary', { to: CONFIG.NOTIFY_TO, name: 'Advitia Labs website', subject: subject, htmlBody: html,
+    body: lines.map(r => r[0] + ': ' + r[1]).join('\n') });
+  return lines;
+}
+
+function rows_(name) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const all = sh.getDataRange().getDisplayValues(), head = all[0];
+  return all.slice(1).map(r => { const o = {}; head.forEach((h, i) => { o[h] = r[i]; }); return o; });
 }
 
 // ---------- helpers ----------

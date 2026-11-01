@@ -14,6 +14,7 @@ function makeSheet(name) {
     formulas: {}, charts: [],
     newChart() { const o = { setChartType() { return o; }, addRange() { return o; }, setPosition() { return o; }, setOption() { return o; }, build: () => ({}) }; return o; },
     insertChart(c) { sh.charts.push(c); },
+    getDataRange: () => ({ getDisplayValues: () => rows.map(r => rows[0].map((_, i) => r[i] == null ? '' : String(r[i]))) }),
     getRange(r, c, nr, nc) {
       if (typeof r === 'string') { const m = /^([A-Z]+)(\d+)/.exec(r); c = [...m[1]].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0); r = +m[2]; nr = 1; nc = 1; }
       return {
@@ -38,7 +39,7 @@ function makeSheet(name) {
 const sheets = {}, mails = [];
 const ctx = {
   console,
-  SpreadsheetApp: { getActive: () => ({ getSheetByName: n => sheets[n] || null, insertSheet: n => (sheets[n] = makeSheet(n)), deleteSheet: sh => { delete sheets[sh.name]; } }) },
+  SpreadsheetApp: { getActive: () => ({ getSheetByName: n => sheets[n] || null, insertSheet: n => (sheets[n] = makeSheet(n)), deleteSheet: sh => { delete sheets[sh.name]; }, getUrl: () => 'https://docs.google.com/spreadsheets/d/TEST' }) },
   Charts: { ChartType: { GEO: 'geo' } },
   MailApp: { sendEmail: m => mails.push(m) },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
@@ -128,5 +129,31 @@ assert.ok(f.includes('select N, count(A)'), 'device = N');
 assert.ok(f.includes('LEFT(Visits!B2:B, 10)') && f.includes('Visits!L2:L'));
 assert.strictEqual(sum.charts.length, 1);
 assert.strictEqual(ctx.colLetter_(1), 'A'); assert.strictEqual(ctx.colLetter_(26), 'Z'); assert.strictEqual(ctx.colLetter_(32), 'AF');
+
+// Daily summary: last 24 h only, datacenter excluded, one email to NOTIFY_TO
+ctx.Utilities.formatDate = () => '2026-11-01 00:00:00';     // pretend the 24 h window starts here (IST text)
+const H = sheets.Visits.rows[0], vrow = o => H.map(h => o[h] || '');
+sheets.Visits.rows.length = 1;
+sheets.Visits.rows.push(
+  vrow({ 'Visit ID': 'OLD1', 'Started (IST)': '2026-10-30 10:00:00', 'City': 'Delhi', 'Country': 'IN', 'Visitor ID': 'p0' }),
+  vrow({ 'Visit ID': 'V1', 'Started (IST)': '2026-11-01 09:00:00', 'City': 'Bengaluru', 'Country': 'IN', 'Device': 'Mobile', 'OS': 'iOS', 'Visitor ID': 'p1', 'Visit # (this browser)': '1', 'Engaged (s)': '120', 'Referrer': 'https://www.linkedin.com/feed/' }),
+  vrow({ 'Visit ID': 'V2', 'Started (IST)': '2026-11-01 11:00:00', 'City': 'Bengaluru', 'Country': 'IN', 'Device': 'Mobile', 'OS': 'iOS', 'Visitor ID': 'p1', 'Visit # (this browser)': '2', 'Engaged (s)': '60' }),
+  vrow({ 'Visit ID': 'V3', 'Started (IST)': '2026-11-01 20:00:00', 'City': 'San Francisco', 'Country': 'US', 'Device': 'Desktop', 'OS': 'macOS', 'Visitor ID': 'p2', 'Visit # (this browser)': '1', 'Link (?r=)': 'yc-garry', 'Engaged (s)': '300' }),
+  vrow({ 'Visit ID': 'BOT', 'Started (IST)': '2026-11-01 21:00:00', 'City': 'Ashburn', 'Country': 'US', 'Datacenter?': 'yes', 'Visitor ID': 'p9' }));
+const LH = sheets.Leads.rows[0]; sheets.Leads.rows.length = 1;
+sheets.Leads.rows.push(LH.map(h => ({ 'Received (IST)': '2026-11-01 20:05:00', 'Name': 'Garry', 'Looking for': 'Investing' }[h] || '')));
+mails.length = 0;
+const lines = Object.fromEntries(ctx.dailySummary());
+assert.strictEqual(mails.length, 1);
+assert.strictEqual(mails[0].to, 'wecare@advitiaum.com, saiteja7050@gmail.com');
+assert.ok(/last 24h: 3 visits, 1 lead$/.test(mails[0].subject), mails[0].subject);
+assert.strictEqual(lines['Visits'], '3 from 2 people (1 returning)');
+assert.strictEqual(lines['Avg time on site'], '2m 40s');
+assert.ok(lines['Top locations'].startsWith('Bengaluru, IN (2)') && lines['Top locations'].includes('San Francisco, US (1)') && !lines['Top locations'].includes('Ashburn') && !lines['Top locations'].includes('Delhi'));
+assert.ok(lines['Devices'].includes('Mobile iOS (2)') && lines['Devices'].includes('Desktop macOS (1)'));
+assert.ok(lines['Sources'].includes('linkedin.com (1)') && lines['Sources'].includes('link: yc-garry (1)') && lines['Sources'].includes('direct (1)'));
+assert.strictEqual(lines['Links opened'], 'yc-garry (1)');
+assert.strictEqual(lines['Leads'], 'Garry — Investing');
+assert.ok(mails[0].htmlBody.includes('https://docs.google.com/spreadsheets/d/TEST'));
 
 console.log('apps script: all assertions passed');

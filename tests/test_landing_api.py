@@ -154,11 +154,11 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(api.anonymize_ip("2001:db8:abcd:12:1:2:3:4"), "2001:db8:abcd::/48")
         self.assertEqual(api.anonymize_ip("not-an-ip"), "")
 
-    def test_page_has_form_and_privacy_note(self):
+    def test_page_has_form(self):
         body = app.test_client().get("/").get_data(as_text=True)
         self.assertIn('id="contact-form"', body)
         self.assertIn('name="t" value="', body)
-        self.assertIn('id="privacy"', body)
+        self.assertNotIn('id="privacy"', body)
         for key in api.INTERESTS:
             self.assertIn(f'value="{key}"', body)
 
