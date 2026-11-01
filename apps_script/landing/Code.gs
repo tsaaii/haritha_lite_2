@@ -10,12 +10,14 @@ const CONFIG = {
   TOKEN: 'CHANGE-ME-long-random-string',                  // must equal LANDING_SCRIPT_TOKEN in app.yaml
   NOTIFY_TO: 'wecare@advitiaum.com, saiteja7050@gmail.com', // lead emails go here (comma-separated)
   NOTIFY_ON_LINK_OPEN: true,  // email when someone opens a ?r=<name> link (first view of that visit)
+  AUTO_REPLY: true,           // send the person who filled the form a short "we've got your message" email
+  REPLY_TO: 'wecare@advitiaum.com', // where their replies to the auto-reply go
   RETENTION_MONTHS: 12,       // Visits older than this are deleted daily (run setup() once)
   TZ: 'Asia/Kolkata',
 };
 
 // ---------- nothing below this line needs editing ----------
-const BUILD = '2026-11-01-v1';
+const BUILD = '2026-11-01-v2';
 const LEADS = 'Leads', VISITS = 'Visits';
 const LEAD_COLS = [
   ['Received (IST)', 'received_at'], ['Name', 'name'], ['Email', 'email'], ['Looking for', 'interest'], ['Details', 'details'],
@@ -69,7 +71,7 @@ function lead_(d) {
     + rows.map(r => '<tr><td style="padding:8px 12px 8px 0;color:#5C6B62;vertical-align:top;white-space:nowrap">' + esc_(r[0])
       + '</td><td style="padding:8px 0;border-bottom:1px solid #E8EDEA;white-space:pre-wrap">' + esc_(r[1]) + '</td></tr>').join('')
     + '</table><p style="color:#5C6B62;font-size:13px;margin-top:20px">Reply to this email to answer ' + esc_(d.name) + ' directly.</p></div>';
-  MailApp.sendEmail({
+  tryMail_('lead notification', {
     to: CONFIG.NOTIFY_TO,
     replyTo: d.email,
     name: 'Advitia Labs website',
@@ -77,7 +79,45 @@ function lead_(d) {
     htmlBody: html,
     body: rows.map(r => r[0] + ': ' + r[1]).join('\n'),
   });
-  return { ok: true };
+  if (CONFIG.AUTO_REPLY) tryMail_('auto-reply', autoReply_(d));
+  return { ok: true };   // the row is saved even if an email fails
+}
+
+// The confirmation the sender receives. Deliberately contains NO text they typed except a cleaned
+// first name, and the category they picked from our fixed list — otherwise the form could be used
+// to make this account send arbitrary text to arbitrary addresses (a spam relay).
+function autoReply_(d) {
+  const first = firstName_(d.name), topic = String(d.interest || '').toLowerCase();
+  const p = 'margin:0 0 16px;font-size:16px;line-height:1.6';
+  const html = '<div style="font-family:Georgia,\'Palatino Linotype\',serif;color:#121A14;max-width:560px">'
+    + '<p style="' + p + '">Hi ' + esc_(first) + ',</p>'
+    + '<p style="' + p + '">Thank you for reaching out to Advitia Labs. We have received your message'
+    + (topic ? ' about <strong>' + esc_(topic) + '</strong>' : '') + ', and one of the founders will reply within one working day.</p>'
+    + '<p style="' + p + '">In the meantime, you can see how our two platforms work — legacy landfill remediation and household waste — at '
+    + '<a href="https://advitiaum.com/#platform" style="color:#0F7A3E">advitiaum.com</a>.</p>'
+    + '<p style="' + p + '">Team Advitia Labs<br><span style="color:#5C6B62">' + esc_(CONFIG.REPLY_TO) + '</span></p>'
+    + '<p style="margin:24px 0 0;font-size:12px;color:#9AA79F">You are receiving this because this address was entered in the contact form on advitiaum.com. If that was not you, you can ignore this email.</p></div>';
+  return {
+    to: d.email,
+    replyTo: CONFIG.REPLY_TO,
+    name: 'Advitia Labs',
+    subject: 'We have received your message — Advitia Labs',
+    htmlBody: html,
+    body: 'Hi ' + first + ',\n\nThank you for reaching out to Advitia Labs. We have received your message'
+      + (topic ? ' about ' + topic : '') + ', and one of the founders will reply within one working day.\n\n'
+      + 'See how our platforms work: https://advitiaum.com/#platform\n\nTeam Advitia Labs\n' + CONFIG.REPLY_TO,
+  };
+}
+
+function firstName_(name) {
+  // Latin (incl. accents), Devanagari, Bengali, Tamil, Telugu, Kannada, Malayalam. Anything else -> "there".
+  const w = String(name || '').trim().split(/\s+/)[0] || '';
+  const ok = /^[A-Za-z\u00C0-\u024F\u0900-\u097F\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F][A-Za-z\u00C0-\u024F\u0900-\u097F\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F.'-]{1,29}$/;
+  return ok.test(w) ? w : 'there';
+}
+
+function tryMail_(what, msg) {
+  try { MailApp.sendEmail(msg); } catch (err) { console.error(what + ' failed: ' + err); }
 }
 
 // ---------- Visits ----------
@@ -106,7 +146,7 @@ function visit_(d) {
   });
   if (notify) {
     const where = [d.city, d.region, d.country].filter(String).join(', ') || 'unknown location';
-    MailApp.sendEmail({
+    tryMail_('link-open notification', {
       to: CONFIG.NOTIFY_TO, name: 'Advitia Labs website',
       subject: 'Link opened: ' + oneLine_(d.ref) + ' — ' + where,
       body: 'Your link ?r=' + d.ref + ' was opened.\n\nWhere: ' + where + '\nNetwork: ' + (d.network || '—')
@@ -123,7 +163,51 @@ function setup() {
   ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'purgeOldVisits').forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('purgeOldVisits').timeBased().everyDays(1).atHour(3).inTimezone(CONFIG.TZ).create();
   sheet_(LEADS, LEAD_COLS); sheet_(VISITS, VISIT_COLS);
+  buildSummary();
 }
+
+// "Summary" tab: live formulas over Visits (datacenter traffic excluded) + a world map by country.
+// Safe to re-run; it rebuilds the tab.
+function buildSummary() {
+  const ss = SpreadsheetApp.getActive();
+  sheet_(VISITS, VISIT_COLS);
+  let sh = ss.getSheetByName('Summary');
+  if (sh) ss.deleteSheet(sh);
+  sh = ss.insertSheet('Summary', 0);
+  const c = name => colLetter_(VISIT_COLS.findIndex(x => x[0] === name) + 1);
+  const V = 'Visits!', human = c('Datacenter?') + " <> 'yes'";
+  const q = (cols, sel) => '=IFERROR(QUERY(' + V + 'A2:' + colLetter_(VISIT_COLS.length) + ', "' + sel + '", 0), "No visits yet")';
+  const blocks = [
+    ['A1', 'Visits by country', q(null, 'select ' + c('Country') + ', count(' + c('Visit ID') + ") where " + c('Country') + " <> '' and " + human
+      + ' group by ' + c('Country') + ' order by count(' + c('Visit ID') + ') desc label count(' + c('Visit ID') + ") 'Visits'")],
+    ['D1', 'Top cities', q(null, 'select ' + c('City') + ', ' + c('Region') + ', ' + c('Country') + ', count(' + c('Visit ID') + ') where '
+      + c('City') + " <> '' and " + human + ' group by ' + c('City') + ', ' + c('Region') + ', ' + c('Country')
+      + ' order by count(' + c('Visit ID') + ') desc limit 25 label count(' + c('Visit ID') + ") 'Visits'")],
+    ['I1', 'Opened links (?r=)', q(null, 'select ' + c('Link (?r=)') + ', count(' + c('Visit ID') + '), max(' + c('Started (IST)') + ') where '
+      + c('Link (?r=)') + " <> '' group by " + c('Link (?r=)') + ' order by max(' + c('Started (IST)') + ") desc label count("
+      + c('Visit ID') + ") 'Opens', max(" + c('Started (IST)') + ") 'Last opened (IST)'")],
+    ['M1', 'Top networks', q(null, 'select ' + c('Network') + ', count(' + c('Visit ID') + ') where ' + c('Network') + " <> '' group by "
+      + c('Network') + ' order by count(' + c('Visit ID') + ') desc limit 20 label count(' + c('Visit ID') + ") 'Visits'")],
+    ['P1', 'Devices', q(null, 'select ' + c('Device') + ', count(' + c('Visit ID') + ') where ' + c('Device') + " <> '' and " + human
+      + ' group by ' + c('Device') + ' order by count(' + c('Visit ID') + ') desc label count(' + c('Visit ID') + ") 'Visits'")],
+    ['S1', 'Visits per day (IST)', '=IFERROR(QUERY({ARRAYFORMULA(LEFT(' + V + c('Started (IST)') + '2:' + c('Started (IST)') + ', 10)), '
+      + V + c('Datacenter?') + '2:' + c('Datacenter?') + "}, \"select Col1, count(Col1) where Col1 <> '' and Col2 <> 'yes' group by Col1 order by Col1 desc limit 60 label count(Col1) 'Visits'\", 0), \"No visits yet\")"],
+  ];
+  blocks.forEach(b => {
+    const cell = sh.getRange(b[0]);
+    cell.setValue(b[1]).setFontWeight('bold').setFontColor('#0F7A3E');
+    sh.getRange(cell.getRow() + 1, cell.getColumn()).setFormula(b[2]);
+  });
+  sh.setFrozenRows(2);
+  try {
+    const chart = sh.newChart().setChartType(Charts.ChartType.GEO).addRange(sh.getRange('A3:B200'))
+      .setPosition(30, 1, 0, 0).setOption('title', 'Visitors by country (bots and datacenters excluded)')
+      .setOption('colorAxis', { colors: ['#E4F6E9', '#0FA14E', '#0B3D22'] }).setOption('width', 760).setOption('height', 420).build();
+    sh.insertChart(chart);
+  } catch (err) { console.warn('geo chart skipped: ' + err); }
+}
+
+function colLetter_(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; }
 
 function purgeOldVisits() {
   const sh = SpreadsheetApp.getActive().getSheetByName(VISITS);
