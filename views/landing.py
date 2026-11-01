@@ -17,14 +17,15 @@ import hashlib
 import os
 from datetime import datetime
 
-from flask import Blueprint, make_response, render_template
+from flask import Blueprint, make_response, render_template, request
 
 import config
+from views.landing_api import INTERESTS, form_token
 
 bp = Blueprint("landing", __name__, template_folder="../templates")
 
 _STATIC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "landing")
-_VERSIONED = ("css/landing.css", "js/landing.js", "js/calculator.js")
+_VERSIONED = ("css/landing.css", "js/landing.js", "js/calculator.js", "js/contact.js", "js/track.js")
 
 CANONICAL_URL = "https://advitiaum.com/"
 CONTACT_EMAIL = "wecare@advitiaum.com"
@@ -74,9 +75,13 @@ def index():
         canonical_url=CANONICAL_URL,
         email=CONTACT_EMAIL,
         year=datetime.now(config.IST).year,
+        form_t=form_token(),
+        interests=INTERESTS,
+        sent=request.args.get("sent"),  # no-JS form fallback result
     )
     resp = make_response(html)
-    resp.headers["Cache-Control"] = "public, max-age=300"
+    # private: the page embeds a signed form timestamp; keep shared caches out of it.
+    resp.headers["Cache-Control"] = "private, max-age=300"
     resp.headers["Content-Security-Policy"] = _CSP
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"

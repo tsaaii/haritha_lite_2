@@ -6,6 +6,7 @@ Flask + Jinja rebuild of the Swachh Andhra Pradesh dashboard, plus the Advitia L
 | --- | --- |
 | `/`, `/main` | Advitia Labs landing / pitch page ([docs/landing.md](docs/landing.md)) |
 | `/sac` | Swachha Andhra public dashboard (was `/`) |
+| `POST /api/contact`, `/api/seen` | Landing contact form and visit tracker → Google Sheet (setup in [docs/landing.md](docs/landing.md)) |
 | `rdf.advitiaum.com/` | RDF disposal report (unchanged) |
 
 ## Top 4 cards
