@@ -44,6 +44,13 @@ env_variables:
   RDF_TRACKER_DIR: "gs://advitia-weighbridge-data/rdf_report"
   RDF_DEADLINE: "2026-11-15"
 
+  # Landing page contact form + visit tracker (docs/landing.md, apps_script/landing/Code.gs).
+  # Until LANDING_SCRIPT_URL is set the form shows an "email us" fallback and visits go
+  # to Cloud Logging only. IPINFO_TOKEN (free at ipinfo.io) adds the visitor's network name.
+  LANDING_SCRIPT_URL: ""
+  LANDING_SCRIPT_TOKEN: ""
+  IPINFO_TOKEN: ""
+
 automatic_scaling:
   min_instances: 1
   max_instances: 4

@@ -226,10 +226,52 @@
     <div class="closing wrap">
       <h2 id="contact-title">Every tonne, accounted for.</h2>
       <p>We're onboarding pilot sites and partners. Bring us a landfill or a city's household waste — we'll bring the ledger.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="mailto:{{ email }}?subject=Pilot%20request">Request a pilot{{ arrow() }}</a>
-        <a class="btn btn-light" href="mailto:{{ email }}?subject=Founders">Talk to the founders{{ arrow() }}</a>
-      </div>
+
+      <form id="contact-form" class="cform" action="/api/contact" method="post" novalidate data-state="{{ 'sent' if sent == '1' else 'idle' }}">
+        <div class="cform-body">
+          <div class="cform-head">
+            <span class="caps">Get in touch</span>
+            <span class="cform-title">Tell us what you're working on.</span>
+          </div>
+          <div class="cform-row">
+            <div class="field">
+              <label for="cf-name">Name</label>
+              <input id="cf-name" name="name" type="text" autocomplete="name" maxlength="100" required placeholder="Your full name">
+            </div>
+            <div class="field">
+              <label for="cf-email">Work email</label>
+              <input id="cf-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required placeholder="you@company.com">
+            </div>
+          </div>
+          <fieldset class="field">
+            <legend>What are you looking for?</legend>
+            <div class="chips">
+              {%- for key, label in interests.items() %}
+              <label class="chip"><input type="radio" name="interest" value="{{ key }}" required{% if loop.first %} id="cf-interest"{% endif %}><span>{{ label }}</span></label>
+              {%- endfor %}
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="cf-details">Details <span class="opt">optional</span></label>
+            <textarea id="cf-details" name="details" rows="4" maxlength="2000" placeholder="Site, city, tonnage, timeline — or anything you'd like us to know."></textarea>
+          </div>
+          <div class="hp" aria-hidden="true"><label for="cf-website">Website</label><input id="cf-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+          <input type="hidden" name="t" value="{{ form_t }}">
+          <input type="hidden" name="ref" value="">
+          <input type="hidden" name="vid" value="">
+          <input type="hidden" name="referrer" value="">
+          <div class="cform-foot">
+            <button class="btn btn-primary cform-submit" type="submit"><span class="cform-label">Send message</span>{{ arrow() }}</button>
+            <p class="cform-err" role="alert">{% if sent == '0' %}That didn't go through. Please email us at <a href="mailto:{{ email }}">{{ email }}</a>.{% endif %}</p>
+          </div>
+        </div>
+        <div class="cform-done" role="status" tabindex="-1">
+          <svg class="cform-check" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="23"/><path d="m14 24.5 7 7 13-14"/></svg>
+          <span class="cform-title">Thank you. We'll be in touch within one working day.</span>
+          <span class="cform-sub">A copy of your message is with the founders now.</span>
+        </div>
+      </form>
+      <p class="cform-alt">Prefer email? <a href="mailto:{{ email }}">{{ email }}</a></p>
       <footer class="foot">
         <div class="foot-col"><span class="foot-brand">Advitia Labs</span><span class="foot-tag">Material recovery intelligence for legacy landfills and household waste.</span></div>
         <nav class="foot-col" aria-label="Platform"><span class="caps">Platform</span><a href="#platform">Product</a><a href="#ledger">Ledger</a><a href="#calculator">Calculator</a></nav>
@@ -237,10 +279,13 @@
         <div class="foot-col"><span class="caps">Contact</span><a href="mailto:{{ email }}">{{ email }}</a></div>
       </footer>
       <div class="foot-base caps"><span>© {{ year }} Advitia Labs</span><span>Every tonne in. Every fraction out.</span></div>
+      <p id="privacy" class="foot-privacy">Privacy: to understand who finds this site, we record anonymised visit data — approximate location, network, device, referring link and the sections you view — and keep a random visitor ID in your browser. Visit records are kept for 12 months and never sold. Messages you send are used only to reply to you. To have your data removed, email <a href="mailto:{{ email }}">{{ email }}</a>.</p>
     </div>
   </section>
 </main>
 
+<script src="{{ S }}js/track.js?v={{ v }}" defer></script>
+<script src="{{ S }}js/contact.js?v={{ v }}" defer></script>
 <script src="{{ S }}js/calculator.js?v={{ v }}" defer></script>
 <script src="{{ S }}vendor/react.production.min.js" defer></script>
 <script src="{{ S }}vendor/react-dom.production.min.js" defer></script>

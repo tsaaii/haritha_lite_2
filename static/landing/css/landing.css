@@ -297,6 +297,58 @@ section[id], div[id] { scroll-margin-top: calc(var(--nav-h) + 8px); }
 .foot-tag { color: var(--green-200); line-height: 1.5; }
 .foot-base { width: 100%; padding-top: 24px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; color: var(--green-200); }
 
+/* ---------- Contact form ---------- */
+.cform { width: 100%; max-width: 760px; margin-top: 12px; text-align: left; background: #fff; color: var(--ink-700); border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.12); position: relative; overflow: hidden; }
+.cform-body { display: flex; flex-direction: column; gap: 22px; padding: clamp(24px, 4.5vw, 44px); }
+.cform-head { display: flex; flex-direction: column; gap: 8px; }
+.cform-head .caps { color: var(--green-700); }
+.cform-title { font-size: clamp(24px, 2.6vw, 32px); line-height: 1.15; letter-spacing: -0.015em; color: var(--ink-900); text-wrap: balance; }
+.cform-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.field > label, .field > legend { padding: 0; font-size: var(--text-sm); font-weight: 700; color: var(--ink-900); }
+.field legend { margin-bottom: 8px; }
+.opt { font-weight: 400; color: var(--ink-500); margin-left: 6px; }
+.field input, .field textarea { width: 100%; font: inherit; font-size: 17px; color: var(--ink-900); background: var(--ink-050); border: 1.5px solid transparent; border-radius: 14px;
+  padding: 14px 16px; min-height: 54px; transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease; -webkit-appearance: none; appearance: none; }
+.field textarea { resize: vertical; min-height: 116px; line-height: 1.5; }
+.field input::placeholder, .field textarea::placeholder { color: var(--ink-300); }
+.field input:hover, .field textarea:hover { border-color: var(--ink-200); }
+.field input:focus, .field textarea:focus { outline: none; background: #fff; border-color: var(--green-600); box-shadow: var(--focus-ring); }
+.field.is-invalid input, .field.is-invalid textarea { border-color: var(--red-600); background: #fff; }
+.field.is-invalid .chip span { border-color: var(--red-600); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; cursor: pointer; }
+.chip input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.chip span { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1.5px solid var(--ink-200); background: #fff; color: var(--ink-700);
+  font-size: 15px; font-weight: 700; transition: all 200ms var(--ease); user-select: none; }
+.chip:hover span { border-color: var(--green-600); color: var(--green-800); }
+.chip input:checked + span { background: var(--green-600); border-color: var(--green-600); color: #fff; box-shadow: 0 6px 16px rgba(15,161,78,0.25); }
+.chip input:focus-visible + span { box-shadow: var(--focus-ring); }
+.hp { position: absolute !important; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+.cform-foot { display: flex; align-items: center; gap: 16px 20px; flex-wrap: wrap; }
+.cform-submit { border: 0; cursor: pointer; }
+.cform-submit[disabled] { cursor: progress; opacity: 0.85; transform: none; }
+.cform[data-state="sending"] .cform-submit .ico { display: none; }
+.cform[data-state="sending"] .cform-submit::after { content: ""; width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.4); border-top-color: #fff; animation: ta-spin 0.8s linear infinite; }
+.cform-err { margin: 0; flex: 1 1 220px; font-size: var(--text-sm); line-height: 1.45; color: var(--red-600); }
+.cform-err:empty { display: none; }
+.cform-err a { color: var(--red-600); text-decoration: underline; }
+.cform-done { display: none; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: clamp(40px, 7vw, 72px) clamp(24px, 4.5vw, 44px); outline: none; }
+.cform[data-state="sent"] .cform-body { display: none; }
+.cform[data-state="sent"] .cform-done { display: flex; animation: lg-in 500ms var(--ease); }
+.cform-sub { color: var(--ink-500); }
+.cform-check { width: 56px; height: 56px; }
+.cform-check circle { fill: var(--green-100); stroke: var(--green-600); stroke-width: 2; }
+.cform-check path { fill: none; stroke: var(--green-700); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }
+.cform[data-state="sent"] .cform-check path { animation: cf-draw 600ms var(--ease) 200ms forwards; }
+@keyframes cf-draw { to { stroke-dashoffset: 0; } }
+.cform-alt { margin: 0; font-size: var(--text-sm); color: var(--green-200); }
+.cform-alt a { color: #fff; text-decoration: underline; text-decoration-color: rgba(255,255,255,0.4); text-underline-offset: 3px; }
+.foot-privacy { width: 100%; margin: 0; text-align: left; font-size: 13px; line-height: 1.55; color: var(--green-200); opacity: 0.85; max-width: 900px; align-self: flex-start; }
+.foot-privacy a { color: #fff; }
+@media (max-width: 480px) { .cform-submit { width: 100%; } .chip { flex: 1 1 auto; } .chip span { width: 100%; justify-content: center; } }
+
 /* ---------- Keyframes used by the SVG scenes ---------- */
 @keyframes ta-spin { to { transform: rotate(360deg); } }
 @keyframes ta-cam { 0%,100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
