@@ -2,7 +2,8 @@
 haritha_lite Flask app.
 
 Routes:
-    GET  /          -> public dashboard (12 cards, all from sites_master.csv)
+    GET  / and /main -> Advitia Labs landing / pitch page (views/landing.py)
+    GET  /sac       -> Swachha Andhra public dashboard (12 cards, all from sites_master.csv)
     GET  /healthz   -> liveness probe (App Engine)
     POST /admin/refresh-cache -> manually invalidate the CSV cache (login-gated)
     GET  /login, POST /login, GET /logout -> auth (login blueprint)
@@ -37,6 +38,7 @@ from views.record_images import bp as record_images_bp
 from views.field import bp as field_bp 
 from views.rdf import bp as rdf_bp
 from views.rdf_report import bp as rdf_report_bp
+from views.landing import bp as landing_bp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -94,8 +96,13 @@ def create_app() -> Flask:
     app.register_blueprint(rdf_bp)
     # Before overview(): on rdf.* it answers "/" with the report.
     app.register_blueprint(rdf_report_bp)
+    # "/" and "/main" -> Advitia Labs pitch page. The rdf.* host hook above
+    # still answers "/" first on rdf.advitiaum.com.
+    app.register_blueprint(landing_bp)
 
-    @app.route("/")
+    # Swachha Andhra dashboard. Endpoint name stays "overview" so every
+    # url_for("overview") back-link follows it to /sac.
+    @app.route("/sac", strict_slashes=False)
     def overview():
         sites = master.get_sites()
         today = config.today_ist()

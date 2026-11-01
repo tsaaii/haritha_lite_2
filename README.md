@@ -1,6 +1,12 @@
 # haritha_lite
 
-Flask + Jinja rebuild of the Swachh Andhra Pradesh dashboard.
+Flask + Jinja rebuild of the Swachh Andhra Pradesh dashboard, plus the Advitia Labs website.
+
+| URL | What |
+| --- | --- |
+| `/`, `/main` | Advitia Labs landing / pitch page ([docs/landing.md](docs/landing.md)) |
+| `/sac` | Swachha Andhra public dashboard (was `/`) |
+| `rdf.advitiaum.com/` | RDF disposal report (unchanged) |
 
 ## Top 4 cards
 
@@ -21,7 +27,7 @@ export USE_LOCAL_CSV=1
 export RECORDS_API_BASE=https://your-fastapi-host.example.com
 
 python main.py
-# -> http://localhost:8080
+# -> http://localhost:8080 (landing), http://localhost:8080/sac (dashboard)
 ```
 
 ## Deploy to App Engine
@@ -33,7 +39,7 @@ gcloud app deploy app.yaml
 ## Manually refresh cache
 
 ```
-GET /admin/refresh-cache
+POST /admin/refresh-cache   (login required)
 ```
 
 ## Knobs

@@ -1,0 +1,249 @@
+{%- macro arrow() -%}<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>{%- endmacro -%}
+{%- set S = url_for('static', filename='landing/') -%}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Advitia Labs · Material recovery intelligence for landfills and household waste</title>
+  <meta name="description" content="Advitia Labs runs two platforms: one to clean up legacy landfills, one to manage household waste end to end. Every metric tonne weighed, every fraction traced, and methane avoided made ready for carbon and EPR credits.">
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta name="theme-color" content="#0B3D22">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Advitia Labs">
+  <meta property="og:title" content="Advitia Labs · Every tonne in. Every fraction out.">
+  <meta property="og:description" content="Material recovery intelligence. 120+ sites and 12 million MT of waste measured, with 400+ acres of land reclaimed.">
+  <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:image" content="{{ canonical_url }}static/landing/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="{{ S }}img/favicon.svg">
+  <link rel="preload" href="{{ S }}fonts/pagella-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ S }}css/landing.css?v={{ v }}">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Advitia Labs","url":"{{ canonical_url }}","email":"{{ email }}","description":"Material recovery intelligence for legacy landfills and household waste."}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <nav class="nav" aria-label="Primary">
+    <a href="#top" class="brand" aria-label="Advitia Labs, back to top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Advitia <span>Labs</span></span></a>
+    <div class="nav-right">
+      <a class="nav-link" href="#traction">Traction</a>
+      <a class="nav-link" href="#platform">Product</a>
+      <a class="nav-link" href="#ledger">Ledger</a>
+      <a class="nav-link" href="#business">Business model</a>
+      <a class="btn-nav" href="#contact">Request a pilot</a>
+    </div>
+  </nav>
+</header>
+
+<main id="main">
+  <section id="top" class="hero wrap" aria-labelledby="hero-title">
+    <div class="hero-inner">
+      <a class="pill-link" href="#contact"><span class="tag">Climate tech</span><span>Now onboarding pilot sites</span>{{ arrow() }}</a>
+      <h1 id="hero-title" class="hero-word"><span id="hero-word">Recovery.</span></h1>
+      <h2 class="hero-sub">Material recovery intelligence that turns waste into <span class="green">measured, sellable value.</span></h2>
+      <p class="hero-p">Two platforms: one to clean up legacy landfills, one to run household waste end to end. Every metric tonne weighed, every fraction traced, and every tonne of greenhouse gas avoided made ready for carbon and EPR credits.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#contact">Request a pilot{{ arrow() }}</a>
+        <a class="btn btn-outline" href="#platform">See the platforms{{ arrow() }}</a>
+      </div>
+      <ul class="audience" aria-label="Who it is for">
+        <li>For municipalities</li><li>Landfill operators</li><li>EPR-obligated producers</li><li>Credit buyers</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="traction" class="traction wrap" aria-labelledby="traction-title">
+    <div class="split-head">
+      <div class="head-col">
+        <div class="kicker"><span class="dot"></span><span>Traction · already in the field</span></div>
+        <h2 id="traction-title" class="h-section">120+ sites. <span class="green">12 million MT</span> measured.</h2>
+      </div>
+      <p class="lede">Every tonne of municipal solid waste weighed in, screened, and scientifically disposed — fraction by fraction — helping reclaim more than 400 acres of land.</p>
+    </div>
+    <div class="mix">
+      <div class="mix-bar" role="img" aria-label="12 million MT measured: bio soil 8 million, inerts 2 million, C&amp;D waste 1 million, metal scrap 200 thousand, RDF 150 thousand MT">
+        <span title="Bio soil · 8,000,000 MT" style="width:66.67%;background:#0E5230"></span><span title="Inerts · 2,000,000 MT" style="width:16.67%;background:#5C6B62"></span><span title="C&amp;D waste · 1,000,000 MT" style="width:8.33%;background:#9AA79F"></span><span title="Metal scrap · 200,000 MT" style="width:1.67%;background:#33413A"></span><span title="RDF · 150,000 MT" style="width:1.25%;background:#C77D1B"></span>
+      </div>
+      <div class="mix-cap"><span>12,000,000 MT of MSW measured in</span><span>11,550,000 MT scientifically disposed · balance is moisture and process loss</span></div>
+    </div>
+    <div class="tiles">
+      {%- for k, val, unit, c in [("Bio soil","8M","MT","#0E5230"),("Inerts","2M","MT","#5C6B62"),("C&D waste","1M","MT","#9AA79F"),("Metal scrap","200K","MT","#33413A"),("RDF","150K","MT","#C77D1B"),("Land reclaimed","400+","acres","#0FA14E")] %}
+      <div class="tile"><span class="tile-k caps"><span class="sw" style="background:{{ c }}"></span>{{ k }}</span><span class="tile-v">{{ val }}<small>{{ unit }}</small></span></div>
+      {%- endfor %}
+    </div>
+    <div class="impact">
+      <div class="impact-col">
+        <span class="caps">Methane avoided</span>
+        <span class="impact-v">≈ 192K<small>MT CH<sub>4</sub></small></span>
+        <span class="impact-d">Residual methane that 12M MT of legacy waste would have released in place.</span>
+      </div>
+      <div class="impact-col">
+        <span class="caps">GHG remediated</span>
+        <span class="impact-v leaf">≈ 5.5M<small>MT CO<sub>2</sub>e</small></span>
+        <span class="impact-d">5.38M from methane avoided, plus 0.18M from coal displaced by RDF in cement kilns.</span>
+      </div>
+      <div class="impact-col impact-method">
+        <span class="caps">How we calculate</span>
+        <span>IPCC 2006 mass-balance: CH<sub>4</sub> = MSW × MCF 0.8 × DOC 0.06 (aged waste) × DOCf 0.5 × F 0.5 × 16/12. CO<sub>2</sub>e at GWP 28 (IPCC AR5). RDF: 0.5 MT coal displaced per MT, 2.4 MT CO<sub>2</sub> per MT coal. Conservative estimate pending third-party verification.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="problem" class="band-deep on-dark" aria-labelledby="problem-title">
+    <div class="problem wrap">
+      <div class="head-col">
+        <div class="kicker"><span class="n">01</span><span class="rule"></span><span>Problem</span></div>
+        <h2 id="problem-title" class="h-section">Waste is the climate problem hiding in plain sight.</h2>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-v">80×</div><p>Methane traps around eighty times the heat of carbon dioxide over its first twenty years.</p></div>
+        <div class="stat"><div class="stat-v">Top 3</div><p>Landfills rank among the largest human-made sources of methane on earth.</p></div>
+        <div class="stat"><div class="stat-v">24 / 7</div><p>Legacy dumps leak methane, CO<sub>2</sub> and other greenhouse gases around the clock until the waste is removed. We remove the source.</p></div>
+        <div class="stat"><div class="stat-v">0</div><p>Ledgers that reconcile what enters a site with what leaves it. What isn't measured can't be recovered, credited, or regulated.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="platform" class="band-mist" aria-labelledby="platform-title">
+    <div id="legacy" class="platform wrap">
+      <div class="head-col">
+        <div class="kicker"><span class="n">02</span><span class="rule"></span><span>Product</span></div>
+        <h2 id="platform-title" class="h-section">Two platforms. Two jobs.</h2>
+        <p class="lede">A dedicated platform to clean up the landfills of the past, and another to run the household waste of today. Choose one to see how it works.</p>
+      </div>
+      <div id="platform-app">
+        <noscript><div class="noscript"><strong>Platform 01 · Clean up legacy landfills.</strong> Drone study, DSM model, waste quantification, composition, baseline study, tracking from excavation to processing, and audit.<br><strong>Platform 02 · Manage household waste.</strong> Door-to-door collection, weighbridge and CCTV, manual picking, trommel processing, weigh-out and disposal, and reconciliation for credits.</div></noscript>
+      </div>
+    </div>
+  </section>
+
+  <section id="ledger" class="ledger wrap" aria-labelledby="ledger-title">
+    <div class="split-head">
+      <div class="head-col">
+        <div class="kicker"><span class="n">03</span><span class="rule"></span><span>The ledger</span></div>
+        <h2 id="ledger-title" class="h-section">In must equal out.</h2>
+      </div>
+      <p class="lede">Every inbound tonne is reconciled against every outward fraction, daily. Gaps are flagged before they become disputes — so recovery claims hold up to auditors, regulators and credit buyers.</p>
+    </div>
+    <div id="balance-viz" class="ledger-viz" role="img" aria-label="Example daily mass balance: 1,284.6 MT inbound against 1,258.9 MT outbound, leaving 25.7 MT unaccounted and flagged for reconciliation."></div>
+  </section>
+
+  <section id="dashboard" class="dash-sec wrap" aria-labelledby="dash-title">
+    <div class="dash-head">
+      <strong id="dash-title">See today. Plan tomorrow.</strong>
+      <span>Forecast inflow by stream and act before a pile turns or a bale yard fills.</span>
+    </div>
+    <div class="dash">
+      <div class="dash-top">
+        <div class="dash-site"><i aria-hidden="true"></i>Site 04 · North processing center</div>
+        <div class="badges"><span class="badge brand">Live</span><span class="badge neutral">Last 14 days</span><span class="illustrative" title="Product preview with illustrative figures">Illustrative data</span></div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><span>Inbound today</span><span>312.4 MT</span></div>
+        <div class="kpi"><span>Recovery rate</span><span class="g">78.2%</span></div>
+        <div class="kpi"><span>Methane avoided</span><span>41.6 MT CO<sub>2</sub>e</span></div>
+        <div class="kpi"><span>Forecast, tomorrow</span><span class="s">336 MT</span></div>
+      </div>
+      <div class="dash-body">
+        <div class="dash-chart">
+          <strong>Inbound volume — actual and forecast</strong>
+          <div id="forecast-viz" class="forecast-viz" role="img" aria-label="Chart: 14 days of actual inbound volume between about 262 and 322 MT a day, then a 7-day forecast rising to about 358 MT with a widening confidence band."></div>
+        </div>
+        <div class="preds">
+          <strong>Predictions</strong>
+          <div class="pred"><span class="badge sky">Monday</span><span>Organic inflow up 12%. Add a turning shift on rows 3–5.</span></div>
+          <div class="pred"><span class="badge warning">In 3 days</span><span>Plastic bale yard reaches capacity. Schedule offtake now.</span></div>
+          <div class="pred"><span class="badge brand">Batch 118</span><span>Compost maturity on track for day 42. Ready for grading.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="business" class="band-mist" aria-labelledby="biz-title">
+    <div class="business wrap">
+      <div class="split-head">
+        <div class="head-col">
+          <div class="kicker"><span class="n">04</span><span class="rule"></span><span>Business model</span></div>
+          <h2 id="biz-title" class="h-section">Three ways every site makes money.</h2>
+        </div>
+        <p class="lede">The same measured tonne is billed three times: as software, as recovered material, and as verified climate impact.</p>
+      </div>
+      <div class="models">
+        <div class="model"><span class="mono-n">A</span><span class="model-t">Platform fee</span><p>A per-site subscription for the weighbridge, CCTV and ledger software, paid by the municipality or operator.</p><span class="model-f">Recurring · per site, per month</span></div>
+        <div class="model"><span class="mono-n">B</span><span class="model-t">Recovered material</span><p>A share of sales of RDF, recyclables, metals, compost and soil, matched to offtakers through the platform.</p><span class="model-f">Volume-linked · per metric tonne</span></div>
+        <div class="model deep"><span class="mono-n">C</span><span class="model-t">Carbon and EPR credits</span><p>A take rate on credits issued from measured recovery: methane avoided for carbon buyers, plastic recovered for EPR-obligated producers.</p><span class="model-f">Margin · per credit issued</span></div>
+      </div>
+
+      <div id="calculator" class="calc" data-calc>
+        <div class="calc-in">
+          <div class="calc-group">
+            <span class="caps">Methane, CO<sub>2</sub> and credit calculator</span>
+            <span class="calc-h">Estimate what your site could prove.</span>
+          </div>
+          <div class="calc-group">
+            <span class="calc-label" id="calc-stream-l">Waste stream</span>
+            <div class="seg" role="group" aria-labelledby="calc-stream-l">
+              <button type="button" data-stream="household" aria-pressed="true">Household waste</button>
+              <button type="button" data-stream="legacy" aria-pressed="false">Legacy landfill</button>
+            </div>
+          </div>
+          <div class="calc-group">
+            <div class="calc-row"><label class="calc-label" for="calc-tons">Metric tonnes processed per month</label><output for="calc-tons" data-out="tons">3,000 MT</output></div>
+            <input id="calc-tons" class="range" type="range" min="100" max="20000" step="100" value="3000">
+            <div class="range-ends" aria-hidden="true"><span>100 MT</span><span>20,000 MT</span></div>
+          </div>
+          <p class="calc-note"><span data-out="note">Household: about 60% organics composted aerobically instead of landfilled; plastics and MLP recovered for recycling and co-processing.</span> Illustrative factors only; verified figures come from your site's measured data and the chosen methodology.</p>
+        </div>
+        <div class="calc-out" aria-live="polite">
+          <div class="res"><span class="caps">Methane avoided</span><span class="res-v" data-out="ch4">936</span><span class="res-u">MT CH<sub>4</sub> per year</span></div>
+          <div class="res"><span class="caps">CO<sub>2</sub>e avoided</span><span class="res-v" data-out="co2">26,208</span><span class="res-u">MT CO<sub>2</sub>e per year · GWP 28</span></div>
+          <div class="res g"><span class="caps">Carbon credits</span><span class="res-v" data-out="carbon">26,208</span><span class="res-u">credits per year, before buffer</span></div>
+          <div class="res s"><span class="caps">EPR credits</span><span class="res-v" data-out="epr">4,320</span><span class="res-u">MT plastic per year</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why" class="why wrap" aria-labelledby="why-title">
+    <div class="head-col">
+      <div class="kicker"><span class="n">05</span><span class="rule"></span><span>Why now</span></div>
+      <h2 id="why-title" class="h-section">Regulation, markets and methane just lined up.</h2>
+    </div>
+    <div class="points">
+      <div class="point"><strong>Proof is now mandatory.</strong><span>Extended producer responsibility rules require evidence of recovery, not promises.</span></div>
+      <div class="point"><strong>Methane is the fast lever.</strong><span>Cutting methane is the quickest way to slow near-term warming, and waste is where it starts.</span></div>
+      <div class="point"><strong>Greenhouse gases, removed.</strong><span>Biomining and aerobic composting stop methane, CO<sub>2</sub> and other greenhouse gases at the source, measured tonne by tonne.</span></div>
+      <div class="point"><strong>Waste replaces coal.</strong><span>Non-recyclables become RDF, an alternative fuel for cement kilns and waste-to-energy plants, cutting coal use and the CO<sub>2</sub>, SO<sub>2</sub> and NO<sub>x</sub> it releases.</span></div>
+      <div class="point"><strong>Buyers want audited data.</strong><span>Credit markets now demand measured, traceable tonnes. Most sites still run on paper and spreadsheets.</span></div>
+    </div>
+  </section>
+
+  <section id="contact" class="band-deep" aria-labelledby="contact-title">
+    <div class="closing wrap">
+      <h2 id="contact-title">Every tonne, accounted for.</h2>
+      <p>We're onboarding pilot sites and partners. Bring us a landfill or a city's household waste — we'll bring the ledger.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="mailto:{{ email }}?subject=Pilot%20request">Request a pilot{{ arrow() }}</a>
+        <a class="btn btn-light" href="mailto:{{ email }}?subject=Founders">Talk to the founders{{ arrow() }}</a>
+      </div>
+      <footer class="foot">
+        <div class="foot-col"><span class="foot-brand">Advitia Labs</span><span class="foot-tag">Material recovery intelligence for legacy landfills and household waste.</span></div>
+        <nav class="foot-col" aria-label="Platform"><span class="caps">Platform</span><a href="#platform">Product</a><a href="#ledger">Ledger</a><a href="#calculator">Calculator</a></nav>
+        <nav class="foot-col" aria-label="Company"><span class="caps">Company</span><a href="#business">Business model</a><a href="mailto:{{ email }}?subject=Careers">Careers</a></nav>
+        <div class="foot-col"><span class="caps">Contact</span><a href="mailto:{{ email }}">{{ email }}</a></div>
+      </footer>
+      <div class="foot-base caps"><span>© {{ year }} Advitia Labs</span><span>Every tonne in. Every fraction out.</span></div>
+    </div>
+  </section>
+</main>
+
+<script src="{{ S }}js/calculator.js?v={{ v }}" defer></script>
+<script src="{{ S }}vendor/react.production.min.js" defer></script>
+<script src="{{ S }}vendor/react-dom.production.min.js" defer></script>
+<script src="{{ S }}js/landing.js?v={{ v }}" defer></script>
+</body>
+</html>
