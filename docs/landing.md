@@ -47,29 +47,70 @@ The HTML itself is cached for 5 minutes.
 
 Both go through one Google Apps Script (`apps_script/landing/Code.gs`) bound to a Google Sheet:
 
-- **Leads** tab: one row per contact-form message. Every lead is also emailed to `NOTIFY_TO`
-  (`wecare@advitiaum.com, saiteja7050@gmail.com`), with Reply-To set to the sender.
-- **Visits** tab: one row per page view, with city / region / country / map link, network (ISP or company),
-  anonymised IP, device, OS, browser, screen, language, time zone, referrer, UTM tags, `?r=` link,
-  visitor ID + visit number, engaged seconds, scroll depth, sections reached, CTA clicks, platform tab and form status.
+- **Leads** tab: one row per contact-form message. Each lead emails `NOTIFY_TO`
+  (`wecare@advitiaum.com, saiteja7050@gmail.com`) with Reply-To set to the sender
+  ([preview](img/email-lead-notification.png)), and the sender gets an automatic confirmation
+  ([preview](img/email-auto-reply.png)) whose replies go to `REPLY_TO` (`wecare@advitiaum.com`).
+- **Visits** tab: one row per page view (location, network, device, link, engagement).
+- **Summary** tab: live tables (visits by country, top cities, opened `?r=` links, networks, devices,
+  visits per day) and a world map. Bots and datacenter traffic are left out.
 
-### One-time setup (about 10 minutes)
+### Part A — Set up the form emails (about 10 minutes)
 
-1. Create a Google Sheet called **Advitia website**, signed in as the account that should send the lead
-   emails (e.g. `wecare@advitiaum.com`).
-2. **Extensions → Apps Script**. Replace the code with `apps_script/landing/Code.gs`.
-3. In `CONFIG`, set `TOKEN` to a long random string, for example the output of
-   `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-4. Run **setup** once from the editor (pick `setup` in the function menu → Run). Approve the permissions
-   (Sheets, send email, triggers). This creates both tabs and the daily 12-month retention cleanup.
-5. **Deploy → New deployment → Web app**. Execute as: *Me*. Who has access: *Anyone*. Copy the `/exec` URL.
-   Opening that URL in a browser should show `{"ok":true,"service":"advitia-landing",...}`.
-6. In `app.yaml` set `LANDING_SCRIPT_URL` to the `/exec` URL and `LANDING_SCRIPT_TOKEN` to the same token.
-7. Optional, recommended: sign up free at ipinfo.io, copy the token into `IPINFO_TOKEN`. This fills the
-   **Network** column (e.g. "Reliance Jio", "Sequoia Capital Operations", "Amazon.com" → flagged as datacenter).
-8. `gcloud app deploy app.yaml`, then submit the form once yourself and check the Sheet and your inbox.
+1. **Pick the sending account.** Emails are sent *from the Google account that owns the script*.
+   Sign in as `wecare@advitiaum.com` if it is a Google Workspace mailbox; otherwise use
+   `saiteja7050@gmail.com` (replies still go to wecare@ via `REPLY_TO`).
+2. Go to <https://sheets.new> and name the sheet **Advitia website**.
+3. **Extensions → Apps Script.** Delete the sample code, paste all of `apps_script/landing/Code.gs`, press **Save**.
+4. In `CONFIG` at the top, replace `CHANGE-ME-long-random-string` with a long random string, e.g. the output of
+   `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`. Keep a copy for step 8.
+   Optional switches: `AUTO_REPLY` (confirmation to the sender), `NOTIFY_ON_LINK_OPEN`, `NOTIFY_TO`, `REPLY_TO`.
+5. In the function menu next to **Debug**, choose **setup** → **Run**. Google asks for permission:
+   *Review permissions → your account → Advanced → Go to (unsafe) → Allow* (the warning appears because the
+   script is yours and unverified). This creates the Leads, Visits and Summary tabs and the daily cleanup.
+6. **Deploy → New deployment →** gear icon **→ Web app**. Description `website`, Execute as **Me**,
+   Who has access **Anyone**. **Deploy**, then copy the **Web app URL** (ends in `/exec`).
+7. Open that URL in a browser. You should see `{"ok":true,"service":"advitia-landing","build":"2026-11-01-v2"}`.
+8. In `app.yaml` set:
+   ```yaml
+   LANDING_SCRIPT_URL: "https://script.google.com/macros/s/…/exec"
+   LANDING_SCRIPT_TOKEN: "<the same string as CONFIG.TOKEN>"
+   ```
+9. `gcloud app deploy app.yaml`.
+10. **Test:** open <https://advitiaum.com/#contact>, send a message using an address you can read.
+    Within a minute: a row in **Leads**, a "New lead" email in both inboxes, and the confirmation in the
+    address you entered. Nothing arrived? See *Troubleshooting* below.
 
-When you change `Code.gs` later: **Deploy → Manage deployments → Edit → New version** (the URL stays the same).
+After any later change to `Code.gs`: **Deploy → Manage deployments → pencil → Version: New version → Deploy**
+(the URL stays the same; check step 7 shows the new `build`).
+
+### Part B — Use the location tracker
+
+1. **Optional, adds company / ISP names:** sign up free at <https://ipinfo.io/signup>, copy the token from the
+   dashboard into `IPINFO_TOKEN` in `app.yaml`, redeploy. Without it everything works except the Network column.
+2. **Make a link per person** you send the site to: `https://advitiaum.com/?r=yc-garry`,
+   `https://advitiaum.com/?r=greenfund-priya`. Letters, digits and `. _ - @ +` only.
+3. **Open the site yourself** (once, from your phone) to check it works. A row appears in **Visits** after
+   about 2 seconds; the engagement columns fill in when you leave or switch tabs.
+4. **Summary tab:** the world map and tables update on their own. Read it top-down: *Opened links* shows who
+   opened their link and when it was last opened; *Top cities* and *Top networks* show where everyone else is.
+5. **Visits tab, to dig into one visitor:** select row 1 → **Data → Create a filter**. Filter
+   *Link (?r=)* to one person to see each visit, how long they stayed (*Engaged (s)*), how far they scrolled and
+   which sections they read. Click **map** in a row to see the location. Filter *Datacenter?* to hide `yes` rows.
+6. **Get alerts on your phone:** each `?r=` link opening already emails you. Install the Google Sheets app to
+   check the Summary tab on the go.
+7. **Your own visits:** open the site once with `?r=me` from each of your devices, then filter out *Visitor ID*s
+   that show `me` under *First link ever*.
+
+### Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| Form says "We couldn't send that just now" | `LANDING_SCRIPT_URL` empty or wrong, or the token differs from `CONFIG.TOKEN`. Check step 7 and redeploy. |
+| Row in Leads but no email | The script owner hit Gmail's daily quota (≈100 recipients/day on a personal account, 1,500 on Workspace), or the mail is in Spam. Apps Script editor → **Executions** shows the error. |
+| No rows in Visits | Ad blockers can block the beacon for some visitors; ensure the deploy has `track.js`. Logs Explorer `textPayload:"LANDING_VISIT"` shows what the server received. |
+| Network column empty | `IPINFO_TOKEN` not set, or the free quota is exhausted. |
+| City empty | App Engine could not geolocate that IP (common for some mobile carriers); country is usually still set. |
 
 ### Tracking who opened your link
 
