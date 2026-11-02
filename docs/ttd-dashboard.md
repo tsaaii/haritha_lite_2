@@ -6,12 +6,41 @@ For Tirumala Tirupati Devasthanams officials. One sign-in, three tabs:
 |---|---|
 | **Overview** | Awarded legacy quantity (51,290 MT) with processed, balance and % complete; trips today; cumulative inward processed; cumulative Soil, Inert, C&D, RDF and Scrap disposed. Refreshes every minute. |
 | **Reports** | Day-wise or month-wise table for any date range: trips and net MT per material, disposed total, grand total. **Download PDF** gives the same report with both logos. |
-| **Live cameras** | The weighbridge cameras on demand, with the live weight. Pictures flow only while this tab is open and stop after 10 minutes. |
+| **Live cameras** | The weighbridge cameras on demand, with the live weight. Each camera starts only when you click Watch and stops after 5 minutes. |
 
 Definitions (complete trips only, net weight):
 - **Inward processed** = all-time net weight of trips with material **MSW** (the legacy waste brought in).
 - **Disposed** = all-time net weight of trips with material Soil / Inert / CnD / RDF / Scrap.
 - **Trips today** = trips started today (India time), including vehicles still waiting for their empty weight.
+
+## Climate impact tiles (Overview)
+
+Four **estimated** tiles under "Climate impact". Hover (or tap on a phone) shows the method, formula and live numbers.
+All are computed in `views/ttd.py` (`impact()`) from weighbridge tonnage; none is a verified or issued credit.
+
+| Tile | Method | Formula (defaults) |
+|---|---|---|
+| **Methane avoided** (t CH₄, and t CO₂e) | IPCC 2006 Guidelines, Vol. 5 Ch. 3 (mass balance of remaining degradable carbon) | MSW processed × MCF 0.8 × DOC 0.06 × DOCf 0.5 × F 0.5 × 16/12 × (1 − OX 0) = 0.016 t CH₄ per t; CO₂e at GWP 28 (IPCC AR5) |
+| **Trees equivalent** | US EPA Greenhouse Gas Equivalencies: one urban tree seedling grown 10 years = 0.060 t CO₂ | CO₂e ÷ 0.060 |
+| **Carbon credits** (potential; 1 credit = 1 t CO₂e) | UN CDM AMS-III.AF (excavating and composting partially decayed MSW) | CO₂e × φ 0.85 (model-uncertainty deduction); before project emissions |
+| **EPR credits** (potential; t plastic) | India Plastic Waste Management Rules, EPR end-of-life (co-processing in cement kilns) | RDF dispatched × plastic share 0.5 (assumption) |
+
+Deliberately conservative: RDF replacing coal is **not** counted (burning RDF also emits fossil CO₂ from its plastic,
+and claiming it needs a separate methodology with the cement plant). Credits exist only after registration,
+validation, verification and issuance (Verra / Gold Standard / Article 6 for carbon; the CPCB portal, via a
+registered processor, for EPR). The EU ETS does not accept such credits, and the EU has no tradable EPR credit.
+
+**Replace the assumptions with site data** (in `app.yaml`, then redeploy):
+
+| Setting | Default | Replace with |
+|---|---|---|
+| `TTD_CH4_DOC` | 0.06 | Lab DOC of the excavated legacy waste (biggest effect on every tile) |
+| `TTD_RDF_PLASTIC_SHARE` | 0.5 | Plastic share of RDF from a composition test |
+| `TTD_CH4_MCF` | 0.8 | 0.4 if the dump was shallow (< 5 m), per IPCC |
+| `TTD_CH4_DOCF`, `TTD_CH4_F`, `TTD_CH4_OX` | 0.5, 0.5, 0 | Keep IPCC defaults unless measured |
+| `TTD_GWP_CH4` | 28 | 28 = IPCC AR5 (EU/UNFCCC reporting) |
+| `TTD_CREDIT_PHI` | 0.85 | Value required by the chosen registry methodology |
+| `TTD_TREE_TCO2` | 0.060 | Keep (US EPA) |
 
 ## Sign-in
 

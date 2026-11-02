@@ -46,10 +46,70 @@
       $('o-inward').textContent = mt(o.processed_mt);
       $('o-inward-s').textContent = '+' + mt(o.inward_today_mt) + ' MT today';
       document.querySelectorAll('[data-mat]').forEach(function (el) { el.textContent = mt(o.disposed[el.dataset.mat]); });
+      if (o.impact) renderImpact(o.impact);
       $('o-upd').textContent = o.updated;
     }).catch(function (e) { showErr(e.message); });
   }
   setInterval(function () { if (current === 'overview' && !document.hidden) loadOverview(); }, 60000);
+
+  // ------------------------------------------------------------------ climate impact tiles
+  // Each tile's "How?" panel shows the method, the formula and the live numbers behind it.
+  var nf1 = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  var num = function (v, d) { return new Intl.NumberFormat('en-IN', { maximumFractionDigits: d == null ? 2 : d }).format(v || 0); };
+  function tip(id, title, lines, formula, numbers, note) {
+    $(id).innerHTML = '<b>' + esc(title) + '</b><br>' + esc(lines.join(' ')) +
+      '<span class="tip-f">' + esc(formula) + '</span>' + esc(numbers) +
+      (note ? '<span class="tip-n">' + esc(note) + '</span>' : '');
+  }
+  function renderImpact(x) {
+    var f = x.factors, p = x.inputs.processed_mt, rdf = x.inputs.rdf_mt;
+    $('i-trees').textContent = nf0.format(x.trees);
+    $('i-ch4').textContent = nf1.format(x.ch4_t);
+    $('i-co2e').textContent = nf0.format(x.co2e_t);
+    $('i-cc').textContent = nf0.format(x.carbon_credits);
+    $('i-epr').textContent = nf1.format(x.epr_plastic_t);
+
+    tip('tip-ch4', 'Methane avoided by removing the legacy waste',
+      ['Method: IPCC 2006 Guidelines, Vol. 5 (Waste), Ch. 3 — the methane the remaining',
+       'degradable carbon would release if the waste stayed in the dump.'],
+      'CH₄ = waste × MCF × DOC × DOCf × F × 16/12 × (1 − OX)\nCO₂e = CH₄ × GWP',
+      num(p) + ' MT × ' + f.mcf + ' × ' + f.doc + ' × ' + f.docf + ' × ' + f.f + ' × 16/12 × ' + (1 - f.ox) +
+        ' = ' + nf1.format(x.ch4_t) + ' t CH₄;  × GWP ' + f.gwp + ' = ' + nf0.format(x.co2e_t) + ' t CO₂e',
+      'Waste = MSW processed (weighbridge). MCF ' + f.mcf + ' unmanaged deep dump; DOC ' + f.doc +
+        ' assumes aged waste (replace with lab results); GWP ' + f.gwp + ' = IPCC AR5, as used in EU and UNFCCC reporting.');
+
+    tip('tip-trees', 'Trees needed to absorb the same CO₂',
+      ['Method: US EPA Greenhouse Gas Equivalencies — one urban tree seedling',
+       'grown for 10 years absorbs ' + f.tree_tco2 + ' t CO₂.'],
+      'trees = CO₂e avoided ÷ ' + f.tree_tco2 + ' t CO₂ per tree',
+      nf0.format(x.co2e_t) + ' t CO₂e ÷ ' + f.tree_tco2 + ' = ' + nf0.format(x.trees) + ' trees',
+      'An equivalence for communication, not trees actually planted. Uses methane avoided only.');
+
+    tip('tip-cc', 'Potential carbon credits (not issued)',
+      ['Basis: UN CDM methodology AMS-III.AF — avoiding methane by excavating and',
+       'composting partially decayed municipal waste. 1 credit = 1 t CO₂e.'],
+      'credits = CO₂e avoided × φ (model-uncertainty deduction)',
+      nf0.format(x.co2e_t) + ' t CO₂e × ' + f.phi + ' = ' + nf0.format(x.carbon_credits) + ' credits',
+      'Before project emissions (fuel, composting). Issued only after registration, validation and verification (e.g. Verra, Gold Standard, Article 6). The EU ETS does not accept such credits. RDF replacing coal is not counted.');
+
+    tip('tip-epr', 'Potential EPR credits (not certified)',
+      ['Basis: India\'s Plastic Waste Management Rules (EPR, end-of-life disposal) —',
+       'plastic in RDF sent for co-processing in a cement kiln.'],
+      'EPR-eligible plastic = RDF dispatched × plastic share of RDF',
+      num(rdf) + ' MT × ' + f.rdf_plastic + ' = ' + nf1.format(x.epr_plastic_t) + ' t plastic',
+      'Plastic share ' + Math.round(f.rdf_plastic * 100) + '% is an assumption — set it from an RDF lab test. Certificates are generated on the CPCB portal by a registered processor (the cement plant). The EU has no tradable EPR credit.');
+  }
+  // Tap support: touch screens have no hover, so a tap toggles the explanation.
+  document.querySelectorAll('.itile').forEach(function (t) {
+    t.addEventListener('click', function (e) {
+      if (e.target.closest('.tip')) return;
+      var open = !t.classList.contains('open');
+      document.querySelectorAll('.itile.open').forEach(function (o) { o.classList.remove('open'); });
+      t.classList.toggle('open', open);
+    });
+  });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.itile')) document.querySelectorAll('.itile.open').forEach(function (o) { o.classList.remove('open'); }); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { document.querySelectorAll('.itile.open').forEach(function (o) { o.classList.remove('open'); }); if (document.activeElement && document.activeElement.classList.contains('itile')) document.activeElement.blur(); } });
 
   // ------------------------------------------------------------------ reports
   var rview = 'day';
