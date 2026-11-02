@@ -51,6 +51,14 @@ env_variables:
   LANDING_SCRIPT_TOKEN: ""
   IPINFO_TOKEN: ""
 
+  # /TTD dashboard (docs/ttd-dashboard.md). The read key is NOT put here: it is read from
+  # Secret Manager by the App Engine service account. Until ADEX_API_URL is set, /TTD shows
+  # "not configured" after sign-in.
+  ADEX_API_URL: ""
+  TTD_SITE_ID: "ttd"
+  TTD_READ_KEY_SECRET: ""   # e.g. projects/YOUR_PROJECT/secrets/ttd-read-key/versions/latest
+  TTD_AWARDED_MT: "51290"
+
 automatic_scaling:
   min_instances: 1
   max_instances: 4

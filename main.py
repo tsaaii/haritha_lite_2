@@ -41,6 +41,7 @@ from views.rdf import bp as rdf_bp
 from views.rdf_report import bp as rdf_report_bp
 from views.landing import bp as landing_bp
 from views.landing_api import bp as landing_api_bp
+from views.ttd import bp as ttd_bp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,6 +104,8 @@ def create_app() -> Flask:
     app.register_blueprint(landing_bp)
     # POST /api/contact (lead form) and /api/seen (visit beacon).
     app.register_blueprint(landing_api_bp)
+    # /TTD: TTD legacy-waste dashboard (views/ttd.py)
+    app.register_blueprint(ttd_bp)
 
     # Swachha Andhra dashboard. Endpoint name stays "overview" so every
     # url_for("overview") back-link follows it to /sac.

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0E5230">
+<title>TTD · Legacy waste dashboard</title>
+<link rel="icon" href="{{ url_for('static', filename='ttd/ttd.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='ttd/ttd.css') }}">
+</head>
+<body>
+<header class="top">
+  <div class="top-brand">
+    <img src="{{ url_for('static', filename='ttd/tharuni.png') }}" alt="Tharuni Associates" width="44" height="44">
+    <img src="{{ url_for('static', filename='ttd/ttd.png') }}" alt="TTD" width="40" height="44">
+    <div class="top-title"><span class="eyebrow">Legacy waste remediation</span><b>Tirumala Tirupati Devasthanams</b></div>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" class="tab on" data-view="overview" aria-selected="true">Overview</button>
+    <button role="tab" class="tab" data-view="reports" aria-selected="false">Reports</button>
+    <button role="tab" class="tab" data-view="cameras" aria-selected="false">Live cameras</button>
+  </nav>
+  <div class="top-user"><span class="muted">{{ user }}</span><a class="btn btn--ghost btn--sm" href="{{ url_for('ttd.logout') }}">Sign out</a></div>
+</header>
+
+<main class="wrap">
+  <div id="err" class="msg msg--err" role="alert" hidden></div>
+
+  <!-- ===================== Overview ===================== -->
+  <section id="v-overview" class="view">
+    <div class="hero card">
+      <div class="hero-main">
+        <p class="eyebrow">Awarded legacy quantity</p>
+        <div class="hero-num"><span id="o-awarded">{{ '{:,.0f}'.format(awarded) }}</span><small>MT</small></div>
+        <div class="progress" role="progressbar" aria-label="Processed" aria-valuemin="0" aria-valuemax="100" id="o-bar"><span id="o-fill"></span></div>
+        <div class="hero-legend">
+          <span><i class="sw sw--done"></i>Processed <b id="o-proc">—</b> MT (<b id="o-pct">—</b>)</span>
+          <span><i class="sw sw--left"></i>Balance <b id="o-bal">—</b> MT</span>
+        </div>
+      </div>
+      <div class="hero-side">
+        <div class="stat"><p class="eyebrow">Trips today</p><div class="stat-num" id="o-trips">—</div><p class="muted" id="o-trips-s">&nbsp;</p></div>
+        <div class="stat"><p class="eyebrow">Cumulative inward processed</p><div class="stat-num"><span id="o-inward">—</span><small>MT</small></div><p class="muted" id="o-inward-s">&nbsp;</p></div>
+      </div>
+    </div>
+
+    <h2 class="sec">Cumulative disposed</h2>
+    <div class="tiles">
+      <div class="tile"><p class="eyebrow">Soil</p><div class="stat-num"><span data-mat="Soil">—</span><small>MT</small></div></div>
+      <div class="tile"><p class="eyebrow">Inert</p><div class="stat-num"><span data-mat="Inert">—</span><small>MT</small></div></div>
+      <div class="tile"><p class="eyebrow">C&amp;D waste</p><div class="stat-num"><span data-mat="CnD">—</span><small>MT</small></div></div>
+      <div class="tile"><p class="eyebrow">RDF</p><div class="stat-num"><span data-mat="RDF">—</span><small>MT</small></div></div>
+      <div class="tile"><p class="eyebrow">Scrap</p><div class="stat-num"><span data-mat="Scrap">—</span><small>MT</small></div></div>
+    </div>
+    <p class="fine">All-time totals of complete weighbridge trips. Updated <span id="o-upd">—</span> IST; refreshes every minute.</p>
+  </section>
+
+  <!-- ===================== Reports ===================== -->
+  <section id="v-reports" class="view" hidden>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Report type">
+        <button class="seg-b on" data-rview="day">Day-wise</button><button class="seg-b" data-rview="month">Month-wise</button>
+      </div>
+      <label class="inline">From <input type="date" id="r-from"></label>
+      <label class="inline">To <input type="date" id="r-to"></label>
+      <span class="grow"></span>
+      <a class="btn btn--primary" id="r-pdf" href="#">Download PDF</a>
+    </div>
+    <div class="card table-card">
+      <div class="table-scroll"><table id="r-table"></table></div>
+    </div>
+    <p class="fine">Net weights in MT. MSW is the legacy waste processed (inward); Soil, Inert, C&amp;D, RDF and Scrap are disposals. Complete trips only.</p>
+  </section>
+
+  <!-- ===================== Cameras ===================== -->
+  <section id="v-cameras" class="view" hidden>
+    <div class="toolbar">
+      <span id="c-plant" class="pill pill--off">Checking the site…</span>
+      <span id="c-weight" class="pill pill--off">— kg</span>
+      <span class="grow"></span>
+      <span id="c-pick" class="chips"></span>
+      <span class="chips" role="group" aria-label="Picture quality">
+        <button class="chip" data-q="low">Low data</button><button class="chip on" data-q="normal">Normal</button><button class="chip" data-q="high">Sharper</button>
+      </span>
+      <button class="btn btn--ghost" id="c-stop">Stop</button>
+    </div>
+    <div class="cams" id="c-grid"></div>
+    <p class="fine" id="c-info">Pictures are sent from the site only while this view is open, and stop after a few minutes to save data.</p>
+  </section>
+</main>
+<script src="{{ url_for('static', filename='ttd/ttd.js') }}"></script>
+</body>
+</html>
