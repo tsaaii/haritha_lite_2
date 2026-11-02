@@ -52,6 +52,9 @@ Both go through one Google Apps Script (`apps_script/landing/Code.gs`) bound to 
   ([preview](img/email-lead-notification.png)), and the sender gets an automatic confirmation
   ([preview](img/email-auto-reply.png)) whose replies go to `REPLY_TO` (`wecare@advitiaum.com`).
 - **Visits** tab: one row per page view (location, network, device, link, engagement).
+- **Daily traffic email** at 9 AM US Eastern (`SUMMARY_HOUR`, `SUMMARY_TZ`): last 24 hours of visits, people,
+  returning visitors, average time, top locations, devices, sources, links opened and leads
+  ([preview](img/email-daily-summary.png)). Run `dailySummary` from the editor to get one immediately.
 - **Summary** tab: live tables (visits by country, top cities, opened `?r=` links, networks, devices,
   visits per day) and a world map. Bots and datacenter traffic are left out.
 
@@ -64,10 +67,12 @@ Both go through one Google Apps Script (`apps_script/landing/Code.gs`) bound to 
 3. **Extensions → Apps Script.** Delete the sample code, paste all of `apps_script/landing/Code.gs`, press **Save**.
 4. In `CONFIG` at the top, replace `CHANGE-ME-long-random-string` with a long random string, e.g. the output of
    `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`. Keep a copy for step 8.
-   Optional switches: `AUTO_REPLY` (confirmation to the sender), `NOTIFY_ON_LINK_OPEN`, `NOTIFY_TO`, `REPLY_TO`.
+   Optional switches: `AUTO_REPLY` (confirmation to the sender), `NOTIFY_ON_LINK_OPEN`, `NOTIFY_TO`, `REPLY_TO`,
+   `DAILY_SUMMARY` / `SUMMARY_HOUR` / `SUMMARY_TZ` (re-run **setup** after changing the time).
 5. In the function menu next to **Debug**, choose **setup** → **Run**. Google asks for permission:
    *Review permissions → your account → Advanced → Go to (unsafe) → Allow* (the warning appears because the
-   script is yours and unverified). This creates the Leads, Visits and Summary tabs and the daily cleanup.
+   script is yours and unverified). This creates the Leads, Visits and Summary tabs, the daily cleanup and the
+   9 AM daily traffic email.
 6. **Deploy → New deployment →** gear icon **→ Web app**. Description `website`, Execute as **Me**,
    Who has access **Anyone**. **Deploy**, then copy the **Web app URL** (ends in `/exec`).
 7. Open that URL in a browser. You should see `{"ok":true,"service":"advitia-landing","build":"2026-11-01-v2"}`.
@@ -97,8 +102,8 @@ After any later change to `Code.gs`: **Deploy → Manage deployments → pencil 
 5. **Visits tab, to dig into one visitor:** select row 1 → **Data → Create a filter**. Filter
    *Link (?r=)* to one person to see each visit, how long they stayed (*Engaged (s)*), how far they scrolled and
    which sections they read. Click **map** in a row to see the location. Filter *Datacenter?* to hide `yes` rows.
-6. **Get alerts on your phone:** each `?r=` link opening already emails you. Install the Google Sheets app to
-   check the Summary tab on the go.
+6. **Alerts:** every morning (9 AM US Eastern) you get the daily traffic email; each `?r=` link opening also
+   emails you right away. Install the Google Sheets app to check the Summary tab on the go.
 7. **Your own visits:** open the site once with `?r=me` from each of your devices, then filter out *Visitor ID*s
    that show `me` under *First link ever*.
 
@@ -130,7 +135,7 @@ scrapers, but VPN users land there too.
 ### Privacy
 
 IPs are anonymised before storage (IPv4 last octet zeroed, IPv6 /48). The full IP is only used in memory for the
-network lookup and spam rate limits. The footer privacy note (`#privacy`) discloses this; visit rows older
+network lookup and spam rate limits. There is no on-page privacy notice (removed at the owner's request); visit rows older
 than 12 months are deleted daily. If someone asks for deletion, filter the Visits tab by their Visitor ID or email.
 
 ### If the script is down or not configured
