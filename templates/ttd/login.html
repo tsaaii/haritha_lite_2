@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0E5230">
+<title>TTD · Legacy waste · Sign in</title>
+<link rel="icon" href="{{ url_for('static', filename='ttd/ttd.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='ttd/ttd.css') }}">
+</head>
+<body class="login-page">
+<main class="login-shell">
+  <section class="login-brand">
+    <div class="logos">
+      <img src="{{ url_for('static', filename='ttd/tharuni.png') }}" alt="Tharuni Associates" width="96" height="96">
+      <span class="logos-sep" aria-hidden="true"></span>
+      <img src="{{ url_for('static', filename='ttd/ttd.png') }}" alt="Tirumala Tirupati Devasthanams" width="88" height="97">
+    </div>
+    <p class="eyebrow">Legacy waste remediation</p>
+    <h1>Tirumala Tirupati Devasthanams</h1>
+    <p class="lede">Progress, disposals and live weighbridge cameras for the legacy waste site, in one place.</p>
+    <p class="fine">Executed by Tharuni Associates</p>
+  </section>
+
+  <section class="login-card" aria-labelledby="signin-title">
+    <h2 id="signin-title">Sign in</h2>
+    <p class="muted">For TTD officials. Use the account given by Tharuni Associates.</p>
+    {% if error %}<div class="msg msg--err" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="{{ url_for('ttd.home') }}" autocomplete="on" novalidate>
+      <label class="field">Username
+        <input name="username" autocomplete="username" required autofocus spellcheck="false" autocapitalize="off">
+      </label>
+      <label class="field">Password
+        <span class="pw">
+          <input name="password" type="password" autocomplete="current-password" required id="pw">
+          <button type="button" class="pw-toggle" id="pw-toggle" aria-controls="pw">Show</button>
+        </span>
+      </label>
+      <label class="field"><span>Security check: what is <b class="captcha-q">{{ captcha_question }}</b>?</span>
+        <input name="captcha_answer" inputmode="numeric" autocomplete="off" required pattern="-?[0-9]*">
+      </label>
+      <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}">
+      <button type="submit" class="btn btn--primary btn--block">Sign in</button>
+    </form>
+    <p class="fine">Five wrong tries lock sign-in for 15 minutes.</p>
+  </section>
+</main>
+<script src="{{ url_for('static', filename='ttd/login.js') }}"></script>
+</body>
+</html>
