@@ -79,14 +79,14 @@
       <span id="c-plant" class="pill pill--off">Checking the site…</span>
       <span id="c-weight" class="pill pill--off">— kg</span>
       <span class="grow"></span>
-      <span id="c-pick" class="chips"></span>
       <span class="chips" role="group" aria-label="Picture quality">
         <button class="chip" data-q="low">Low data</button><button class="chip on" data-q="normal">Normal</button><button class="chip" data-q="high">Sharper</button>
       </span>
-      <button class="btn btn--ghost" id="c-stop">Stop</button>
+      <button class="btn" id="c-all">Watch all</button>
+      <button class="btn btn--ghost" id="c-stop">Stop all</button>
     </div>
     <div class="cams" id="c-grid"></div>
-    <p class="fine" id="c-info">Pictures are sent from the site only while this view is open, and stop after a few minutes to save data.</p>
+    <p class="fine" id="c-info">Cameras switch on only when you click Watch, and stop after 5 minutes to save data.</p>
   </section>
 </main>
 <script src="{{ url_for('static', filename='ttd/ttd.js') }}"></script>

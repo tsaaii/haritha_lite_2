@@ -156,4 +156,8 @@ tfoot td { position: sticky; bottom: 0; background: #E8EDEA; font-weight: 700; b
   color: #fff; font-size: 13px; font-weight: 700; }
 .cam .cam-age { position: absolute; right: 10px; top: 10px; z-index: 1; padding: 3px 10px; border-radius: 999px; background: rgba(18,26,20,.72);
   color: #fff; font-size: 12px; }
+.cam .go { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cam .go small { font-size: 13px; color: #93A39A; }
+.cam .stop-one { position: absolute; right: 10px; bottom: 10px; z-index: 1; height: 32px; padding: 0 12px; border-radius: 999px;
+  border: none; background: rgba(18,26,20,.75); color: #fff; cursor: pointer; }
 .cam.wide { grid-column: 1 / -1; aspect-ratio: auto; min-height: 200px; flex-direction: column; gap: 14px; }

@@ -25,6 +25,9 @@ D0 = TODAY.isoformat()
 JPEG = b"\xff\xd8" + b"x" * 100
 
 
+SEEN_PARAMS: list = []
+
+
 class FakeResp:
     def __init__(self, status=200, json_body=None, content=b"", headers=None):
         self.status_code, self._j, self.content, self.headers = status, json_body, content, headers or {}
@@ -63,6 +66,11 @@ def fake_adex(url, params=None, headers=None, timeout=None):
         return FakeResp(content=JPEG, headers={"X-Age": "0.4"})
     if path == "live/back.jpg":
         return FakeResp(status=204)
+    if path == "live/cam3.jpg":
+        SEEN_PARAMS.append(dict(params))
+        return FakeResp(content=JPEG, headers={"X-Age": "0.2"})
+    if path == "live/cam9.jpg":
+        return FakeResp(status=410, json_body={"detail": "Viewing stopped after 5 minutes. Click Watch to see it again."})
     return FakeResp(status=404, json_body={"detail": "no"})
 
 
@@ -227,6 +235,22 @@ class TestData(TTDBase):
         self.assertEqual(self.c.get("/TTD/api/live/back.jpg").status_code, 204)
         self.assertEqual(self.c.get("/TTD/api/live/..%2Fsecret.jpg").status_code, 404)
         self.assertEqual(self.c.get("/TTD/api/live/window.jpg").status_code, 404)
+
+    def test_watch_starts_a_session_and_time_limit_passes_through(self):
+        SEEN_PARAMS.clear()
+        self.assertEqual(self.c.get("/TTD/api/live/cam3.jpg?q=low&start=1").status_code, 200)
+        self.assertEqual(self.c.get("/TTD/api/live/cam3.jpg?q=low").status_code, 200)
+        self.assertEqual(SEEN_PARAMS, [{"q": "low", "start": 1}, {"q": "low"}])   # only the Watch click starts one
+        r = self.c.get("/TTD/api/live/cam9.jpg")
+        self.assertEqual(r.status_code, 410)
+        self.assertIn("Click Watch", r.get_json()["error"])
+
+    def test_cameras_tab_does_not_autostart(self):
+        js = open(os.path.join(app.static_folder, "ttd", "ttd.js"), encoding="utf-8").read()
+        self.assertIn("start=1", js)
+        page = self.c.get("/TTD").get_data(as_text=True)
+        self.assertIn("Watch all", page)
+        self.assertIn("only when you click Watch", page)
 
     def test_service_not_configured_or_down(self):
         with mock.patch.dict(os.environ, {"TTD_READ_KEY": ""}):
