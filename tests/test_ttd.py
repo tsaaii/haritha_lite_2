@@ -193,6 +193,27 @@ class TestData(TTDBase):
         self.assertEqual(o["trips_today"], 3)                          # 2 complete + 1 awaiting empty weight
         self.assertEqual(o["trips_today_complete"], 2)
         self.assertEqual(o["inward_today_mt"], 4.5)
+        # Climate impact, by hand: CH4/t = 0.8*0.06*0.5*0.5*16/12 = 0.016; 12,825.5 MT -> 205.208 t CH4
+        # -> x28 = 5,745.824 t CO2e -> /0.060 = 95,764 trees; x0.85 = 4,884 credits; RDF 1,250 x 0.5 = 625 t plastic
+        i = o["impact"]
+        self.assertEqual((i["ch4_t"], i["co2e_t"], i["trees"], i["carbon_credits"], i["epr_plastic_t"]),
+                         (205.2, 5745.8, 95764, 4884, 625.0))
+        self.assertEqual(i["inputs"]["ch4_per_t"], 0.016)
+
+    def test_impact_factors_configurable_and_safe(self):
+        with mock.patch.dict(os.environ, {"TTD_CH4_DOC": "0.12", "TTD_RDF_PLASTIC_SHARE": "0.6", "TTD_GWP_CH4": "oops"}):
+            i = ttd.impact(1000, 100)
+        self.assertEqual(i["factors"]["doc"], 0.12)
+        self.assertEqual(i["factors"]["gwp"], 28.0)                     # bad value -> default, no crash
+        self.assertEqual(i["ch4_t"], 32.0)                              # 1000 x 0.032
+        self.assertEqual(i["epr_plastic_t"], 60.0)
+        self.assertEqual(ttd.impact(0, 0)["trees"], 0)
+
+    def test_impact_tiles_on_page(self):
+        body = self.c.get("/TTD").get_data(as_text=True)
+        for tid in ("i-trees", "i-ch4", "i-co2e", "i-cc", "i-epr", "tip-trees", "tip-ch4", "tip-cc", "tip-epr"):
+            self.assertIn(f'id="{tid}"', body)
+        self.assertNotIn("earned", body.lower())                        # potential, never claimed as earned
 
     def test_day_report_fills_every_day_and_totals(self):
         r = self.c.get(f"/TTD/api/report?view=day&from={D1}&to={D0}").get_json()

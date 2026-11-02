@@ -22,6 +22,9 @@ Configuration (environment, see ttd_secrets.example.yaml):
     TTD_READ_KEY_SECRET Secret Manager name, e.g. projects/PROJECT/secrets/ttd-read-key/versions/latest
     TTD_PASSWORD_HASH   optional: werkzeug hash to replace the built-in password
     TTD_AWARDED_MT      optional: awarded legacy quantity (default 51290)
+    TTD_CH4_MCF, TTD_CH4_DOC, TTD_CH4_DOCF, TTD_CH4_F, TTD_CH4_OX, TTD_GWP_CH4,
+    TTD_CREDIT_PHI, TTD_TREE_TCO2, TTD_RDF_PLASTIC_SHARE
+                        optional: factors behind the climate-impact tiles (see IMPACT_DEFAULTS)
 """
 from __future__ import annotations
 
@@ -170,6 +173,59 @@ def _today() -> date:
 
 
 # ---------------------------------------------------------------------------
+# Climate impact estimates (Overview tiles). Every figure is an ESTIMATE from weighbridge
+# tonnage and published factors; nothing here is a verified or issued credit.
+# ---------------------------------------------------------------------------
+IMPACT_DEFAULTS = {
+    # IPCC 2006 Guidelines, Vol. 5 (Waste), Ch. 3 - methane from solid waste disposal sites.
+    "mcf": 0.8,     # methane correction factor: unmanaged, deep (>= 5 m) site
+    "doc": 0.06,    # degradable organic carbon left in AGED legacy waste (fresh Indian MSW ~0.15). Replace with lab data.
+    "docf": 0.5,    # fraction of DOC that decomposes (IPCC default)
+    "f": 0.5,       # fraction of CH4 in landfill gas (IPCC default)
+    "ox": 0.0,      # oxidation factor: 0 for unmanaged / uncovered sites (IPCC default)
+    "gwp": 28.0,    # CH4 global warming potential, 100 yr, IPCC AR5 (used in EU and UNFCCC reporting)
+    "phi": 0.85,    # model-uncertainty deduction applied by CDM waste methodologies (AMS-III.AF / SWDS tool)
+    "tree_tco2": 0.060,      # US EPA: t CO2 sequestered by one urban tree seedling grown for 10 years
+    "rdf_plastic": 0.5,      # plastic share of RDF by weight - an ASSUMPTION; set from a lab test
+}
+_IMPACT_ENV = {"mcf": "TTD_CH4_MCF", "doc": "TTD_CH4_DOC", "docf": "TTD_CH4_DOCF", "f": "TTD_CH4_F",
+               "ox": "TTD_CH4_OX", "gwp": "TTD_GWP_CH4", "phi": "TTD_CREDIT_PHI", "tree_tco2": "TTD_TREE_TCO2",
+               "rdf_plastic": "TTD_RDF_PLASTIC_SHARE"}
+
+
+def _impact_factors() -> dict:
+    out = {}
+    for k, default in IMPACT_DEFAULTS.items():
+        try:
+            out[k] = float(os.environ.get(_IMPACT_ENV[k], "") or default)
+        except ValueError:
+            logger.warning("Ignoring bad %s; using %s", _IMPACT_ENV[k], default)
+            out[k] = default
+    return out
+
+
+def impact(processed_mt: float, rdf_mt: float) -> dict:
+    """Methane avoided, CO2e, tree equivalent, potential carbon credits and EPR-eligible plastic.
+
+    processed_mt: legacy waste excavated and processed (MSW inward, all time).
+    rdf_mt:       RDF dispatched (all time).
+    """
+    f = _impact_factors()
+    ch4_per_t = f["mcf"] * f["doc"] * f["docf"] * f["f"] * 16 / 12 * (1 - f["ox"])
+    ch4 = processed_mt * ch4_per_t
+    co2e = ch4 * f["gwp"]
+    return {
+        "ch4_t": round(ch4, 1),
+        "co2e_t": round(co2e, 1),
+        "trees": int(round(co2e / f["tree_tco2"])) if f["tree_tco2"] > 0 else 0,
+        "carbon_credits": int(round(co2e * f["phi"])),
+        "epr_plastic_t": round(rdf_mt * f["rdf_plastic"], 1),
+        "inputs": {"processed_mt": processed_mt, "rdf_mt": rdf_mt, "ch4_per_t": round(ch4_per_t, 5)},
+        "factors": f,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Figures
 # ---------------------------------------------------------------------------
 def overview() -> dict:
@@ -191,6 +247,7 @@ def overview() -> dict:
         "inward_today_mt": round((today_mats.get(INWARD) or {}).get("net_kg", 0) / 1000, 2),
         "disposed": {m: mt(m) for m in DISPOSED},
         "disposed_total_mt": round(sum(mt(m) for m in DISPOSED), 2),
+        "impact": impact(processed, mt("RDF")),
         "updated": datetime.now(IST).strftime("%d %b %Y, %H:%M"),
     }
 
