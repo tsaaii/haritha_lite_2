@@ -8,7 +8,8 @@ Routes:
     GET      /TTD/api/report       day-wise or month-wise table  ?view=day|month&from=YYYY-MM-DD&to=YYYY-MM-DD
     GET      /TTD/report.pdf       the same report as a PDF with both logos
     GET      /TTD/api/live/state   remote camera view: station online?, live weight, cameras
-    GET      /TTD/api/live/<cam>.jpg   newest camera picture (asking = watching for 12 s)
+    GET      /TTD/api/live/<cam>.jpg   newest camera picture (asking = watching for 12 s);
+                                   ?start=1 is the Watch button; 410 once the 5-minute Watch is over
 
 Data comes from the Adex weighbridge cloud API (adex-lite3/cloud). The browser never sees
 that API's key: every call goes through this server, and only a signed-in TTD session may
@@ -339,12 +340,21 @@ def api_live_picture(cam):
     if not CAM_RE.match(cam):
         return jsonify({"error": "No such camera."}), 404
     q = request.args.get("q", "")
+    params = {"q": q} if q in ("low", "normal", "high") else {}
+    if request.args.get("start") == "1":
+        params["start"] = 1          # the Watch button: starts a viewing session in the relay
     try:
-        r = adex_get(f"live/{cam}.jpg", {"q": q} if q in ("low", "normal", "high") else None, raw=True, timeout=8)
+        r = adex_get(f"live/{cam}.jpg", params or None, raw=True, timeout=8)
     except AdexError as e:
         return jsonify({"error": str(e)}), 503
     if r.status_code == 204:
         return Response(status=204)
+    if r.status_code == 410:         # the relay ended this Watch (time limit); Watch again restarts it
+        try:
+            msg = r.json().get("detail")
+        except Exception:
+            msg = None
+        return jsonify({"error": msg or "Viewing time is over. Click Watch to see it again."}), 410
     if r.status_code != 200 or not r.content.startswith(b"\xff\xd8"):
         return jsonify({"error": "No picture."}), 502
     return Response(r.content, mimetype="image/jpeg",

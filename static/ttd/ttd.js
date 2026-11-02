@@ -28,7 +28,7 @@
     showErr('');
     if (v === 'overview') loadOverview();
     if (v === 'reports') loadReport();
-    if (v === 'cameras') camStart(); else camStop();
+    if (v === 'cameras') camStart(); else camStopView();
   }
 
   // ------------------------------------------------------------------ overview
@@ -92,88 +92,95 @@
   }
 
   // ------------------------------------------------------------------ live cameras (on demand)
-  // Short requests only: the newest picture about once a second. The site sends pictures only
-  // while someone is asking, so closing this tab stops the data within ~12 seconds.
-  var CV = { on: false, cams: null, pick: null, names: {}, q: 'normal', timers: [], until: 0, urls: {}, stateT: null };
-  function camStop(msg) {
-    CV.on = false; CV.timers.forEach(clearTimeout); CV.timers = []; clearInterval(CV.stateT);
-    if (msg) {
-      $('c-grid').innerHTML = '<div class="cam wide"><span>' + esc(msg) + '</span><button class="btn" id="c-again">Watch again</button></div>';
-      $('c-again').addEventListener('click', camStart);
-    }
-  }
+  // Nothing streams until Watch is clicked. A watched camera asks for its newest picture about
+  // once a second (short requests). The cloud ends each Watch after 5 minutes (410).
+  var CV = { cams: [], names: {}, q: 'normal', tiles: {}, stateT: null, maxMin: 5 };
+  var mins = function (n) { return n + (n === 1 ? ' minute' : ' minutes'); };
   function camState() {
     return api('live/state').then(function (s) {
       $('c-plant').className = 'pill ' + (s.plant_online ? 'pill--ok' : 'pill--off');
       $('c-plant').textContent = s.plant_online ? 'Site online' : 'Site offline';
       var w = s.weight;
       $('c-weight').textContent = (w && w.connected ? nf0.format(w.weight) : '—') + ' kg' + (w && w.connected && w.stable ? ' · stable' : '');
-      $('c-info').textContent = 'Pictures are sent from the site only while this view is open. Viewing stops after ' + s.max_minutes + ' minutes to save data.';
-      var ids = s.cams.map(function (c) { return c[0]; });
+      CV.maxMin = s.max_minutes;
+      $('c-info').textContent = 'Cameras switch on only when you click Watch, and stop after ' + mins(s.max_minutes) + ' to save data.';
       s.cams.forEach(function (c) { CV.names[c[0]] = c[1]; });
-      if (JSON.stringify(ids) !== JSON.stringify(CV.cams)) {
-        CV.cams = ids;
-        if (!CV.pick || !CV.pick.every(function (c) { return ids.indexOf(c) >= 0; })) CV.pick = ids.slice();
-        camButtons();
-        if (CV.on) camDraw();
-      }
-      return s;
-    });
-  }
-  function camButtons() {
-    var opts = CV.cams.map(function (c) { return [[c], CV.names[c] || c]; });
-    if (CV.cams.length > 1) opts.push([CV.cams.slice(), 'All']);
-    var box = $('c-pick'); box.innerHTML = '';
-    opts.forEach(function (o) {
-      var b = document.createElement('button');
-      b.className = 'chip' + (o[0].join() === CV.pick.join() ? ' on' : ''); b.textContent = o[1];
-      b.addEventListener('click', function () { CV.pick = o[0]; camButtons(); camStart(); });
-      box.appendChild(b);
+      var ids = s.cams.map(function (c) { return c[0]; });
+      if (JSON.stringify(ids) !== JSON.stringify(CV.cams)) { CV.cams = ids; camDraw(); }
+      else ids.forEach(function (c) { var t = CV.tiles[c]; if (t) t.el.querySelector('.cam-name').textContent = CV.names[c] || c; });
     });
   }
   function camDraw() {
-    CV.timers.forEach(clearTimeout); CV.timers = [];
-    var grid = $('c-grid'); grid.innerHTML = '';
-    CV.pick.forEach(function (c) {
-      var d = document.createElement('div'); d.className = 'cam';
-      d.innerHTML = '<span class="cam-name"></span><span class="cam-age" hidden></span><span class="cam-wait">Waiting for the site to send pictures… (up to 20 s)</span>';
-      d.querySelector('.cam-name').textContent = CV.names[c] || c;
-      grid.appendChild(d);
-      camPoll(c, d);
+    Object.keys(CV.tiles).forEach(function (c) { if (CV.cams.indexOf(c) < 0) { camStop(c); CV.tiles[c].el.remove(); delete CV.tiles[c]; } });
+    var grid = $('c-grid');
+    var wait = grid.querySelector('.cam.wide'); if (wait) wait.remove();
+    CV.cams.forEach(function (c) {
+      var t = CV.tiles[c];
+      if (!t) {
+        var el = document.createElement('div'); el.className = 'cam'; el.dataset.cam = c;
+        t = CV.tiles[c] = { el: el, on: false, timer: null, url: null };
+        camIdle(c);
+      }
+      grid.appendChild(t.el);   // keeps the site's camera order
     });
   }
-  function camPoll(cam, tile) {
-    if (!CV.on) return;
-    if (Date.now() > CV.until) return camStop('Viewing paused to save data.');
+  function camIdle(c, msg) {
+    var t = CV.tiles[c];
+    t.el.innerHTML = '<span class="cam-name"></span><span class="cam-age" hidden></span><div class="go"><span>' + esc(msg || 'Not watching') +
+      '</span><button class="btn">' + (msg ? 'Watch again' : 'Watch') + '</button><small>' + mins(CV.maxMin) + ' per Watch</small></div>';
+    t.el.querySelector('.cam-name').textContent = CV.names[c] || c;
+    t.el.querySelector('.go .btn').addEventListener('click', function () { camWatch(c); });
+  }
+  function camWatch(c) {
+    var t = CV.tiles[c];
+    if (!t || t.on) return;
+    t.on = true;
+    t.el.innerHTML = '<span class="cam-name"></span><span class="cam-age" hidden></span><span class="cam-wait">Switching on… (up to 20 s)</span><button class="stop-one">Stop</button>';
+    t.el.querySelector('.cam-name').textContent = CV.names[c] || c;
+    t.el.querySelector('.stop-one').addEventListener('click', function () { camStop(c); camIdle(c); });
+    camPoll(c, true);
+  }
+  function camStop(c) {
+    var t = CV.tiles[c]; if (!t) return;
+    t.on = false; clearTimeout(t.timer);
+    if (t.url) { URL.revokeObjectURL(t.url); t.url = null; }
+  }
+  function camPoll(c, first) {
+    var t = CV.tiles[c];
+    if (!t || !t.on) return;
     var wait = CV.q === 'high' ? 500 : 1000;
-    var next = function () { if (CV.on) CV.timers.push(setTimeout(function () { camPoll(cam, tile); }, wait)); };
+    var next = function () { if (t.on) t.timer = setTimeout(function () { camPoll(c, false); }, wait); };
     if (document.hidden) { wait = 2000; return next(); }   // tab hidden: stop asking, so the site stops sending
-    fetch('/TTD/api/live/' + cam + '.jpg?q=' + CV.q, { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
+    fetch('/TTD/api/live/' + c + '.jpg?q=' + CV.q + (first ? '&start=1' : ''), { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
+      if (!t.on) return;
       if (r.status === 401) { location.href = '/TTD'; return; }
+      if (r.status === 410) { camStop(c); camIdle(c, 'Stopped after ' + mins(CV.maxMin)); return; }
       if (r.status !== 200) { if (r.status !== 204) wait = 3000; return; }
       var age = +r.headers.get('X-Age');
       return r.blob().then(function (b) {
-        var url = URL.createObjectURL(b), img = tile.querySelector('img');
-        if (!img) { img = document.createElement('img'); img.alt = CV.names[cam] || cam; tile.appendChild(img); var w = tile.querySelector('.cam-wait'); if (w) w.remove(); }
+        var url = URL.createObjectURL(b), img = t.el.querySelector('img');
+        if (!img) { img = document.createElement('img'); img.alt = CV.names[c] || c; t.el.prepend(img); var w = t.el.querySelector('.cam-wait'); if (w) w.remove(); }
         img.src = url;
-        if (CV.urls[cam]) URL.revokeObjectURL(CV.urls[cam]);
-        CV.urls[cam] = url;
-        var tag = tile.querySelector('.cam-age'); tag.hidden = !(age > 4); tag.textContent = 'delayed ' + Math.round(age) + ' s';
+        if (t.url) URL.revokeObjectURL(t.url);
+        t.url = url;
+        var tag = t.el.querySelector('.cam-age'); tag.hidden = !(age > 4); tag.textContent = 'delayed ' + Math.round(age) + ' s';
       });
     }).catch(function () { wait = 3000; }).then(next);
   }
-  function camStart() {
-    camStop();
-    camState().then(function (s) {
-      CV.on = true; CV.until = Date.now() + s.max_minutes * 60000;
-      CV.stateT = setInterval(function () { camState().catch(function () {}); }, 3000);
-      camDraw();
-    }).catch(function (e) { camStop(e.message); });
+  function camStopAll() { Object.keys(CV.tiles).forEach(function (c) { if (CV.tiles[c].on) { camStop(c); camIdle(c); } }); }
+  function camOpen() {
+    if (!CV.cams.length) $('c-grid').innerHTML = '<div class="cam wide"><span>Checking which cameras the site has…</span></div>';
+    camState().catch(function (e) { $('c-grid').innerHTML = '<div class="cam wide"><span>' + esc(e.message) + '</span></div>'; CV.cams = []; });
+    clearInterval(CV.stateT);
+    CV.stateT = setInterval(function () { camState().catch(function () {}); }, 5000);
   }
+  function camStart() { camOpen(); }
+  function camStopView() { clearInterval(CV.stateT); camStopAll(); }
   document.querySelectorAll('[data-q]').forEach(function (b) {
     b.addEventListener('click', function () { CV.q = b.dataset.q; document.querySelectorAll('[data-q]').forEach(function (x) { x.classList.toggle('on', x === b); }); });
   });
-  $('c-stop').addEventListener('click', function () { camStop('Stopped.'); });
+  $('c-all').addEventListener('click', function () { CV.cams.forEach(camWatch); });
+  $('c-stop').addEventListener('click', camStopAll);
 
   loadOverview();
 })();
