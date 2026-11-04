@@ -1,10 +1,13 @@
 """
 Daily RDF tracker store for the RDF disposal report (views/rdf_report.py).
 
-One CSV per day is uploaded from the report's gear panel. Each file is keyed
-by the "as on Dt: DD.MM.YYYY" date in its header row, so:
-    - uploading the next day's tracker adds a point to every graph, and
-    - re-uploading a corrected sheet for the same date replaces that day.
+Two sources, merged by the "as on Dt: DD.MM.YYYY" date in each sheet's header row:
+    data/rdf_history/YYYY-MM-DD.csv   hardcoded history, deployed with the code
+    RDF_TRACKER_DIR/trackers/         one CSV per day uploaded from the gear icon
+So the graphs always start from the built-in history, every upload adds a point,
+and an upload for a date that is already there (built-in or uploaded) replaces it.
+To hardcode more history, drop the day's sheet in data/rdf_history (any file name;
+`python -m data.rdf_tracker add-history <csv>...` names it by its date) and deploy.
 
 Storage is RDF_TRACKER_DIR — a local folder or gs://bucket/prefix, same
 plug-and-play idea as SITES_MASTER_CSV:
@@ -15,8 +18,9 @@ The bucket is the only state. Each request lists trackers/ (one cheap API
 call) and only downloads files whose generation changed, so every App Engine
 instance sees an upload immediately.
 
-CLI (uses the same code path, so it works against gs:// with ADC):
-    python -m data.rdf_tracker seed data/rdf_seed/*.csv
+CLI:
+    python -m data.rdf_tracker add-history ~/Downloads/Daily_RDF_tracker-*.csv
+    python -m data.rdf_tracker seed <csv>...     (store as uploads; works against gs:// with ADC)
 """
 from __future__ import annotations
 
@@ -34,6 +38,8 @@ import config
 logger = logging.getLogger(__name__)
 
 TRACKER_DIR = os.environ.get("RDF_TRACKER_DIR", "rdf_tracker_data").rstrip("/")
+# Hardcoded history (ships with the code): data/rdf_history/YYYY-MM-DD.csv
+HISTORY_DIR = os.environ.get("RDF_HISTORY_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "rdf_history")
 _TRACKERS = "trackers"
 _UPLOADS = "uploads"
 
@@ -216,15 +222,15 @@ _lock = threading.Lock()
 _parsed: dict[str, tuple[str, Tracker]] = {}     # name -> (version, tracker)
 
 
-def history() -> list[Tracker]:
-    """Every stored day, oldest first. Re-downloads only files that changed."""
+def _uploaded() -> dict[date, Tracker]:
+    """Days uploaded from the gear icon (RDF_TRACKER_DIR/trackers). Re-reads only changed files."""
     listing = _list_trackers()
-    out = []
+    out: dict[date, Tracker] = {}
     for name, version, _ in listing:
         with _lock:
             hit = _parsed.get(name)
         if hit and hit[0] == version:
-            out.append(hit[1])
+            out[hit[1].date] = hit[1]
             continue
         raw = _read(f"{_TRACKERS}/{name}")
         if raw is None:
@@ -236,26 +242,65 @@ def history() -> list[Tracker]:
             continue
         with _lock:
             _parsed[name] = (version, t)
-        out.append(t)
+        out[t.date] = t
     names = {n for n, _, _ in listing}
     with _lock:
         for gone in set(_parsed) - names:
             _parsed.pop(gone, None)
-    return sorted(out, key=lambda t: t.date)
+    return out
+
+
+_builtin_cache: dict[str, tuple[str, dict[date, Tracker]]] = {}
+
+
+def builtin() -> dict[date, Tracker]:
+    """Hardcoded history shipped with the app (HISTORY_DIR, one YYYY-MM-DD.csv per day).
+
+    Deployed with the code, so the graphs always start from it, even with an empty bucket.
+    """
+    try:
+        names = sorted(n for n in os.listdir(HISTORY_DIR) if n.endswith(".csv"))
+    except FileNotFoundError:
+        return {}
+    sig = "|".join(f"{n}:{os.stat(os.path.join(HISTORY_DIR, n)).st_mtime_ns}" for n in names)
+    hit = _builtin_cache.get(HISTORY_DIR)
+    if hit and hit[0] == sig:
+        return hit[1]
+    out: dict[date, Tracker] = {}
+    for n in names:
+        with open(os.path.join(HISTORY_DIR, n), "rb") as f:
+            try:
+                t = parse(f.read(), n)
+            except TrackerError as exc:
+                logger.warning("Skipping unreadable built-in tracker %s: %s", n, exc)
+                continue
+        out[t.date] = t
+    _builtin_cache[HISTORY_DIR] = (sig, out)
+    return out
+
+
+def history() -> list[Tracker]:
+    """Built-in history + every uploaded day, oldest first. An upload wins over a built-in day."""
+    days = dict(builtin())
+    days.update(_uploaded())
+    return [days[d] for d in sorted(days)]
 
 
 def listing() -> list[dict]:
-    """For the gear panel: one row per stored day, newest first."""
+    """For the gear panel: one row per day, newest first."""
     by_name = {n: u for n, _, u in _list_trackers()}
+    base, up = builtin(), _uploaded()
     rows = []
     for t in history():
-        name = t.date.isoformat() + ".csv"
-        upd = by_name.get(name)
+        upd = by_name.get(t.date.isoformat() + ".csv")
+        uploaded = t.date in up
         rows.append({
             "date": t.date.isoformat(),
             "label": t.date.strftime("%-d %b %Y"),
             "sites": len(t.sites),
-            "uploaded": upd.astimezone(config.IST).strftime("%-d %b, %H:%M") if upd else "",
+            "uploaded": upd.astimezone(config.IST).strftime("%-d %b, %H:%M") if upd and uploaded else "",
+            "builtin": not uploaded,                       # shipped history: cannot be removed
+            "overrides_builtin": uploaded and t.date in base,
         })
     return rows[::-1]
 
@@ -264,7 +309,7 @@ def store(raw: bytes, filename: str) -> tuple[Tracker, bool]:
     """Validate + save one upload. Returns (tracker, replaced_existing_day)."""
     t = parse(raw, filename)
     name = t.date.isoformat() + ".csv"
-    replaced = any(n == name for n, _, _ in _list_trackers())
+    replaced = t.date in history_dates()
     stamp = datetime.now(config.IST).strftime("%Y%m%d-%H%M%S")
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", filename or "upload.csv")[:120]
     _write(f"{_UPLOADS}/{stamp}_{safe}", raw)
@@ -272,9 +317,16 @@ def store(raw: bytes, filename: str) -> tuple[Tracker, bool]:
     return t, replaced
 
 
+def history_dates() -> set[date]:
+    return set(builtin()) | set(_uploaded())
+
+
 def remove(day_iso: str) -> None:
+    """Remove an uploaded day. Built-in history stays (a built-in day shows again if it was overridden)."""
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day_iso or ""):
         raise TrackerError("Bad date.")
+    if not any(n == day_iso + ".csv" for n, _, _ in _list_trackers()):
+        raise TrackerError("That day is part of the built-in history and cannot be removed here.")
     _delete(f"{_TRACKERS}/{day_iso}.csv")
 
 
@@ -283,6 +335,18 @@ def remove(day_iso: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _main(argv: list[str]) -> int:
+    if len(argv) >= 2 and argv[0] == "add-history":
+        os.makedirs(HISTORY_DIR, exist_ok=True)
+        for path in argv[1:]:
+            with open(path, "rb") as f:
+                raw = f.read()
+            t = parse(raw, os.path.basename(path))
+            dest = os.path.join(HISTORY_DIR, t.date.isoformat() + ".csv")
+            existed = os.path.exists(dest)
+            with open(dest, "wb") as f:
+                f.write(raw)
+            print(f"{path} -> {os.path.relpath(dest)} ({t.date}, {len(t.sites)} sites){' replaced' if existed else ''}")
+        return 0
     if len(argv) >= 2 and argv[0] == "seed":
         for path in argv[1:]:
             with open(path, "rb") as f:

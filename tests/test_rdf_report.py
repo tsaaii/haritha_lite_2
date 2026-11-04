@@ -1,6 +1,6 @@
 """RDF disposal report (/rdf): PIN + captcha sign-in, upload, figures, gist, PDF.
 
-Runs against a temp folder (RDF_TRACKER_DIR) seeded from data/rdf_seed, so it is offline.
+Runs against temp folders (built-in history from data/rdf_history + an empty upload store), so it is offline.
 
     python -m unittest tests.test_rdf_report -v
 """
@@ -26,17 +26,21 @@ import captcha  # noqa: E402
 from data import rdf_report, rdf_tracker  # noqa: E402
 from main import app  # noqa: E402
 
-# Other test modules may have imported data.rdf_tracker first; point it at the temp store either way.
-rdf_tracker.TRACKER_DIR = TMP
-SEED = sorted(glob.glob(os.path.join(ROOT, "data", "rdf_seed", "*.csv")))
+HIST = os.path.join(TMP, "_history")
+# Other test modules may have imported data.rdf_tracker first; point it at the temp folders either way.
+rdf_tracker.TRACKER_DIR = os.path.join(TMP, "store")
+rdf_tracker.HISTORY_DIR = HIST
+SEED = sorted(glob.glob(os.path.join(ROOT, "data", "rdf_history", "*.csv")))
 XRW = {"X-Requested-With": "rdf-report"}
 
 
 def reset_store(drop_last: bool = True):
+    """Built-in history = the shipped days (minus the last, which tests upload); no uploads yet."""
     shutil.rmtree(TMP, ignore_errors=True)
-    os.makedirs(os.path.join(TMP, "trackers"))
+    os.makedirs(os.path.join(TMP, "store", "trackers"))
+    os.makedirs(HIST)
     for p in SEED[:-1] if drop_last else SEED:
-        shutil.copy(p, os.path.join(TMP, "trackers"))
+        shutil.copy(p, HIST)
 
 
 def answer(client) -> str:
@@ -142,7 +146,7 @@ class Upload(Base):
         self.assertIn('filename="Daily_RDF_tracker_14-10-2026.pdf"', r.headers["Content-Disposition"])
 
     def test_not_a_tracker(self):
-        bad = os.path.join(TMP, "bad.csv")
+        bad = os.path.join(TMP, "store", "bad.csv")
         with open(bad, "w") as f:
             f.write("a,b\n1,2\n")
         j = self.upload(bad).get_json()
@@ -153,10 +157,56 @@ class Upload(Base):
         self.assertEqual(self.upload(SEED[-1], headers={}).status_code, 400)
 
     def test_same_day_replaces(self):
-        self.upload(SEED[-1])
+        self.assertFalse(self.upload(SEED[-1]).get_json()["results"][0]["replaced"])
         j = self.upload(SEED[-1], "again.csv").get_json()
         self.assertTrue(j["results"][0]["replaced"])
         self.assertEqual(len(self.c.get("/rdf/api/trackers").get_json()["days"]), len(SEED))
+
+
+class History(Base):
+    """Hardcoded history is always on the graph; uploads add days and win on the same date."""
+
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+
+    def days(self):
+        return {d["date"]: d for d in self.c.get("/rdf/api/trackers").get_json()["days"]}
+
+    def test_builtin_history_shows_with_empty_store(self):
+        d = self.days()
+        self.assertEqual(len(d), len(SEED) - 1)
+        self.assertTrue(all(x["builtin"] for x in d.values()))
+        page = self.c.get("/rdf/").data
+        self.assertIn(b"1 Oct to 12 Oct", page)          # chart range covers the whole history
+
+    def test_upload_adds_a_point(self):
+        with open(SEED[-1], "rb") as f:
+            self.c.post("/rdf/api/upload", headers=XRW, content_type="multipart/form-data",
+                        data={"files": (io.BytesIO(f.read()), "Daily_RDF_tracker-14-10-2026.csv")})
+        d = self.days()
+        self.assertEqual(len(d), len(SEED))
+        self.assertFalse(d["2026-10-13"]["builtin"])
+        self.assertIn(b"1 Oct to 13 Oct", self.c.get("/rdf/").data)
+        self.assertEqual(len(rdf_report.build(rdf_tracker.history())["chart_marks"]) > 0, True)
+
+    def test_upload_overrides_builtin_day_and_remove_restores_it(self):
+        with open(SEED[5], "rb") as f:
+            raw = f.read().replace(b"Tharuni associates", b"Tharuni Associates", 1)
+        j = self.c.post("/rdf/api/upload", headers=XRW, content_type="multipart/form-data",
+                        data={"files": (io.BytesIO(raw), "fix.csv")}).get_json()
+        day = j["results"][0]["date"]
+        self.assertTrue(j["results"][0]["replaced"])
+        self.assertTrue(self.days()[day]["overrides_builtin"])
+        r = self.c.post("/rdf/api/delete", headers=XRW, json={"date": day}).get_json()
+        self.assertTrue(r["ok"])
+        self.assertTrue(self.days()[day]["builtin"])     # built-in sheet is back
+
+    def test_builtin_day_cannot_be_removed(self):
+        day = next(iter(self.days()))
+        r = self.c.post("/rdf/api/delete", headers=XRW, json={"date": day})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn(day, self.days())
 
 
 class Gist(unittest.TestCase):
