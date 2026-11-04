@@ -1,15 +1,17 @@
-/* RDF disposal report — gear panel.
-   Picking (or dropping) a tracker CSV is the only action: it uploads, the server
-   re-renders the report, the page swaps in the new sheet, and the export-ready
-   PDF downloads — no second click. */
+/* RDF disposal dashboard.
+   Tabs (Overview, Agencies, Sites, Date range, Report), site filters/sort, date-range
+   progress, WhatsApp summary, and the gear panel. Picking (or dropping) a tracker CSV
+   is the only action needed: it uploads, the server re-renders every tab, the page
+   swaps them in, and the export-ready PDF downloads. Handlers are delegated from
+   document so they keep working after the tabs are swapped. */
 (function () {
   "use strict";
   var cfg = JSON.parse(document.getElementById("rdf-report-config").textContent);
   var $ = function (id) { return document.getElementById(id); };
   var panel = $("panel"), input = $("files"), drop = $("drop"), msgs = $("msgs"), daysEl = $("days");
-  var slot = $("sheet-slot"), pdfBtn = $("pdf"), toast = $("toast");
-  var gistBox = $("gist"), gistText = $("gist-text"), gistDay = $("gist-day"), gistWa = $("gist-wa");
+  var sheetSlot = $("sheet-slot"), dashSlot = $("dash-slot"), pdfBtn = $("pdf"), toast = $("toast");
   var busy = false, toastTimer = null;
+  var state = { tab: "overview", filter: "all", sort: null, dir: -1, q: "" };
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -38,20 +40,97 @@
     }, function () { return { ok: false, error: "Network error. Check the connection and try again." }; });
   }
 
-  // Swap in the server-rendered sheet and point "Save as PDF" at the new day.
-  function applySheet(j) {
-    if (j.sheet_html == null) return;
-    slot.innerHTML = j.sheet_html;
-    if (j.pdf_url) { pdfBtn.href = j.pdf_url; pdfBtn.hidden = false; } else pdfBtn.hidden = true;
-    document.title = "RDF disposal report" + (j.rep_label ? " · " + j.rep_label : "");
-    setGist(j.gist || "", j.gist_day || "");
+  // ---------------------------------------------------------------- tabs
+  var TABS = ["overview", "agencies", "sites", "range", "report"];
+  function showTab(name, push) {
+    if (TABS.indexOf(name) < 0) name = "overview";
+    state.tab = name;
+    document.querySelectorAll(".tab").forEach(function (t) { t.setAttribute("aria-selected", String(t.dataset.tab === name)); });
+    document.querySelectorAll(".tabpanel").forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+    if (push !== false && location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
   }
 
-  function setGist(text, dayLabel) {
-    gistText.textContent = text;
-    gistDay.textContent = dayLabel;
-    gistWa.href = "https://wa.me/?text=" + encodeURIComponent(text);
-    gistBox.hidden = !text;
+  // ---------------------------------------------------------------- sites table
+  function applySites() {
+    var table = $("site-table");
+    if (!table) return;
+    var rows = Array.prototype.slice.call(table.tBodies[0].rows), shown = 0, q = state.q.trim().toLowerCase();
+    rows.forEach(function (tr) {
+      var f = " " + tr.dataset.f + " ";
+      var ok = (state.filter === "all" || f.indexOf(" " + state.filter + " ") >= 0) && (!q || tr.dataset.site.indexOf(q) >= 0);
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    if (state.sort) {
+      var k = state.sort, dir = state.dir, text = k === "site" || k === "agency";
+      rows.sort(function (a, b) {
+        var x = a.dataset["v" + k[0].toUpperCase() + k.slice(1)], y = b.dataset["v" + k[0].toUpperCase() + k.slice(1)];
+        if (text) return dir * x.localeCompare(y);
+        return dir * (parseFloat(x) - parseFloat(y));
+      }).forEach(function (tr) { table.tBodies[0].appendChild(tr); });
+    }
+    table.querySelectorAll("th[data-sort]").forEach(function (th) {
+      th.setAttribute("aria-sort", th.dataset.sort === state.sort ? (state.dir > 0 ? "ascending" : "descending") : "none");
+    });
+    document.querySelectorAll("#site-chips .chip").forEach(function (c) { c.classList.toggle("is-on", c.dataset.filter === state.filter); });
+    var chip = document.querySelector('#site-chips .chip[data-filter="' + state.filter + '"]');
+    var label = chip ? chip.textContent.replace(/\s+\d+\s*$/, "").trim() : "all";
+    var note = $("site-note");
+    if (note) note.textContent = "Showing " + shown + " site" + (shown === 1 ? "" : "s") +
+      (state.filter === "all" ? "" : " · " + label) + (q ? " matching “" + state.q + "”" : "") + ". Click a column to sort.";
+    var search = $("site-search");
+    if (search && search.value !== state.q) search.value = state.q;
+  }
+  function gotoSites(filter) {
+    state.filter = filter;
+    // Sensible default order per list.
+    state.sort = { quick: "bal", long: "bal", stalled: "bal", active: "today" }[filter] || state.sort;
+    state.dir = filter === "quick" ? 1 : -1;
+    showTab("sites");
+    applySites();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ---------------------------------------------------------------- date range
+  function runRange() {
+    var f = $("range-from").value, t = $("range-to").value, out = $("range-out");
+    if (!f || !t) return;
+    out.classList.add("is-busy");
+    api(cfg.api.range + "?from=" + encodeURIComponent(f) + "&to=" + encodeURIComponent(t)).then(function (j) {
+      out.classList.remove("is-busy");
+      if (j.html != null) out.innerHTML = j.html;
+      else out.innerHTML = "", out.appendChild(el("div", "card empty", j.error || "Could not load."));
+    });
+  }
+  function quickRange(days) {
+    var to = $("range-to"), from = $("range-from");
+    to.value = to.max;
+    if (days === "all") from.value = from.min;
+    else {
+      var d = new Date(to.max + "T00:00:00");
+      d.setDate(d.getDate() - (parseInt(days, 10) - 1));
+      var iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      from.value = iso < from.min ? from.min : iso;
+    }
+    runRange();
+  }
+
+  // ---------------------------------------------------------------- swap in fresh render
+  function applyAll(j) {
+    if (j.sheet_html == null) return;
+    sheetSlot.innerHTML = j.sheet_html;
+    if (j.dash_html != null) dashSlot.innerHTML = j.dash_html;
+    if (j.pdf_url) { pdfBtn.href = j.pdf_url; pdfBtn.hidden = false; } else pdfBtn.hidden = true;
+    document.title = "RDF disposal dashboard" + (j.rep_label ? " · " + j.rep_label : "");
+    if (j.range && j.range.max) {
+      ["range-from", "range-to"].forEach(function (id) { $(id).min = j.range.min; $(id).max = j.range.max; });
+      if (!$("range-to").value || $("range-to").value > j.range.max || $("range-to").value === $("range-to").dataset.lastMax)
+        $("range-to").value = j.range.max;
+      $("range-to").dataset.lastMax = j.range.max;
+      runRange();
+    }
+    showTab(state.tab, false);
+    applySites();
   }
 
   function copyText(text) {
@@ -71,12 +150,13 @@
       return r.blob();
     }).then(function (b) {
       var u = URL.createObjectURL(b), a = el("a");
-      a.href = u; a.download = name || "RDF_disposal_report.pdf";
+      a.href = u; a.download = name || "Daily_RDF_tracker.pdf";
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(u); }, 30000);
     });
   }
 
+  // ---------------------------------------------------------------- gear panel
   function renderDays(days) {
     daysEl.textContent = "";
     if (!days.length) { daysEl.appendChild(el("small", "c5", "None yet.")); return; }
@@ -98,7 +178,7 @@
         api(cfg.api["delete"], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: d.date }) })
           .then(function (r) {
             if (!r.ok) { say(r.error || "Could not remove.", false); return; }
-            applySheet(r);
+            applyAll(r);
             loadDays();
           });
       });
@@ -123,7 +203,8 @@
 
     busy = true;
     drop.classList.add("is-over");
-    slot.classList.add("is-busy");
+    dashSlot.classList.add("is-busy");
+    sheetSlot.classList.add("is-busy");
     say("Processing " + files.length + " file" + (files.length > 1 ? "s" : "") + "…", true);
 
     api(cfg.api.upload, { method: "POST", body: fd }).then(function (j) {
@@ -134,30 +215,59 @@
         failed.forEach(function (r) { say(r.file + ": " + r.error, false); });
         return null;
       }
-      applySheet(j);
+      applyAll(j);
       loadDays();
       (j.results || []).forEach(function (r) {
         say(r.ok ? r.file + ": " + r.label + ", " + r.sites + " sites" + (r.replaced ? " (replaced that day)." : " added.")
                  : r.file + ": " + r.error, r.ok);
       });
-      if (!failed.length) closePanel();          // all good: show the updated report
+      if (!failed.length) closePanel();          // all good: show the updated dashboard
       window.scrollTo({ top: 0, behavior: "smooth" });
       return downloadPdf(j.pdf_url, j.pdf_name).then(function () {
-        notify("Report updated to " + j.rep_label + " · PDF downloaded", true);
+        notify("Dashboard updated to " + j.rep_label + " · PDF downloaded", true);
       }, function () {
-        notify("Report updated to " + j.rep_label + ". The PDF did not download. Use Save as PDF.", false);
+        notify("Dashboard updated to " + j.rep_label + ". The PDF did not download. Use Save as PDF.", false);
       });
     }).then(function () {
       busy = false;
       drop.classList.remove("is-over");
-      slot.classList.remove("is-busy");
+      dashSlot.classList.remove("is-busy");
+      sheetSlot.classList.remove("is-busy");
     });
   }
 
-  $("gist-copy").addEventListener("click", function () {
-    copyText(gistText.textContent).then(function () { notify("Summary copied. Paste it in WhatsApp.", true); },
-      function () { notify("Could not copy. Select the text and copy it.", false); });
+  // ---------------------------------------------------------------- events (delegated)
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-tab], [data-goto], [data-filter], th[data-sort], #gist-copy, [data-days]");
+    if (!t) return;
+    if (t.dataset.tab) return showTab(t.dataset.tab);
+    if (t.dataset.goto) return gotoSites(t.dataset.goto);
+    if (t.dataset.filter) { state.filter = t.dataset.filter; return applySites(); }
+    if (t.dataset.days) return quickRange(t.dataset.days);
+    if (t.dataset.sort) {
+      var k = t.dataset.sort;
+      state.dir = state.sort === k ? -state.dir : (k === "site" || k === "agency" ? 1 : -1);
+      state.sort = k;
+      return applySites();
+    }
+    if (t.id === "gist-copy") {
+      var txt = $("gist-text");
+      copyText(txt ? txt.textContent : "").then(function () { notify("Summary copied. Paste it in WhatsApp.", true); },
+        function () { notify("Could not copy. Select the text and copy it.", false); });
+    }
   });
+  document.addEventListener("input", function (e) {
+    if (e.target.id === "site-search") { state.q = e.target.value; applySites(); }
+  });
+  $("range-form").addEventListener("change", runRange);
+  $("range-form").addEventListener("submit", function (e) { e.preventDefault(); runRange(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.target.closest && e.target.closest(".tbl--click tr[data-goto]") && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault(); gotoSites(e.target.closest("tr").dataset.goto);
+    }
+  });
+  window.addEventListener("hashchange", function () { showTab(location.hash.slice(1), false); });
+
   $("gear").addEventListener("click", function () { if (!busy) msgs.textContent = ""; loadDays(); openPanel(); });
   $("panel-close").addEventListener("click", closePanel);
   input.addEventListener("change", function () { upload(input.files); });
@@ -168,4 +278,12 @@
     drop.addEventListener(ev, function (e) { e.preventDefault(); if (!busy) drop.classList.remove("is-over"); });
   });
   drop.addEventListener("drop", function (e) { upload(e.dataTransfer && e.dataTransfer.files); });
+
+  // Ctrl/Cmd+P prints the Report tab (the PDF layout), whatever tab is open.
+  var before = null;
+  window.addEventListener("beforeprint", function () { before = state.tab; showTab("report", false); });
+  window.addEventListener("afterprint", function () { if (before) showTab(before, false); });
+
+  showTab(location.hash.slice(1) || "overview", false);
+  applySites();
 })();

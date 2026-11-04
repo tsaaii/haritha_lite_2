@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0B3D22">
-<title>RDF disposal report{% if r %} · {{ r.rep_label }}{% endif %}</title>
+<title>RDF disposal dashboard{% if r %} · {{ r.rep_label }}{% endif %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='rdf_report/report.css') }}">
 <script id="rdf-report-config" type="application/json">{{ cfg | tojson }}</script>
 </head>
@@ -25,19 +25,33 @@
 
   {% if load_error %}<div class="alert" data-noprint>{{ load_error }}</div>{% endif %}
 
-  <section class="gist" id="gist" data-noprint{% if not r %} hidden{% endif %} aria-labelledby="gist-title">
-    <div class="gist__head">
-      <h2 id="gist-title">WhatsApp summary · <span id="gist-day">{{ r.rep_day if r else "" }}</span></h2>
-      <div class="gist__actions">
-        <button type="button" class="btn btn--secondary" id="gist-copy">Copy</button>
-        <a class="btn btn--ghost" id="gist-wa" target="_blank" rel="noopener"
-           href="https://wa.me/?text={{ (r.gist if r else '') | urlencode }}">Open in WhatsApp</a>
-      </div>
-    </div>
-    <pre class="gist__text" id="gist-text">{{ r.gist if r else "" }}</pre>
+  <nav class="tabs" role="tablist" aria-label="Dashboard" data-noprint>
+    <button type="button" role="tab" class="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button type="button" role="tab" class="tab" data-tab="agencies" aria-selected="false">Agencies</button>
+    <button type="button" role="tab" class="tab" data-tab="sites" aria-selected="false">Sites</button>
+    <button type="button" role="tab" class="tab" data-tab="range" aria-selected="false">Date range</button>
+    <button type="button" role="tab" class="tab" data-tab="report" aria-selected="false">Report <small>PDF view</small></button>
+  </nav>
+
+  <div class="dash" id="dash-slot">{% include "rdf_report/_dashboard.html" %}</div>
+
+  <section class="tabpanel dash" data-panel="range" aria-label="Date range" hidden>
+    <form class="card range-form" id="range-form" data-noprint>
+      <h2>Progress between two dates</h2>
+      <label>From <input type="date" name="from" id="range-from" value="{{ range_from }}" min="{{ range_min }}" max="{{ range_max }}" required></label>
+      <label>To <input type="date" name="to" id="range-to" value="{{ range_to }}" min="{{ range_min }}" max="{{ range_max }}" required></label>
+      <span class="range-quick">
+        <button type="button" class="chip" data-days="7">Last 7 days</button>
+        <button type="button" class="chip" data-days="14">Last 14 days</button>
+        <button type="button" class="chip" data-days="all">Everything</button>
+      </span>
+    </form>
+    <div id="range-out">{% if g %}{% include "rdf_report/_range.html" %}{% endif %}</div>
   </section>
 
-  <div id="sheet-slot" class="sheet-slot">{% include "rdf_report/_sheet.html" %}</div>
+  <section class="tabpanel tabpanel--report" data-panel="report" aria-label="Report (PDF view)" hidden>
+    <div id="sheet-slot" class="sheet-slot">{% include "rdf_report/_sheet.html" %}</div>
+  </section>
 </div>
 
 <dialog class="panel" id="panel" aria-labelledby="panel-title">

@@ -1,11 +1,13 @@
 """
-RDF disposal report — the daily, printable report for Swachha Andhra Corporation.
+RDF disposal dashboard — tabs Overview / Agencies / Sites / Date range / Report,
+where Report is the daily printable sheet (and its PDF) for Swachha Andhra Corporation.
 
     GET  /rdf/                 -> the report (PIN + captcha page if not signed in)
     POST /rdf/login            -> {pin, captcha_answer, captcha_nonce} form post
     GET  /rdf/logout
     GET  /rdf/report.pdf       -> export-ready A4 PDF: Daily_RDF_tracker_DD-MM-YYYY.pdf
     GET  /rdf/api/gist         -> {text}: WhatsApp summary of who sent RDF on the report day
+    GET  /rdf/api/range        -> ?from&to: agency progress between two dates (HTML fragment)
     GET  /rdf/api/trackers     -> days on file (gear panel)
     POST /rdf/api/upload       -> multipart "files": one or more daily tracker CSVs;
                                   replies with the re-rendered report sheet, gist + PDF link
@@ -23,13 +25,14 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import date, timedelta
 from functools import wraps
 
 from flask import Blueprint, Response, jsonify, make_response, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 import captcha
-from data import rdf_report, rdf_report_pdf, rdf_tracker
+from data import rdf_dashboard, rdf_report, rdf_report_pdf, rdf_tracker
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("rdf_report", __name__, template_folder="../templates")
@@ -93,13 +96,31 @@ def _pin_hash() -> str:
     return os.environ.get("RDF_REPORT_PIN_HASH", "").strip() or _DEFAULT_PIN_HASH
 
 
-def _report() -> tuple[dict | None, str]:
-    """(report view model or None if no days on file, error message)."""
+def _load() -> tuple[list, str]:
     try:
-        return rdf_report.build(rdf_tracker.history()), ""
+        return rdf_tracker.history(), ""
     except Exception:
         logger.exception("rdf_report: could not load trackers")
-        return None, "Could not read the uploaded trackers. Try again in a minute."
+        return [], "Could not read the uploaded trackers. Try again in a minute."
+
+
+def _report() -> tuple[dict | None, str]:
+    """(report view model or None if no days on file, error message)."""
+    hist, err = _load()
+    return (rdf_report.build(hist) if hist else None), err
+
+
+def _views() -> dict:
+    """Everything the page needs: report sheet (r), dashboard tabs (d), default date range (g)."""
+    hist, err = _load()
+    if not hist:
+        return {"r": None, "d": None, "g": None, "load_error": err, "range_min": "", "range_max": "",
+                "range_from": "", "range_to": ""}
+    first, last = hist[0].date, hist[-1].date
+    start = max(first, last - timedelta(days=6))
+    return {"r": rdf_report.build(hist), "d": rdf_dashboard.build(hist), "g": rdf_dashboard.date_range(hist, start, last),
+            "load_error": err, "range_min": first.isoformat(), "range_max": last.isoformat(),
+            "range_from": start.isoformat(), "range_to": last.isoformat()}
 
 
 def _pdf_url(r: dict) -> str:
@@ -111,10 +132,10 @@ def _pdf_url(r: dict) -> str:
 def report_view():
     if not _signed_in():
         return _login_page()
-    r, load_error = _report()
+    v = _views()
     return _no_cache(render_template(
-        "rdf_report/report.html", r=r, load_error=load_error, pdf_url=_pdf_url(r) if r else "",
-        cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in ("trackers", "upload", "delete", "gist")},
+        "rdf_report/report.html", **v, pdf_url=_pdf_url(v["r"]) if v["r"] else "",
+        cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in ("trackers", "upload", "delete", "gist", "range")},
              "maxBytes": MAX_UPLOAD_BYTES},
     ))
 
@@ -189,6 +210,21 @@ def api_gist():
     return _no_cache(jsonify(ok=bool(r), text=r["gist"] if r else "", error=err))
 
 
+@bp.route(URL_PREFIX + "/api/range")
+@_api
+def api_range():
+    """?from=YYYY-MM-DD&to=YYYY-MM-DD -> agency progress between the two dates (HTML fragment)."""
+    try:
+        start = date.fromisoformat(request.args.get("from", ""))
+        end = date.fromisoformat(request.args.get("to", ""))
+    except ValueError:
+        return jsonify(ok=False, error="Pick both dates."), 400
+    hist, err = _load()
+    g = rdf_dashboard.date_range(hist, start, end) if hist else {"ok": False, "error": err or "No trackers on file."}
+    return _no_cache(jsonify(ok=g["ok"], html=render_template("rdf_report/_range.html", g=g),
+                             **{k: g.get(k) for k in ("from_iso", "to_iso")}))
+
+
 @bp.route(URL_PREFIX + "/api/trackers")
 @_api
 def api_trackers():
@@ -226,9 +262,12 @@ def api_upload():
 
 
 def _sheet_payload() -> dict:
-    """Fresh report sheet HTML + where to fetch its PDF, for in-place page updates."""
-    r, _ = _report()
+    """Fresh report sheet + dashboard tabs HTML + where to fetch the PDF, for in-place page updates."""
+    v = _views()
+    r = v["r"]
     return {"sheet_html": render_template("rdf_report/_sheet.html", r=r),
+            "dash_html": render_template("rdf_report/_dashboard.html", r=r, d=v["d"]),
+            "range": {"min": v["range_min"], "max": v["range_max"]},
             "rep_label": r["rep_label"] if r else "", "pdf_url": _pdf_url(r) if r else "",
             "gist": r["gist"] if r else "", "gist_day": r["rep_day"] if r else "",
             "pdf_name": rdf_report_pdf.filename(r) if r else ""}

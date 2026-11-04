@@ -1,0 +1,31 @@
+{# Date-range result (GET /rdf/api/range). #}
+{% if not g.ok %}
+<div class="card empty">{{ g.error }}</div>
+{% else %}
+<div class="tiles">
+  <div class="tile tile--hero"><span class="tile__l">Disposed {{ g.from_label }} to {{ g.to_label }}</span><span class="tile__v">{{ g.total }} <small>MT</small></span>
+    <span class="tile__s">{{ g.total_avg }} MT a day over {{ g.span }} day{{ '' if g.span == 1 else 's' }} · {{ g.report_days }} report{{ '' if g.report_days == 1 else 's' }} on file</span></div>
+  <div class="tile"><span class="tile__l">Left at start</span><span class="tile__v">{{ g.total_bal0 }} <small>MT</small></span><span class="tile__s">as of {{ g.baseline }}</span></div>
+  <div class="tile"><span class="tile__l">Left at end</span><span class="tile__v">{{ g.total_bal1 }} <small>MT</small></span><span class="tile__s">as of {{ g.to_label }}</span></div>
+  <div class="tile"><span class="tile__l">Days with dispatch</span><span class="tile__v">{{ g.total_days }} <small>of {{ g.report_days }}</small></span><span class="tile__s">report days with RDF sent</span></div>
+</div>
+<div class="card">
+  <div class="card__head"><h2>Progress by agency</h2><span class="muted">Disposed = cumulative on {{ g.to_label }} minus cumulative on {{ g.baseline }}</span></div>
+  <div class="scroll-x"><table class="tbl">
+    <thead><tr><th>Agency</th><th class="n">Disposed (MT)</th><th class="w-bar"></th><th class="n">MT / day</th><th class="n">Days with dispatch</th><th class="n">Sites that moved</th><th class="n">Left at start</th><th class="n">Left at end</th><th class="n">Cleared</th></tr></thead>
+    <tbody>
+    {% for a in g.rows %}
+    <tr>
+      <td><i class="sq" style="background:{{ a.color }}"></i>{{ a.name }}</td>
+      <td class="n b {{ 'good' if a.disposed_v > 0 else 'bad' }}">{{ a.disposed }}</td>
+      <td class="w-bar"><span class="hbar"><span style="width:{{ a.bar_w }};background:{{ a.color }}"></span></span></td>
+      <td class="n">{{ a.avg }}</td><td class="n">{{ a.days }}</td><td class="n">{{ a.sites }}</td>
+      <td class="n">{{ a.bal0 }}</td><td class="n">{{ a.bal1 }}</td><td class="n">{{ a.cleared_pct }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="tot"><td>All agencies</td><td class="n">{{ g.total }}</td><td></td><td class="n">{{ g.total_avg }}</td><td class="n">{{ g.total_days }}</td><td></td><td class="n">{{ g.total_bal0 }}</td><td class="n">{{ g.total_bal1 }}</td><td></td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">"Cleared" = disposed ÷ (disposed + left at end). Some sheets don't update the balance column every day, so the end balance is the steadier base.</p>
+</div>
+{% endif %}

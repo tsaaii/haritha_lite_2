@@ -1,0 +1,171 @@
+{# Overview / Agencies / Sites tab panels. Rendered in the page and returned by /api/upload. #}
+{% if not d %}
+<section class="tabpanel" data-panel="overview"><div class="card empty">No daily trackers on file yet. Use the gear icon to upload the daily RDF tracker CSV.</div></section>
+<section class="tabpanel" data-panel="agencies" hidden></section>
+<section class="tabpanel" data-panel="sites" hidden></section>
+{% else %}
+{% set k = d.kpi %}{% set c = d.counts %}
+
+{# ---------------- Overview ---------------- #}
+<section class="tabpanel" data-panel="overview" aria-label="Overview">
+  <div class="lede">
+    <span class="lede__date">Report of {{ d.rep_label }}</span>
+    <span class="lede__line">{{ k.pct }} of RDF disposed · {{ k.bal }} MT left · {{ d.days_left }} days to {{ d.dl_label }}.
+      At the last 7 days' pace ({{ k.pace }} MT a day) everything clears by
+      <b class="{{ 'bad' if k.late else 'good' }}">{{ k.finish }}</b>.</span>
+  </div>
+
+  <div class="tiles">
+    <div class="tile tile--hero"><span class="tile__l">Disposed on {{ d.rep_label }}</span><span class="tile__v">{{ k.today }} <small>MT</small></span>
+      <span class="tile__s">Needed every day to clear by {{ d.dl_label }}: <b>{{ k.need }} MT</b>{% if k.short_x != "—" %} · {{ k.short_x }} the current pace{% endif %}</span></div>
+    <div class="tile"><span class="tile__l">Disposed to date</span><span class="tile__v good">{{ k.cum }} <small>MT</small></span><span class="tile__s">{{ k.pct }} done</span></div>
+    <div class="tile"><span class="tile__l">Left at sites</span><span class="tile__v">{{ k.bal }} <small>MT</small></span><span class="tile__s">{{ c.sites - c.cleared }} of {{ c.sites }} sites still have RDF</span></div>
+    <div class="tile"><span class="tile__l">Agencies on track</span><span class="tile__v {{ 'bad' if c.agencies_on_track < c.agencies else 'good' }}">{{ c.agencies_on_track }} <small>of {{ c.agencies }}</small></span><span class="tile__s">clear by {{ d.dl_label }} at their pace</span></div>
+  </div>
+
+  <div class="chips chips--big" role="group" aria-label="Site groups">
+    <button type="button" class="stat" data-goto="active"><span class="stat__v">{{ c.active }}</span><span class="stat__l"><i class="dot dot--ok"></i>Active sites</span><small>sent RDF in the last 3 days</small></button>
+    <button type="button" class="stat" data-goto="stalled"><span class="stat__v">{{ c.stalled }}</span><span class="stat__l"><i class="dot dot--bad"></i>Stalled</span><small>RDF left, nothing sent for 7+ days</small></button>
+    <button type="button" class="stat" data-goto="quick"><span class="stat__v">{{ c.quick }}</span><span class="stat__l"><i class="dot dot--quick"></i>Quick wins</span><small>1,000 MT or less left</small></button>
+    <button type="button" class="stat" data-goto="long"><span class="stat__v">{{ c.long }}</span><span class="stat__l"><i class="dot dot--long"></i>Long haul</span><small>still has RDF on {{ d.dl_label }} at its pace</small></button>
+    <button type="button" class="stat" data-goto="cleared"><span class="stat__v">{{ c.cleared }}</span><span class="stat__l"><i class="dot dot--done"></i>Cleared</span><small>nothing left at site</small></button>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card__head"><h2>Daily disposal by agency</h2><span class="muted">{{ d.first_label }} to {{ d.rep_label }} · hover a bar for figures</span></div>
+      <div class="legend legend--wrap">{% for a in d.agencies if a.has_sites %}<span><i class="sq" style="background:{{ a.color }}"></i>{{ a.short }}</span>{% endfor %}</div>
+      {{ d.stack_chart | safe }}
+    </div>
+    {% if r %}
+    <div class="card">
+      <div class="card__head"><h2>Disposed so far · all agencies</h2><span class="muted">{{ r.range_label }}</span></div>
+      <div class="legend legend--wrap">
+        <span><i class="sw sw--g"></i>MT disposed each day (left)</span>
+        <span><i class="sw sw--r"></i>MT a day needed by {{ r.deadline_short }} (left)</span>
+        <span><i class="sw sw--k"></i>MT left (right)</span>
+      </div>
+      {{ r.chart | safe }}
+      <p class="muted small">{{ r.proj_text }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="grid3">
+    {% for key, title, note, rows, col, colname in [
+        ("quick", "Quick wins", "Smallest balances, one push closes them", d.top.quick, "bal", "Left (MT)"),
+        ("long", "Long haul", "Most RDF still left on " ~ d.dl_label ~ " at the current pace", d.top.long, "leftover", "Left on " ~ d.dl_label),
+        ("stalled", "Stalled, biggest first", "Nothing sent for 7+ days", d.top.stalled, "last", "Last sent")] %}
+    <div class="card">
+      <div class="card__head"><h2>{{ title }}</h2><button type="button" class="link" data-goto="{{ key }}">See all</button></div>
+      <p class="muted small">{{ note }}</p>
+      <table class="tbl tbl--mini"><thead><tr><th>Site</th><th class="n">{{ colname }}</th></tr></thead><tbody>
+      {% for s in rows %}<tr><td><i class="sq" style="background:{{ s.color }}" title="{{ s.agency }}"></i>{{ s.site }} <span class="muted small">· {{ s.agency }}</span></td><td class="n b">{{ s[col] }}</td></tr>
+      {% else %}<tr><td colspan="2" class="muted">None.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if r %}
+  <section class="card gist" id="gist" aria-labelledby="gist-title">
+    <div class="card__head">
+      <h2 id="gist-title">WhatsApp summary · <span id="gist-day">{{ r.rep_day }}</span></h2>
+      <div class="gist__actions">
+        <button type="button" class="btn btn--secondary" id="gist-copy">Copy</button>
+        <a class="btn btn--ghost" id="gist-wa" target="_blank" rel="noopener" href="https://wa.me/?text={{ r.gist | urlencode }}">Open in WhatsApp</a>
+      </div>
+    </div>
+    <pre class="gist__text" id="gist-text">{{ r.gist }}</pre>
+  </section>
+  {% endif %}
+</section>
+
+{# ---------------- Agencies ---------------- #}
+<section class="tabpanel" data-panel="agencies" aria-label="Agencies" hidden>
+  <div class="card">
+    <div class="card__head"><h2>Agency progress</h2><span class="muted">% of RDF disposed · <i class="tick-key"></i> where it should be today on a straight line from {{ d.first_label }} to 100% on {{ d.dl_label }}</span></div>
+    <div class="prog">
+      {% for a in d.agencies if a.has_sites %}
+      <button type="button" class="prog__row" data-goto="ag-{{ a.slug }}" title="Show {{ a.short }}'s sites">
+        <span class="prog__name"><i class="sq" style="background:{{ a.color }}"></i>{{ a.short }}</span>
+        <span class="prog__bar"><span class="prog__fill" style="width:{{ a.pct_w }}"></span>{% if a.exp_w %}<span class="prog__tick" style="left:{{ a.exp_w }}"></span>{% endif %}</span>
+        <span class="prog__v"><b>{{ a.pct }}</b> <span class="{{ 'bad' if a.behind else 'good' }} small">{{ 'behind' if a.behind else 'on line' }} · should be {{ a.exp }}</span></span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><h2>Projected finish per agency</h2><span class="muted">at each agency's last-7-day pace · dashed line = target</span></div>
+    {{ d.finish_chart | safe }}
+  </div>
+
+  <div class="card">
+    <div class="card__head"><h2>Agencies</h2><span class="muted">click a row to see its sites</span></div>
+    <div class="scroll-x"><table class="tbl tbl--click">
+      <thead><tr><th>Agency</th><th class="n">Today</th><th class="n">7-day pace</th><th class="n">Needed/day</th><th class="n">To date</th><th class="n">Left</th><th class="n">Done</th><th class="n">Sites</th><th>Status of sites</th><th>Projected finish</th></tr></thead>
+      <tbody>
+      {% for a in d.agencies %}
+      <tr {% if a.has_sites %}data-goto="ag-{{ a.slug }}" tabindex="0"{% endif %}>
+        <td><i class="sq" style="background:{{ a.color }}"></i>{{ a.name }}</td>
+        <td class="n b {{ 'good' if a.today != '0.00' else 'bad' }}">{{ a.today }}</td>
+        <td class="n">{{ a.pace }}</td><td class="n">{{ a.need }}</td><td class="n good">{{ a.cum }}</td><td class="n">{{ a.bal }}</td>
+        <td class="n">{{ a.pct }}</td><td class="n">{{ a.sites }}</td>
+        <td class="small">{% if a.has_sites %}<span class="good">{{ a.counts.Active }} active</span> · {{ a.counts.Slowing }} slowing · <span class="bad">{{ a.counts.Stalled }} stalled</span> · {{ a.counts.Cleared }} cleared{% else %}<span class="muted">no sites in tracker yet</span>{% endif %}</td>
+        <td class="{{ 'bad' if a.late else 'good' }} small">{{ a.finish }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+{# ---------------- Sites ---------------- #}
+<section class="tabpanel" data-panel="sites" aria-label="Sites" hidden>
+  <div class="card">
+    <div class="chips" role="group" aria-label="Filter sites" id="site-chips">
+      <button type="button" class="chip is-on" data-filter="all">All <small>{{ c.sites }}</small></button>
+      <button type="button" class="chip" data-filter="active"><i class="dot dot--ok"></i>Active <small>{{ c.active }}</small></button>
+      <button type="button" class="chip" data-filter="stalled"><i class="dot dot--bad"></i>Stalled <small>{{ c.stalled }}</small></button>
+      <button type="button" class="chip" data-filter="quick"><i class="dot dot--quick"></i>Quick wins <small>{{ c.quick }}</small></button>
+      <button type="button" class="chip" data-filter="long"><i class="dot dot--long"></i>Long haul <small>{{ c.long }}</small></button>
+      <button type="button" class="chip" data-filter="cleared"><i class="dot dot--done"></i>Cleared <small>{{ c.cleared }}</small></button>
+      <span class="chips__sep" aria-hidden="true"></span>
+      {% for a in d.agencies if a.has_sites %}<button type="button" class="chip" data-filter="ag-{{ a.slug }}"><i class="sq" style="background:{{ a.color }}"></i>{{ a.short }} <small>{{ a.sites }}</small></button>{% endfor %}
+      <input type="search" class="search" id="site-search" placeholder="Search site" aria-label="Search site">
+    </div>
+    <p class="muted small" id="site-note">Showing all {{ c.sites }} sites. Click a column to sort.</p>
+    <div class="scroll-x"><table class="tbl tbl--sort" id="site-table">
+      <thead><tr>
+        <th data-sort="site">Site</th><th data-sort="agency">Agency</th><th>Status</th>
+        <th class="n" data-sort="today">Today</th><th class="n" data-sort="pace">7-day pace</th>
+        <th class="n" data-sort="cum">To date</th><th class="n" data-sort="bal">Left</th><th class="n" data-sort="pct">Done</th>
+        <th class="n" data-sort="last">Last sent</th><th class="n" data-sort="finish">Projected finish</th>
+      </tr></thead>
+      <tbody>
+      {% for s in d.sites %}
+      <tr data-f="{{ s.filters }}" data-site="{{ s.site | lower }}" data-v-site="{{ s.site | lower }}" data-v-agency="{{ s.agency | lower }}"
+          data-v-today="{{ s.today_v }}" data-v-pace="{{ s.pace_v }}" data-v-cum="{{ s.cum_v }}" data-v-bal="{{ s.bal_v }}"
+          data-v-pct="{{ s.pct_v }}" data-v-last="{{ s.last_v }}" data-v-finish="{{ s.finish_v }}">
+        <td class="c9">{{ s.site }}</td>
+        <td><i class="sq" style="background:{{ s.color }}"></i>{{ s.agency }}</td>
+        <td>{% for label, kind in s.tags %}<span class="tag tag--{{ kind }}">{{ label }}</span>{% endfor %}</td>
+        <td class="n {{ 'good b' if s.today_v > 0 else 'muted' }}">{{ s.today }}</td>
+        <td class="n">{{ s.pace }}</td><td class="n good">{{ s.cum }}</td><td class="n b">{{ s.bal }}</td><td class="n">{{ s.pct }}</td>
+        <td class="n {{ 'bad' if s.last == 'never' else '' }}">{{ s.last }}</td>
+        <td class="n small {{ 'bad' if s.late else 'good' }}">{{ s.finish }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><h2>Site activity</h2><span class="muted">RDF sent per site per day, darker = more · grouped by agency · hover a cell</span></div>
+    <div class="legend"><span><i class="sq" style="background:#F5F7F5;border:1px solid var(--ink-200)"></i>nothing</span>
+      <span><i class="sq" style="background:#E4F6E9"></i><i class="sq" style="background:#BFEBC9"></i><i class="sq" style="background:#57C97F"></i><i class="sq" style="background:#0FA14E"></i><i class="sq" style="background:#0E5230"></i>more MT</span></div>
+    <div class="scroll-x heat">{{ d.heatmap | safe }}</div>
+  </div>
+</section>
+{% endif %}
