@@ -10,7 +10,6 @@ Storage is RDF_TRACKER_DIR — a local folder or gs://bucket/prefix, same
 plug-and-play idea as SITES_MASTER_CSV:
     <dir>/trackers/2026-10-13.csv      the sheet that reports 13 Oct (raw bytes)
     <dir>/uploads/<ts>_<name>          every upload as received (audit trail)
-    <dir>/pin_hash                     werkzeug hash of the report PIN
 
 The bucket is the only state. Each request lists trackers/ (one cheap API
 call) and only downloads files whose generation changed, so every App Engine
@@ -18,7 +17,6 @@ instance sees an upload immediately.
 
 CLI (uses the same code path, so it works against gs:// with ADC):
     python -m data.rdf_tracker seed data/rdf_seed/*.csv
-    python -m data.rdf_tracker set-pin
 """
 from __future__ import annotations
 
@@ -29,17 +27,15 @@ import os
 import re
 import threading
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import config
-from data._cache import TTLCache
 
 logger = logging.getLogger(__name__)
 
 TRACKER_DIR = os.environ.get("RDF_TRACKER_DIR", "rdf_tracker_data").rstrip("/")
 _TRACKERS = "trackers"
 _UPLOADS = "uploads"
-_PIN = "pin_hash"
 
 
 # ---------------------------------------------------------------------------
@@ -57,8 +53,9 @@ class SiteDay:
 
 @dataclass(frozen=True)
 class Tracker:
-    date: date
+    date: date             # "as on Dt" — the day the disposal happened (report day)
     sites: tuple[SiteDay, ...]
+    sheet_date: date       # the sheet's own date (its title / file name), usually date + 1
 
 
 class TrackerError(ValueError):
@@ -105,18 +102,25 @@ def parse(raw: bytes, filename: str = "") -> Tracker:
     if hi < 0:
         raise TrackerError("No header row starting with 'Agency' — is this the daily RDF tracker?")
 
+    title = _clean(rows[0][0]) if rows and rows[0] else ""
+    tm, fm = _TITLE_DATE.search(title), _FNAME_DATE.search(filename or "")
+    sheet = None
+    if tm:
+        try:
+            sheet = datetime.strptime(tm.group(1), "%B %d, %Y").date()
+        except ValueError:
+            sheet = None
+    if sheet is None and fm:
+        sheet = date(int(fm.group(3)), int(fm.group(2)), int(fm.group(1)))
+
     m = _AS_ON.search(" ".join(_clean(c) for c in rows[hi]))
     if m:
         d = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    elif sheet:
+        d = sheet
     else:
-        title = _clean(rows[0][0]) if rows and rows[0] else ""
-        tm, fm = _TITLE_DATE.search(title), _FNAME_DATE.search(filename or "")
-        if tm:
-            d = datetime.strptime(tm.group(1), "%B %d, %Y").date()
-        elif fm:
-            d = date(int(fm.group(3)), int(fm.group(2)), int(fm.group(1)))
-        else:
-            raise TrackerError("Could not find the 'as on Dt: DD.MM.YYYY' date in the header row.")
+        raise TrackerError("Could not find the 'as on Dt: DD.MM.YYYY' date in the header row.")
+    sheet = sheet or d + timedelta(days=1)
 
     body = [r + [""] * (10 - len(r)) for r in rows[hi + 1:] if r]
     # Skip the "1,2,3,..." column-number row and blank/total rows.
@@ -133,7 +137,7 @@ def parse(raw: bytes, filename: str = "") -> Tracker:
         site, sl = _clean(r[2]), _clean(r[1])
         name = f"{site} #{sl}" if seen[site.lower()] > 1 and sl else site
         sites.append(SiteDay(_clean(r[0]), name, _num(r[6]), _num(r[7]), _num(r[9])))
-    return Tracker(d, tuple(sites))
+    return Tracker(d, tuple(sites), sheet)
 
 
 # ---------------------------------------------------------------------------
@@ -275,48 +279,15 @@ def remove(day_iso: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# PIN (hash lives in the bucket so it never sits in the public repo)
-# ---------------------------------------------------------------------------
-
-_pin_cache = TTLCache(300)    # a PIN change reaches every instance within 5 minutes
-
-
-def pin_hash() -> str:
-    """RDF_REPORT_PIN_HASH env var wins; else <dir>/pin_hash. '' = not set up."""
-    env = os.environ.get("RDF_REPORT_PIN_HASH", "").strip()
-    if env:
-        return env
-    def load() -> str:
-        raw = _read(_PIN)
-        return raw.decode().strip() if raw else ""
-    return _pin_cache.get_or_load("h", load)
-
-
-def set_pin(pin: str) -> None:
-    from werkzeug.security import generate_password_hash
-    _write(_PIN, generate_password_hash(pin).encode(), content_type="text/plain")
-    _pin_cache.invalidate()
-
-
-# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def _main(argv: list[str]) -> int:
-    import getpass
     if len(argv) >= 2 and argv[0] == "seed":
         for path in argv[1:]:
             with open(path, "rb") as f:
                 t, replaced = store(f.read(), os.path.basename(path))
             print(f"{path} -> {t.date} ({len(t.sites)} sites){' replaced' if replaced else ''}")
-        return 0
-    if argv == ["set-pin"]:
-        pin = getpass.getpass("New report PIN: ")
-        if len(pin) < 4 or pin != getpass.getpass("Again: "):
-            print("PINs must match and be at least 4 characters.")
-            return 1
-        set_pin(pin)
-        print(f"PIN saved to {TRACKER_DIR}/{_PIN}")
         return 0
     print(__doc__)
     return 1

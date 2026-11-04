@@ -1,0 +1,123 @@
+{# The report sheet. Rendered in the page and returned by /api/upload so the page updates in place. #}
+<div class="sheet">
+  <header class="rh">
+    <div class="rh__left">
+      <span class="rh__org">Swachha Andhra Corporation</span>
+      <span class="rh__title">RDF disposal report</span>
+    </div>
+    {% if r %}
+    <div class="rh__right">
+      <span class="rh__date">{{ r.rep_label }}</span>
+      <span>Target: clear by {{ r.deadline_label }}</span>
+      <span>{{ r.days_label }}</span>
+    </div>
+    {% endif %}
+  </header>
+
+  {% if not r %}
+  <div class="empty">No daily trackers uploaded yet.<br>Use the gear icon above to upload the daily RDF tracker CSV.</div>
+  {% else %}
+
+  <section data-keep style="display:flex;flex-direction:column;gap:8px;">
+    <div class="kpis">
+      <div class="kpi"><span class="kpi__l">Disposed on {{ r.rep_day }}</span><span class="kpi__v kpi__v--g">{{ r.k.today }} <span class="kpi__u">MT</span></span></div>
+      <div class="kpi"><span class="kpi__l">Needed per day</span><span class="kpi__v">{{ r.k.need }} <span class="kpi__u">MT</span></span></div>
+      <div class="kpi"><span class="kpi__l">Disposed to date</span><span class="kpi__v kpi__v--g">{{ r.k.cum }} <span class="kpi__u">MT</span></span></div>
+      <div class="kpi"><span class="kpi__l">Left to dispose</span><span class="kpi__v">{{ r.k.bal }} <span class="kpi__u">MT</span></span></div>
+      <div class="kpi"><span class="kpi__l">Done</span><span class="kpi__v">{{ r.k.pct }}</span></div>
+      <div class="kpi"><span class="kpi__l">Sites</span><span class="kpi__v">{{ r.k.sites }}</span></div>
+    </div>
+    <span class="status" style="color:{{ r.k.status_color }};">Status: {{ r.k.verdict }}</span>
+  </section>
+
+  <section data-keep class="sec sec--chart">
+    <div class="chart-head">
+      <h2>Disposed so far · all agencies</h2>
+      <span>{{ r.range_label }}</span>
+    </div>
+    <div class="legend">
+      <span><span class="sw sw--g"></span><span>MT disposed each day (left)</span></span>
+      <span><span class="sw sw--r"></span><span>MT a day needed to clear by {{ r.deadline_short }} (left)</span></span>
+      <span><span class="sw sw--k"></span><span>MT left to dispose (right)</span></span>
+    </div>
+    <div class="chart">{{ r.chart | safe }}</div>
+    <span class="proj">{{ r.proj_text }}</span>
+  </section>
+
+  <section class="sec">
+    <h2 data-head>By agency</h2>
+    <div class="scroll-x"><div>
+      <div class="tr tr--h g-ag" data-head>
+        <span>Agency</span><span class="n">Today (MT)</span><span class="n">Needed/day</span><span class="n">To date (MT)</span><span class="n">Left (MT)</span><span class="n">Done</span>
+      </div>
+      {% for a in r.ag_rows %}
+      <div class="tr g-ag">
+        <span class="c9" style="min-width:0;">{{ a.name }} <span class="tag" style="color:{{ a.status_color }};">· {{ a.status }}</span></span>
+        <span class="n b" style="color:{{ a.today_color }};">{{ a.today }}</span>
+        <span class="n c7">{{ a.need }}</span>
+        <span class="n cg">{{ a.cum }}</span>
+        <span class="n c9">{{ a.bal }}</span>
+        <span class="n c9">{{ a.pct }}</span>
+      </div>
+      {% endfor %}
+      <div class="tr tr--total g-ag">
+        <span>All agencies</span><span class="n">{{ r.k.today }}</span><span class="n">{{ r.k.need }}</span><span class="n">{{ r.k.cum }}</span><span class="n">{{ r.k.bal }}</span><span class="n">{{ r.k.pct }}</span>
+      </div>
+    </div></div>
+  </section>
+
+  <section data-keep class="sec">
+    <h2 data-head style="margin-bottom:4px;">Closest to reclaim</h2>
+    <span data-head class="sub" style="margin:0 0 10px;">The {{ r.least | length }} sites with the least RDF left, across all agencies.</span>
+    <div class="scroll-x"><div>
+      <div class="tr tr--h g-least" data-head>
+        <span>#</span><span>Site</span><span>Agency</span><span class="n">Left (MT)</span><span class="n">Done</span>
+      </div>
+      {% for s in r.least %}
+      <div class="tr g-least">
+        <span class="c5">{{ s.rank }}</span>
+        <span class="c9">{{ s.site }}</span>
+        <span class="c5">{{ s.agency }}</span>
+        <span class="n b c9">{{ s.bal }}</span>
+        <span class="n c9">{{ s.pct }}</span>
+      </div>
+      {% endfor %}
+    </div></div>
+  </section>
+
+  <section class="sec">
+    <h2 data-head style="margin-bottom:4px;">By site</h2>
+    <span data-head class="sub" style="margin:0 0 12px;">Every site in the {{ r.rep_day }} tracker, grouped by agency. Today = RDF disposed on {{ r.rep_day }}, as reported in the tracker.</span>
+    <div class="scroll-x"><div>
+    {% for g in r.groups %}
+      <div class="group">
+        <div class="tr tr--band g-site" data-head>
+          <span class="nm">{{ g.name }} <span class="cnt">· {{ g.count }}</span></span>
+          <span class="n" style="color:{{ g.today_color }};">{{ g.today }}</span>
+          <span class="n cg">{{ g.cum }}</span>
+          <span class="n">{{ g.bal }}</span>
+          <span class="n">{{ g.pct }}</span>
+        </div>
+        <div class="tr tr--sh g-site" data-head>
+          <span>Site</span><span class="n">Today (MT)</span><span class="n">To date (MT)</span><span class="n">Left (MT)</span><span class="n">Done</span>
+        </div>
+        {% for s in g.sites %}
+        <div class="tr tr--site g-site">
+          <span class="c9">{{ s.site }}</span>
+          <span class="n" style="font-weight:{{ s.today_weight }};color:{{ s.today_color }};">{{ s.today }}</span>
+          <span class="n cg">{{ s.cum }}</span>
+          <span class="n c9">{{ s.bal }}</span>
+          <span class="n c9">{{ s.pct }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    </div></div>
+  </section>
+  {% endif %}
+
+  <footer class="foot">
+    <span>Source: daily RDF tracker{% if r %}, {{ r.rep_label }}{% endif %}. Quantities in metric tonnes (MT).</span>
+    <span>Swachha Andhra Corporation</span>
+  </footer>
+</div>
