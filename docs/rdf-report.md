@@ -27,10 +27,25 @@ If a file isn't a tracker, the panel stays open and says why, and nothing change
 | Figures, statuses, chart (SVG + shared marks), WhatsApp gist | `data/rdf_report.py` |
 | Export-ready A4 PDF (ReportLab, vector) | `data/rdf_report_pdf.py` |
 | Page / sheet partial / PIN page / styles / gear panel | `templates/rdf_report/`, `static/rdf_report/` |
-| The 12 trackers from the design session (1–13 Oct) | `data/rdf_seed/` |
+| **Hardcoded history** (one sheet per day, deployed with the code) | `data/rdf_history/` |
 | Tests | `tests/test_rdf_report.py` (`python -m unittest tests.test_rdf_report -v`) |
 
 ## How the data works
+
+- **Two sources, one graph.** The graphs and tables are built from:
+  1. **Built-in history** in `data/rdf_history/`, one CSV per day (now 1–13 Oct). This ships with
+     the code, so it shows up on every deploy and needs no bucket setup.
+  2. **Uploads** from the gear icon, stored in the bucket. Each upload adds one point to the graphs.
+
+  If an upload has the same "as on" date as a built-in day, the upload wins. Removing that upload
+  brings the built-in day back. In the gear panel, built-in days are labelled "built-in history"
+  and have no Remove button.
+- **Hardcoding more history**: put the sheets in `data/rdf_history/`, then commit and deploy:
+  ```bash
+  python -m data.rdf_tracker add-history ~/Downloads/Daily_RDF_tracker-*.csv   # files them as YYYY-MM-DD.csv
+  git add data/rdf_history && git commit -m "RDF: add history" && gcloud app deploy app.yaml --quiet
+  ```
+  Uploading the same sheets from the gear icon also works, and needs no deploy.
 
 - **Storage**: `RDF_TRACKER_DIR` (app.yaml) is `gs://advitia-weighbridge-data/rdf_report`. It holds:
   ```
@@ -75,14 +90,10 @@ gcloud storage buckets add-iam-policy-binding gs://advitia-weighbridge-data \
   --member="serviceAccount:<PROJECT_ID>@appspot.gserviceaccount.com" \
   --role="roles/storage.objectAdmin"
 
-# 2. Load the history so far (1–13 Oct). The files are already named by date.
-#    --no-clobber keeps any day you have already uploaded from the gear icon.
-gcloud storage cp --no-clobber data/rdf_seed/*.csv gs://advitia-weighbridge-data/rdf_report/trackers/
-
-# 3. Deploy (the same command as the rest of the site), then open https://advitiaum.com/rdf
+# 2. Deploy (the same command as the rest of the site), then open https://advitiaum.com/rdf
 gcloud app deploy app.yaml --quiet
 
-# 4. Optional: also serve it at rdf.advitiaum.com. App Engine issues and renews the HTTPS certificate itself.
+# 3. Optional: also serve it at rdf.advitiaum.com. App Engine issues and renews the HTTPS certificate itself.
 gcloud app domain-mappings create rdf.advitiaum.com --certificate-management=AUTOMATIC
 #    The command prints a DNS record. At your DNS provider for advitiaum.com, add:
 #        Type CNAME   Name rdf   Value ghs.googlehosted.com.
@@ -90,8 +101,8 @@ gcloud app domain-mappings create rdf.advitiaum.com --certificate-management=AUT
 gcloud app domain-mappings describe rdf.advitiaum.com     # sslSettings shows the certificate id once ready
 ```
 
-If step 4 says the domain is not verified, run `gcloud domains verify advitiaum.com`, follow the
-Search Console steps, and run step 4 again. If advitiaum.com is already mapped to this app, it
+If step 3 says the domain is not verified, run `gcloud domains verify advitiaum.com`, follow the
+Search Console steps, and run step 3 again. If advitiaum.com is already mapped to this app, it
 is already verified.
 
 ### Changing the PIN
@@ -105,7 +116,6 @@ then redeploy.
 
 ```bash
 source .venv/bin/activate
-mkdir -p rdf_tracker_data/trackers && cp data/rdf_seed/*.csv rdf_tracker_data/trackers/
 python main.py                              # http://localhost:8080/rdf
 ```
 

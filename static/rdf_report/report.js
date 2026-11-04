@@ -83,13 +83,18 @@
     days.forEach(function (d) {
       var row = el("div", "day"), left = el("span");
       left.appendChild(el("span", "c9", d.label + " "));
-      left.appendChild(el("small", null, "· " + d.sites + " sites" + (d.uploaded ? " · uploaded " + d.uploaded : "")));
+      left.appendChild(el("small", null, "· " + d.sites + " sites" +
+        (d.builtin ? " · built-in history" : d.uploaded ? " · uploaded " + d.uploaded : "") +
+        (d.overrides_builtin ? " (replaces built-in)" : "")));
       row.appendChild(left);
       row.appendChild(el("span"));
+      if (d.builtin) { row.appendChild(el("span")); daysEl.appendChild(row); return; }
       var rm = el("button", null, "Remove");
       rm.type = "button";
       rm.addEventListener("click", function () {
-        if (!confirm("Remove the " + d.label + " tracker from the report? The graphs will drop this day.")) return;
+        if (!confirm(d.overrides_builtin
+          ? "Remove your " + d.label + " upload? The built-in sheet for that day will be used again."
+          : "Remove the " + d.label + " tracker from the report? The graphs will drop this day.")) return;
         api(cfg.api["delete"], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: d.date }) })
           .then(function (r) {
             if (!r.ok) { say(r.error || "Could not remove.", false); return; }
