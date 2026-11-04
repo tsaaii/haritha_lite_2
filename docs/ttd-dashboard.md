@@ -44,12 +44,15 @@ registered processor, for EPR). The EU ETS does not accept such credits, and the
 
 ## Sign-in
 
-- Username `admin-ttd`, password `ttd@tirumala` (stored only as a scrypt hash in `views/ttd.py`).
+- Two accounts, both opening the same dashboard (passwords are stored only as scrypt hashes in `views/ttd.py`):
+  - `admin-ttd`, password `ttd@tirumala`
+  - `ycdemo` (demo account; its password is not written in this public repo)
 - A maths question (captcha) must be answered first, and each question works once.
 - Five wrong passwords from one network lock sign-in for 15 minutes.
 - This login is separate from `/login`; signing in to one does not open the other.
 
-To change the password without touching code, set `TTD_PASSWORD_HASH` to the output of
+To change a password without touching code, set `TTD_PASSWORD_HASH` (admin-ttd) or
+`TTD_YCDEMO_PASSWORD_HASH` (ycdemo) to the output of
 `python -c "from werkzeug.security import generate_password_hash as g; print(g('NEW PASSWORD'))"`.
 
 ## Where the data comes from

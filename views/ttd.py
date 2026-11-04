@@ -20,7 +20,8 @@ Configuration (environment, see ttd_secrets.example.yaml):
     TTD_SITE_ID         site id in the Adex cloud (default "ttd")
     TTD_READ_KEY        that site's read key, or instead (preferred, nothing secret in app.yaml):
     TTD_READ_KEY_SECRET Secret Manager name, e.g. projects/PROJECT/secrets/ttd-read-key/versions/latest
-    TTD_PASSWORD_HASH   optional: werkzeug hash to replace the built-in password
+    TTD_PASSWORD_HASH   optional: werkzeug hash to replace the built-in admin-ttd password
+    TTD_YCDEMO_PASSWORD_HASH  optional: the same for the ycdemo account
     TTD_AWARDED_MT      optional: awarded legacy quantity (default 51290)
     TTD_CH4_MCF, TTD_CH4_DOC, TTD_CH4_DOCF, TTD_CH4_F, TTD_CH4_OX, TTD_GWP_CH4,
     TTD_CREDIT_PHI, TTD_TREE_TCO2, TTD_RDF_PLASTIC_SHARE
@@ -48,9 +49,11 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("ttd", __name__)
 
 # ---- Sign-in (hardcoded for now, as requested) ----
-USERNAME = "admin-ttd"
+USERNAME = "admin-ttd"            # the main account
 # werkzeug.security.generate_password_hash("ttd@tirumala")
 _DEFAULT_HASH = "scrypt:32768:8:1$znOn4sw1QHcqGVo4$385c28057057608032bcf1adbbc456ccb4ef861c1569601b772a6bcfc68c837aa00bd5a5c83383e4e838b72c15981bfddeed919e4bf6982e33eb3b47ee4fce3c"
+# Demo account (YC demo). Only the hash is kept here; TTD_YCDEMO_PASSWORD_HASH overrides it.
+_YCDEMO_HASH = "scrypt:32768:8:1$URNur6CBS0CUHNu0$483de5aebda428e50ca0c31fef224311da1a8ad98ff4e195777d5a9963f9b1245d93340e124839b24a5f070c644559e6d658cc8d2182d2f0013102897aa1a841"
 SESSION_KEY = "ttd_user"
 
 MATERIALS = ["MSW", "Soil", "Inert", "CnD", "RDF", "Scrap", "Others"]
@@ -67,19 +70,35 @@ def _password_hash() -> str:
     return os.environ.get("TTD_PASSWORD_HASH") or _DEFAULT_HASH
 
 
-def verify_credentials(username: str, password: str) -> bool:
-    if not username or not password or username.strip().lower() != USERNAME:
-        return False
+def _users() -> dict[str, str]:
+    """username -> password hash. Every account sees the same TTD dashboard."""
+    return {
+        USERNAME: _password_hash(),
+        "ycdemo": os.environ.get("TTD_YCDEMO_PASSWORD_HASH") or _YCDEMO_HASH,
+    }
+
+
+def verify_credentials(username: str, password: str) -> str | None:
+    """The signed-in username if (username, password) match an account, else None."""
+    name = (username or "").strip().lower()
+    h = _users().get(name)
+    if not h or not password:
+        return None
     try:
-        return check_password_hash(_password_hash(), password)
+        return name if check_password_hash(h, password) else None
     except Exception:
-        return False
+        return None
+
+
+def _current_user() -> str | None:
+    u = session.get(SESSION_KEY)
+    return u if u in _users() else None
 
 
 def ttd_login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if session.get(SESSION_KEY) != USERNAME:
+        if not _current_user():
             if request.path.startswith("/TTD/api/") or request.path.endswith(".pdf"):
                 return jsonify({"error": "Please sign in again."}), 401
             return redirect(url_for("ttd.home"))
@@ -326,8 +345,9 @@ def lower():
 @bp.route("/TTD", methods=["GET", "POST"], strict_slashes=False)
 def home():
     if request.method == "GET":
-        if session.get(SESSION_KEY) == USERNAME:
-            return render_template("ttd/dashboard.html", user=USERNAME,
+        user = _current_user()
+        if user:
+            return render_template("ttd/dashboard.html", user=user,
                                    awarded=float(os.environ.get("TTD_AWARDED_MT", "51290")))
         return _login_page()
 
@@ -339,7 +359,8 @@ def home():
     if not captcha.verify(request.form.get("captcha_answer", ""), nonce=request.form.get("captcha_nonce", "")):
         return _login_page("The answer to the sum was not right. Please try the new one.", 400)
     username = (request.form.get("username") or "").strip()
-    if not verify_credentials(username, request.form.get("password") or ""):
+    user = verify_credentials(username, request.form.get("password") or "")
+    if not user:
         count, just_blocked = captcha.register_failure(ip)
         current_app.logger.info("Failed TTD login user=%r ip=%s count=%d", username, ip, count)
         if just_blocked:
@@ -349,7 +370,7 @@ def home():
         return _login_page(msg, 401)
     captcha.clear_failures(ip)
     session.clear()
-    session[SESSION_KEY] = USERNAME
+    session[SESSION_KEY] = user
     session.permanent = True
     return redirect(url_for("ttd.home"))
 
