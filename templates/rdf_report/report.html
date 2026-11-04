@@ -25,6 +25,18 @@
 
   {% if load_error %}<div class="alert" data-noprint>{{ load_error }}</div>{% endif %}
 
+  <section class="gist" id="gist" data-noprint{% if not r %} hidden{% endif %} aria-labelledby="gist-title">
+    <div class="gist__head">
+      <h2 id="gist-title">WhatsApp summary · <span id="gist-day">{{ r.rep_day if r else "" }}</span></h2>
+      <div class="gist__actions">
+        <button type="button" class="btn btn--secondary" id="gist-copy">Copy</button>
+        <a class="btn btn--ghost" id="gist-wa" target="_blank" rel="noopener"
+           href="https://wa.me/?text={{ (r.gist if r else '') | urlencode }}">Open in WhatsApp</a>
+      </div>
+    </div>
+    <pre class="gist__text" id="gist-text">{{ r.gist if r else "" }}</pre>
+  </section>
+
   <div id="sheet-slot" class="sheet-slot">{% include "rdf_report/_sheet.html" %}</div>
 </div>
 

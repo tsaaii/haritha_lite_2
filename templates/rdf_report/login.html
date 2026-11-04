@@ -16,14 +16,19 @@
       <span class="rh__title" id="pin-title">RDF disposal report</span>
     </div>
     {% if error %}<div class="msg msg--err" role="alert">{{ error }}</div>{% endif %}
-    <form method="post" action="{{ url_for('rdf_report.login') }}" autocomplete="off">
+    <form method="post" action="{{ url_for('rdf_report.login') }}" autocomplete="off" novalidate>
       <input type="hidden" name="next" value="{{ request.path }}">
+      <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}">
       <label>Enter PIN
         <input class="pin-input" type="password" name="pin" inputmode="numeric" autocomplete="current-password"
-               required autofocus{% if not configured %} disabled{% endif %}>
+               maxlength="12" required autofocus>
       </label>
-      <button type="submit" class="btn btn--primary"{% if not configured %} disabled{% endif %}>Open report</button>
+      <label><span>Security check: what is <b class="c9">{{ captcha_question }}</b>?</span>
+        <input class="cap-input" name="captcha_answer" inputmode="numeric" autocomplete="off" required pattern="-?[0-9]*">
+      </label>
+      <button type="submit" class="btn btn--primary">Open report</button>
     </form>
+    <p class="fine">Five wrong tries lock sign-in for 15 minutes.</p>
   </section>
 </main>
 </body>

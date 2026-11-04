@@ -1,28 +1,34 @@
-# RDF disposal report — rdf.advitiaum.com
+# RDF disposal report — advitiaum.com/rdf
 
 The daily RDF disposal report for Swachha Andhra Corporation, built from the Claude Design
-handoff ("RDF Disposal Report"). You open it with a PIN.
+handoff ("RDF Disposal Report").
 
-**Daily use: one step.** Sign in, click the **gear icon**, and pick (or drop) the day's tracker CSV.
+**Open it:** `https://advitiaum.com/rdf`. Enter the 5-digit report PIN and answer the security
+question. `/RDF` and the old `/rdf_report/` both lead here, and so does `https://rdf.advitiaum.com/`
+once that subdomain is mapped (step 4 below).
+
+**Daily use: one step.** Click the **gear icon**, then pick or drop the day's tracker CSV.
 That single action does everything:
 1. The sheet is checked, then stored under its "as on" date.
 2. The report on screen updates in place: figures, graph (one more point) and tables.
-3. The export-ready A4 PDF downloads (`RDF_disposal_report_<date>.pdf`).
+3. The **WhatsApp summary** above the report updates, e.g.
+   `1. Saurashtra sent RDF from Kurnool and Yemmiganur sites.`. Use **Copy** and paste it into
+   WhatsApp, or **Open in WhatsApp**, which opens a new message with the text filled in.
+4. The export-ready A4 PDF downloads as `Daily_RDF_tracker_DD-MM-YYYY.pdf`. The date is the
+   sheet's own date, so `Daily_RDF_tracker-14-10-2026.csv` gives `Daily_RDF_tracker_14-10-2026.pdf`.
 
 If a file isn't a tracker, the panel stays open and says why, and nothing changes.
 **Save as PDF** downloads the same PDF again at any time.
 
 | Piece | File |
 | --- | --- |
-| Routes, PIN login, upload API | `views/rdf_report.py` (registered in `main.py`) |
+| Routes, PIN + captcha sign-in, upload / gist API | `views/rdf_report.py` (registered in `main.py`) |
 | CSV parsing + storage (local or GCS) + CLI | `data/rdf_tracker.py` |
-| Figures, statuses, chart (SVG + shared marks) | `data/rdf_report.py` |
+| Figures, statuses, chart (SVG + shared marks), WhatsApp gist | `data/rdf_report.py` |
 | Export-ready A4 PDF (ReportLab, vector) | `data/rdf_report_pdf.py` |
 | Page / sheet partial / PIN page / styles / gear panel | `templates/rdf_report/`, `static/rdf_report/` |
 | The 12 trackers from the design session (1–13 Oct) | `data/rdf_seed/` |
-
-URLs: `https://rdf.advitiaum.com/` (the report is served at `/` on any `rdf.*` host) and
-`https://advitiaum.com/rdf_report/`.
+| Tests | `tests/test_rdf_report.py` (`python -m unittest tests.test_rdf_report -v`) |
 
 ## How the data works
 
@@ -30,7 +36,6 @@ URLs: `https://rdf.advitiaum.com/` (the report is served at `/` on any `rdf.*` h
   ```
   trackers/2026-10-13.csv      one file per day, named by the sheet's "as on Dt" date
   uploads/<time>_<file name>   every upload exactly as received (audit trail)
-  pin_hash                     hash of the report PIN
   ```
 - **Which day a sheet belongs to**: the date in the `as on Dt: DD.MM.YYYY` header. A file named
   `Daily_RDF_tracker-14-10-2026.csv` reports **13 Oct**. If you upload a corrected sheet for a
@@ -44,6 +49,11 @@ URLs: `https://rdf.advitiaum.com/` (the report is served at `/` on any `rdf.*` h
 - **PDF**: generated on the server from the same figures and chart geometry as the page. It is
   ink-light like the design (colour only in text and lines) and has page numbers. The PDF uses
   Times because the Palatino files are not shipped, so its typeface differs slightly from the page.
+- **WhatsApp summary**: lists every agency with RDF disposed on the report day, in alphabetical
+  order, with its sites in alphabetical order. A site appears once even if the sheet splits it
+  (`Kurnool 3.0 (Package 4)` and `Kurnool 2.0 (Additional Qty)` both become "Kurnool"; `Tirupati #26`
+  becomes "Tirupati"). Agency short names are in `AGENCY_SHORT` in `data/rdf_report.py`. Site
+  spellings come from the sheet.
 - Every page load lists `trackers/` and re-reads only the files that changed, so an upload
   shows up immediately on every App Engine instance.
 
@@ -66,18 +76,13 @@ gcloud storage buckets add-iam-policy-binding gs://advitia-weighbridge-data \
   --role="roles/storage.objectAdmin"
 
 # 2. Load the history so far (1–13 Oct). The files are already named by date.
-gcloud storage cp data/rdf_seed/*.csv gs://advitia-weighbridge-data/rdf_report/trackers/
+#    --no-clobber keeps any day you have already uploaded from the gear icon.
+gcloud storage cp --no-clobber data/rdf_seed/*.csv gs://advitia-weighbridge-data/rdf_report/trackers/
 
-# 3. Set the PIN. It is typed at a prompt, so it is not saved in your shell history.
-#    Only the hash is stored, in the bucket and not in this public repo.
-python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-gcloud auth application-default login
-RDF_TRACKER_DIR=gs://advitia-weighbridge-data/rdf_report python -m data.rdf_tracker set-pin
-
-# 4. Deploy (the same command as the rest of the site)
+# 3. Deploy (the same command as the rest of the site), then open https://advitiaum.com/rdf
 gcloud app deploy app.yaml --quiet
 
-# 5. Map the subdomain. App Engine issues and renews the HTTPS certificate itself.
+# 4. Optional: also serve it at rdf.advitiaum.com. App Engine issues and renews the HTTPS certificate itself.
 gcloud app domain-mappings create rdf.advitiaum.com --certificate-management=AUTOMATIC
 #    The command prints a DNS record. At your DNS provider for advitiaum.com, add:
 #        Type CNAME   Name rdf   Value ghs.googlehosted.com.
@@ -85,30 +90,31 @@ gcloud app domain-mappings create rdf.advitiaum.com --certificate-management=AUT
 gcloud app domain-mappings describe rdf.advitiaum.com     # sslSettings shows the certificate id once ready
 ```
 
-If step 5 says the domain is not verified, run `gcloud domains verify advitiaum.com`, follow the
-Search Console steps, and run step 5 again. If advitiaum.com is already mapped to this app, it
+If step 4 says the domain is not verified, run `gcloud domains verify advitiaum.com`, follow the
+Search Console steps, and run step 4 again. If advitiaum.com is already mapped to this app, it
 is already verified.
 
-Until step 3 is done, the PIN page shows "The report PIN has not been set up yet".
+### Changing the PIN
 
-### Changing the PIN later
-
-Run step 3 again. There is no need to redeploy, because the new PIN takes effect within 5 minutes.
-People who are already signed in stay signed in until their 8-hour session ends.
+The PIN is hardcoded, as requested: its hash is `_DEFAULT_PIN_HASH` in `views/rdf_report.py`.
+To change it without editing code, set `RDF_REPORT_PIN_HASH` in app.yaml `env_variables` to the
+output of `python -c "from werkzeug.security import generate_password_hash as g; print(g('NEW-PIN'))"`,
+then redeploy.
 
 ## Run locally
 
 ```bash
 source .venv/bin/activate
 mkdir -p rdf_tracker_data/trackers && cp data/rdf_seed/*.csv rdf_tracker_data/trackers/
-python -m data.rdf_tracker set-pin          # writes rdf_tracker_data/pin_hash
-python main.py                              # http://localhost:8080/rdf_report/
+python main.py                              # http://localhost:8080/rdf
 ```
 
 ## Security notes
 
-- There is one shared PIN, and anyone who has it can upload or remove days. Wrong PINs share the
-  main login's lockout: 5 tries per IP, then 15 minutes blocked.
+- There is one shared PIN, and anyone who has it can upload or remove days. Sign-in needs the PIN
+  *and* a math captcha. Wrong PINs share the main login's lockout: 5 tries per IP, then 15 minutes
+  blocked. Only the PIN's hash is in this public repo, but a 5-digit PIN can be recovered from its hash
+  offline, so treat it as a light gate, not a secret.
 - After sign-in, access is held in the Flask session cookie, which is signed with `SECRET_KEY`.
   **`SECRET_KEY` is committed in `app.yaml` in this public repo.** Anyone who reads it can forge
   a session and skip the PIN, and the same applies to the main `/login`. Rotate it and keep it

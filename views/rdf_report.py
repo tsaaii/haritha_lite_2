@@ -1,25 +1,28 @@
 """
 RDF disposal report — the daily, printable report for Swachha Andhra Corporation.
 
-    GET  /rdf_report/                 -> the report (PIN page if not signed in)
-    POST /rdf_report/login            -> {pin} form post
-    GET  /rdf_report/logout
-    GET  /rdf_report/report.pdf       -> export-ready A4 PDF of the latest report
-    GET  /rdf_report/api/trackers     -> days on file (gear panel)
-    POST /rdf_report/api/upload       -> multipart "files": one or more daily tracker CSVs;
-                                         replies with the re-rendered report sheet + PDF link
-                                         so one upload updates the page and downloads the PDF
-    POST /rdf_report/api/delete       -> {date: "YYYY-MM-DD"}
+    GET  /rdf/                 -> the report (PIN + captcha page if not signed in)
+    POST /rdf/login            -> {pin, captcha_answer, captcha_nonce} form post
+    GET  /rdf/logout
+    GET  /rdf/report.pdf       -> export-ready A4 PDF: Daily_RDF_tracker_DD-MM-YYYY.pdf
+    GET  /rdf/api/gist         -> {text}: WhatsApp summary of who sent RDF on the report day
+    GET  /rdf/api/trackers     -> days on file (gear panel)
+    POST /rdf/api/upload       -> multipart "files": one or more daily tracker CSVs;
+                                  replies with the re-rendered report sheet, gist + PDF link
+                                  so one upload updates the page and downloads the PDF
+    POST /rdf/api/delete       -> {date: "YYYY-MM-DD"}
 
-On the rdf.* host (rdf.advitiaum.com) the report is also served at "/".
+Also /RDF, and the old /rdf_report/ address redirects here. On the rdf.* host
+(rdf.advitiaum.com) the report is also served at "/".
 
-One shared PIN (hash in RDF_TRACKER_DIR/pin_hash, see data/rdf_tracker.py).
-Wrong PINs use the same per-IP lockout as the main login (captcha.py).
+Sign-in: hardcoded PIN (as requested) + the math captcha and per-IP lockout
+from captcha.py (5 wrong tries -> 15 minutes). RDF_REPORT_PIN_HASH overrides the PIN.
 Data lives in RDF_TRACKER_DIR; see data/rdf_tracker.py and docs/rdf-report.md.
 """
 from __future__ import annotations
 
 import logging
+import os
 from functools import wraps
 
 from flask import Blueprint, Response, jsonify, make_response, redirect, render_template, request, session, url_for
@@ -31,7 +34,9 @@ from data import rdf_report, rdf_report_pdf, rdf_tracker
 logger = logging.getLogger(__name__)
 bp = Blueprint("rdf_report", __name__, template_folder="../templates")
 
-URL_PREFIX = "/rdf_report"
+URL_PREFIX = "/rdf"
+# Hash of the hardcoded 5-digit report PIN (the PIN itself is not written in this public repo).
+_DEFAULT_PIN_HASH = "scrypt:32768:8:1$AVK4XUVlP4GM18Ep$b1821cf0f055e77e1eb4c46b73c8d203c073763f1c16c242bdc3e5e6c92bcc74ca6d7b7a4fb2b9a6d197156eb388427e4ef8e0d32f961d3fbc0762d69e242708"
 SESSION_KEY = "rdf_report_ok"
 HOST_PREFIX = "rdf."
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -76,8 +81,16 @@ def _rdf_host_root():
 # ---------------------------------------------------------------------------
 
 @bp.route(URL_PREFIX)
+@bp.route("/RDF")
+@bp.route("/RDF/")
+@bp.route("/rdf_report")
+@bp.route("/rdf_report/")
 def root():
     return redirect(url_for("rdf_report.report_view"), code=301)
+
+
+def _pin_hash() -> str:
+    return os.environ.get("RDF_REPORT_PIN_HASH", "").strip() or _DEFAULT_PIN_HASH
 
 
 def _report() -> tuple[dict | None, str]:
@@ -101,16 +114,15 @@ def report_view():
     r, load_error = _report()
     return _no_cache(render_template(
         "rdf_report/report.html", r=r, load_error=load_error, pdf_url=_pdf_url(r) if r else "",
-        cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in ("trackers", "upload", "delete")},
+        cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in ("trackers", "upload", "delete", "gist")},
              "maxBytes": MAX_UPLOAD_BYTES},
     ))
 
 
 def _login_page(error: str = "", status: int = 200):
-    configured = bool(rdf_tracker.pin_hash())
-    if not configured and not error:
-        error = "The report PIN has not been set up yet (python -m data.rdf_tracker set-pin)."
-    return _no_cache(render_template("rdf_report/login.html", error=error, configured=configured)), status
+    return _no_cache(render_template(
+        "rdf_report/login.html", error=error,
+        captcha_question=captcha.current_question(), captcha_nonce=captcha.current_nonce())), status
 
 
 @bp.route(URL_PREFIX + "/login", methods=["POST"])
@@ -118,23 +130,24 @@ def login():
     ip = captcha.client_ip()
     blocked, retry = captcha.is_blocked(ip)
     if blocked:
-        resp, _ = _login_page(f"Too many wrong PINs. Try again in {max(1, retry // 60)} minute(s).", 429)
+        resp, _ = _login_page(f"Too many wrong tries. Try again in {max(1, retry // 60)} minute(s).", 429)
         resp.headers["Retry-After"] = str(retry)
         return resp, 429
 
+    # Captcha first: it is cheap, and it keeps bots off the PIN check entirely.
+    if not captcha.verify(request.form.get("captcha_answer", ""), nonce=request.form.get("captcha_nonce", "")):
+        return _login_page("The security check answer was wrong. Try the new one.", 400)
+
     pin = (request.form.get("pin") or "").strip()
-    h = rdf_tracker.pin_hash()
-    ok = False
-    if h and pin:
-        try:
-            ok = check_password_hash(h, pin)
-        except Exception:
-            ok = False
+    try:
+        ok = bool(pin) and check_password_hash(_pin_hash(), pin)
+    except Exception:
+        ok = False
     if not ok:
         count, just_blocked = captcha.register_failure(ip)
         logger.info("rdf_report wrong PIN ip=%s count=%d", ip, count)
         if just_blocked:
-            return _login_page(f"Too many wrong PINs. Try again in {captcha.BLOCK_SECONDS // 60} minute(s).", 429)
+            return _login_page(f"Too many wrong tries. Try again in {captcha.BLOCK_SECONDS // 60} minute(s).", 429)
         left = max(0, captcha.MAX_FAILURES - count)
         msg = "Incorrect PIN." + (f" {left} attempt(s) left." if left and left <= 2 else "")
         return _login_page(msg, 401)
@@ -142,7 +155,7 @@ def login():
     captcha.clear_failures(ip)
     session[SESSION_KEY] = True
     session.permanent = True
-    # Back to wherever the PIN page was shown ("/" on rdf.*, else /rdf_report/).
+    # Back to wherever the PIN page was shown ("/" on rdf.*, else /rdf/).
     nxt = request.form.get("next") or ""
     return redirect(nxt if nxt in ("/", URL_PREFIX + "/") else url_for("rdf_report.report_view"))
 
@@ -168,6 +181,13 @@ def report_pdf():
 # ---------------------------------------------------------------------------
 # Gear panel API
 # ---------------------------------------------------------------------------
+
+@bp.route(URL_PREFIX + "/api/gist")
+@_api
+def api_gist():
+    r, err = _report()
+    return _no_cache(jsonify(ok=bool(r), text=r["gist"] if r else "", error=err))
+
 
 @bp.route(URL_PREFIX + "/api/trackers")
 @_api
@@ -210,6 +230,7 @@ def _sheet_payload() -> dict:
     r, _ = _report()
     return {"sheet_html": render_template("rdf_report/_sheet.html", r=r),
             "rep_label": r["rep_label"] if r else "", "pdf_url": _pdf_url(r) if r else "",
+            "gist": r["gist"] if r else "", "gist_day": r["rep_day"] if r else "",
             "pdf_name": rdf_report_pdf.filename(r) if r else ""}
 
 

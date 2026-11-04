@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from html import escape
@@ -227,6 +228,58 @@ def chart_svg(pts: list[Point], dl: date) -> str:
 
 
 # ---------------------------------------------------------------------------
+# WhatsApp gist — "1. Tharuni sent RDF from Kadapa and Srikakulam sites."
+# ---------------------------------------------------------------------------
+
+# Short names people use in messages. Anything not listed drops a trailing company word.
+AGENCY_SHORT = {
+    "tharuni associates": "Tharuni", "saurashtra enviro": "Saurashtra", "zigma global": "Zigma",
+    "coastline projects": "Coastline", "iway associates": "Iway", "card box company": "Card Box",
+    "raghu ram hume pipes": "Raghu Ram", "pr constructions": "PR Constructions",
+}
+_SUFFIX = re.compile(r"\s+(associates|enviro|global|projects|company|constructions|pvt\.?|ltd\.?|"
+                     r"private|limited|hume pipes|infra|enterprises)\b.*$", re.I)
+
+
+def agency_short(name: str) -> str:
+    key = re.sub(r"\s+", " ", name or "").strip()
+    return AGENCY_SHORT.get(key.lower()) or (_SUFFIX.sub("", key) or key)
+
+
+def site_short(name: str) -> str:
+    """Town name for messages: 'Kurnool 3.0 (Package 4)' -> 'Kurnool', 'Tirupati #26' -> 'Tirupati',
+    'Nellore(Donthali)-Phase-1' -> 'Nellore', 'Proddatur - Site2 (Small)' -> 'Proddatur'."""
+    s = re.sub(r"#\d+", " ", name or "")
+    s = re.sub(r"\([^)]*\)", " ", s)
+    s = re.split(r"\s+-\s+", s)[0]
+    s = re.sub(r"[-\s]*phase[-\s]*\d+", " ", s, flags=re.I)
+    s = re.sub(r"\b\d+(\.\d+)?\s*%?", " ", s)
+    s = re.sub(r"\s+", " ", s).strip(" -,")
+    return s or (name or "").strip()
+
+
+def _join(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def gist(t: Tracker) -> str:
+    """Agencies that disposed RDF on the report day, alphabetical; their sites alphabetical."""
+    sent: dict[str, dict[str, str]] = {}
+    for s in t.sites:
+        if s.today > 0:
+            sites = sent.setdefault(agency_short(s.agency), {})
+            town = site_short(s.site)
+            sites.setdefault(town.lower(), town)
+    if not sent:
+        return f"No agency sent RDF on {day(t.date)}."
+    lines = []
+    for i, ag in enumerate(sorted(sent, key=str.lower), 1):
+        towns = sorted(sent[ag].values(), key=str.lower)
+        lines.append(f"{i}. {ag} sent RDF from {_join(towns)} site{'s' if len(towns) > 1 else ''}.")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
 
@@ -318,6 +371,6 @@ def build(hist: list[Tracker]) -> dict | None:
         "k": {"today": fmt(today), "need": fmt(need), "cum": fmt(cum), "bal": fmt(bal),
               "pct": _pct_s(cum, bal), "sites": len(S), "verdict": verdict, "status_color": status_color},
         "chart": chart_svg(series, dl), "chart_marks": chart_marks(series, dl), "proj_text": proj_text,
-        "rep_iso": rep.isoformat(),
+        "rep_iso": rep.isoformat(), "sheet_date": rep_t.sheet_date, "gist": gist(rep_t),
         "ag_rows": ag_rows, "least": least_rows, "groups": groups,
     }

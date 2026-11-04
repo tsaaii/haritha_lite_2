@@ -8,6 +8,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var panel = $("panel"), input = $("files"), drop = $("drop"), msgs = $("msgs"), daysEl = $("days");
   var slot = $("sheet-slot"), pdfBtn = $("pdf"), toast = $("toast");
+  var gistBox = $("gist"), gistText = $("gist-text"), gistDay = $("gist-day"), gistWa = $("gist-wa");
   var busy = false, toastTimer = null;
 
   function el(tag, cls, text) {
@@ -43,6 +44,24 @@
     slot.innerHTML = j.sheet_html;
     if (j.pdf_url) { pdfBtn.href = j.pdf_url; pdfBtn.hidden = false; } else pdfBtn.hidden = true;
     document.title = "RDF disposal report" + (j.rep_label ? " · " + j.rep_label : "");
+    setGist(j.gist || "", j.gist_day || "");
+  }
+
+  function setGist(text, dayLabel) {
+    gistText.textContent = text;
+    gistDay.textContent = dayLabel;
+    gistWa.href = "https://wa.me/?text=" + encodeURIComponent(text);
+    gistBox.hidden = !text;
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (ok, fail) {          // http://localhost fallback
+      var ta = el("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy") ? ok() : fail(); } catch (e) { fail(e); }
+      ta.remove();
+    });
   }
 
   // Fetch the PDF as a blob and save it — works after an async upload, and errors are visible.
@@ -130,6 +149,10 @@
     });
   }
 
+  $("gist-copy").addEventListener("click", function () {
+    copyText(gistText.textContent).then(function () { notify("Summary copied. Paste it in WhatsApp.", true); },
+      function () { notify("Could not copy. Select the text and copy it.", false); });
+  });
   $("gear").addEventListener("click", function () { if (!busy) msgs.textContent = ""; loadDays(); openPanel(); });
   $("panel-close").addEventListener("click", closePanel);
   input.addEventListener("change", function () { upload(input.files); });

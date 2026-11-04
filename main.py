@@ -12,7 +12,7 @@ Routes:
     GET/POST /sites/<slug> -> per-site dashboard gate (sites blueprint)
     GET  /record-images/... -> weighbridge image proxy + 2x2 viewer
     GET  /rdf_planning/ + /rdf_planning/api/* -> agency RDF form (views/rdf.py)
-    GET  /rdf_report/ (and / on rdf.advitiaum.com) -> RDF disposal report (views/rdf_report.py)
+    GET  /rdf/ (and / on rdf.advitiaum.com) -> RDF disposal report (views/rdf_report.py)
 """
 from __future__ import annotations
 

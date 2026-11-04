@@ -251,7 +251,8 @@ def _page_number(canvas, doc):
 
 
 def filename(r: dict) -> str:
-    return f"RDF_disposal_report_{r['rep_iso']}.pdf"
+    """Daily_RDF_tracker_DD-MM-YYYY.pdf, dated like the uploaded sheet (its title date)."""
+    return f"Daily_RDF_tracker_{r['sheet_date'].strftime('%d-%m-%Y')}.pdf"
 
 
 def build_pdf(r: dict) -> bytes:

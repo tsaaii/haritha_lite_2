@@ -56,4 +56,4 @@ POST /admin/refresh-cache   (login required)
 
 ## RDF disposal report
 
-`rdf.advitiaum.com` (also `/rdf_report/`): PIN-gated daily report; upload the tracker CSV from the gear icon. See [docs/rdf-report.md](docs/rdf-report.md).
+`advitiaum.com/rdf` (also `rdf.advitiaum.com`): PIN + captcha daily report; upload the tracker CSV from the gear icon to update the report, get the WhatsApp summary and download `Daily_RDF_tracker_DD-MM-YYYY.pdf`. See [docs/rdf-report.md](docs/rdf-report.md).
