@@ -172,6 +172,44 @@ class TestSignIn(TTDBase):
             self.assertEqual(self.login(pw="new-pass-1").status_code, 302)
 
 
+class TestSecondAccount(TTDBase):
+    """ycdemo: a second sign-in to the same dashboard. Its password is not written in this public
+    repo, so the sign-in flow is tested through the hash override."""
+
+    def setUp(self):
+        super().setUp()
+        from werkzeug.security import generate_password_hash
+        p = mock.patch.dict(os.environ, {"TTD_YCDEMO_PASSWORD_HASH": generate_password_hash("demo-pass-1")})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_ycdemo_signs_in_and_sees_dashboard(self):
+        r = self.login(user="ycdemo", pw="demo-pass-1")
+        self.assertEqual(r.status_code, 302)
+        page = self.c.get("/TTD").get_data(as_text=True)
+        self.assertIn("ycdemo", page)
+        self.assertNotEqual(self.c.get("/TTD/api/overview").status_code, 401)
+
+    def test_username_is_case_insensitive(self):
+        self.assertEqual(self.login(user="  YCdemo ", pw="demo-pass-1").status_code, 302)
+
+    def test_passwords_are_not_shared(self):
+        self.assertEqual(self.login(user="ycdemo", pw="ttd@tirumala").status_code, 401)
+        self.assertEqual(self.login(user="admin-ttd", pw="demo-pass-1").status_code, 401)
+
+    def test_admin_still_works(self):
+        self.assertEqual(self.login().status_code, 302)
+        self.assertIn("admin-ttd", self.c.get("/TTD").get_data(as_text=True))
+
+    def test_builtin_hash_present(self):
+        self.assertTrue(ttd._YCDEMO_HASH.startswith("scrypt:"))
+
+    def test_stale_session_user_is_signed_out(self):
+        with self.c.session_transaction() as s:
+            s[ttd.SESSION_KEY] = "someone-removed"
+        self.assertEqual(self.c.get("/TTD/api/overview").status_code, 401)
+
+
 class TestData(TTDBase):
     def setUp(self):
         super().setUp()
