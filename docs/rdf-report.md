@@ -7,6 +7,25 @@ handoff ("RDF Disposal Report").
 question. `/RDF` and the old `/rdf_report/` both lead here, and so does `https://rdf.advitiaum.com/`
 once that subdomain is mapped (step 4 below).
 
+**Tabs**
+
+| Tab | What it shows |
+| --- | --- |
+| **Overview** | One-line status, headline tiles, site-group counts (each click opens that list in Sites), daily disposal by agency (stacked bars), the "Disposed so far" chart, top 5 quick wins, long haul and stalled sites, and the WhatsApp summary |
+| **Agencies** | % done per agency against where it should be today (a straight line from the first day on file to 100% on the deadline), the projected finish date per agency at its 7-day pace, and the agency table. Click an agency to see its sites |
+| **Sites** | Filter chips (All, Active, Stalled, Quick wins, Long haul, Cleared, and each agency), search, a sortable table with status tags, and a site × day activity heatmap |
+| **Date range** | Pick From/To (or Last 7 / 14 days / Everything) to see each agency's MT disposed, MT/day, days with dispatch, sites that moved, and the balance at the start and end |
+| **Report** | The printable sheet: exactly what the PDF contains. Ctrl/Cmd+P prints this tab from anywhere |
+
+**Site groups** (set in `data/rdf_dashboard.py`, adjustable with environment variables):
+- **Active**: sent RDF in the last 3 calendar days (`RDF_ACTIVE_DAYS`).
+- **Stalled**: RDF left, but nothing sent for 7 or more days, or never (`RDF_STALLED_DAYS`).
+- **Quick win**: 1,000 MT or less left (`RDF_QUICK_MT`).
+- **Long haul**: at its last-7-day pace (`RDF_SITE_PACE_DAYS`), RDF is still left on the deadline.
+- **Slowing**: sent something 3–6 days ago. **Cleared**: nothing left.
+
+Pace and range figures are differences of the *cumulative* column, so a missing day never skews them.
+
 **Daily use: one step.** Click the **gear icon**, then pick or drop the day's tracker CSV.
 That single action does everything:
 1. The sheet is checked, then stored under its "as on" date.
@@ -24,7 +43,8 @@ If a file isn't a tracker, the panel stays open and says why, and nothing change
 | --- | --- |
 | Routes, PIN + captcha sign-in, upload / gist API | `views/rdf_report.py` (registered in `main.py`) |
 | CSV parsing + storage (local or GCS) + CLI | `data/rdf_tracker.py` |
-| Figures, statuses, chart (SVG + shared marks), WhatsApp gist | `data/rdf_report.py` |
+| Report sheet figures, chart (SVG + shared marks), WhatsApp gist | `data/rdf_report.py` |
+| Dashboard tabs: site groups, agency progress, projections, heatmap, date range | `data/rdf_dashboard.py` |
 | Export-ready A4 PDF (ReportLab, vector) | `data/rdf_report_pdf.py` |
 | Page / sheet partial / PIN page / styles / gear panel | `templates/rdf_report/`, `static/rdf_report/` |
 | **Hardcoded history** (one sheet per day, deployed with the code) | `data/rdf_history/` |

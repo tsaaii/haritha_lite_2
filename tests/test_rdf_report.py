@@ -256,3 +256,87 @@ def tearDownModule():
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Dashboard(Base):
+    """Tabs: site lists, agency progress, projected finish, date range."""
+
+    def setUp(self):
+        super().setUp()
+        reset_store(drop_last=False)
+        from data import rdf_dashboard
+        self.D = rdf_dashboard
+        self.hist = rdf_tracker.history()
+        self.d = rdf_dashboard.build(self.hist)
+
+    def test_site_lists_follow_agreed_rules(self):
+        c = self.d["counts"]
+        self.assertEqual(c["sites"], 63)
+        self.assertEqual((c["active"], c["stalled"], c["quick"], c["cleared"]), (14, 31, 15, 12))
+        for s in self.d["sites"]:
+            f = s["filters"].split()
+            if "quick" in f:
+                self.assertLessEqual(s["bal_v"], 1000)
+                self.assertGreater(s["bal_v"], 0)
+            if "cleared" in f:
+                self.assertLessEqual(s["bal_v"], 0)
+        self.assertEqual([x["site"] for x in self.d["top"]["quick"]][:2], ["Atmakur", "Salur"])
+
+    def test_stalled_means_nothing_for_7_days(self):
+        from datetime import date
+        series = self.D._series(self.hist)
+        rep = self.hist[-1].date
+        for s in self.d["sites"]:
+            if "stalled" in s["filters"].split():
+                ss = next(v for v in series.values() if v.site == s["site"] and agency_short_ok(v.agency, s["agency"]))
+                last = ss.last_dispatch()
+                self.assertTrue(last is None or (rep - last).days >= 7, s["site"])
+        self.assertIsInstance(rep, date)
+
+    def test_agency_progress_and_finish(self):
+        ag = {a["short"]: a for a in self.d["agencies"]}
+        self.assertEqual(ag["Tharuni"]["pct"], "48%")
+        self.assertTrue(ag["Tharuni"]["behind"])
+        self.assertEqual(ag["Card Box"]["finish"], "31 Oct 2026")
+        self.assertFalse(ag["Card Box"]["late"])
+        self.assertEqual(ag["Iway"]["finish"], "no recent dispatch")
+        self.assertIn("<svg", self.d["stack_chart"])
+        self.assertIn("<svg", self.d["finish_chart"])
+        self.assertIn("<svg", self.d["heatmap"])
+
+    def test_date_range_uses_cumulative_difference(self):
+        from datetime import date
+        g = self.D.date_range(self.hist, date(2026, 10, 7), date(2026, 10, 13))
+        self.assertTrue(g["ok"])
+        self.assertEqual(g["total"], "7,993.51")              # cum 13 Oct − cum 6 Oct
+        self.assertEqual(g["baseline"], "6 Oct 2026")
+        tharuni = next(r for r in g["rows"] if r["short"] == "Tharuni")
+        self.assertEqual(tharuni["disposed"], "3,868.18")
+        g = self.D.date_range(self.hist, date(2026, 10, 1), date(2026, 10, 13))
+        self.assertEqual(g["total"], "13,709.96")             # from the first day, its own disposal included
+        self.assertFalse(self.D.date_range(self.hist, date(2027, 1, 1), date(2027, 1, 5))["ok"])
+
+    def test_page_and_range_api(self):
+        sign_in(self.c)
+        page = self.c.get("/rdf/").data
+        for label in (b'data-tab="overview"', b'data-tab="agencies"', b'data-tab="sites"', b'data-tab="range"',
+                      b'data-tab="report"', b"Quick wins", b"Long haul", b"Stalled", b"Projected finish per agency",
+                      b"Site activity", b"Daily disposal by agency", b"WhatsApp summary"):
+            self.assertIn(label, page)
+        j = self.c.get("/rdf/api/range?from=2026-10-07&to=2026-10-13").get_json()
+        self.assertTrue(j["ok"])
+        self.assertIn("7,993.51", j["html"])
+        self.assertEqual(self.c.get("/rdf/api/range?from=x&to=y").status_code, 400)
+
+    def test_upload_returns_dashboard(self):
+        reset_store()
+        sign_in(self.c)
+        with open(SEED[-1], "rb") as f:
+            j = self.c.post("/rdf/api/upload", headers=XRW, content_type="multipart/form-data",
+                            data={"files": (io.BytesIO(f.read()), "Daily_RDF_tracker-14-10-2026.csv")}).get_json()
+        self.assertIn('data-panel="sites"', j["dash_html"])
+        self.assertEqual(j["range"]["max"], "2026-10-13")
+
+
+def agency_short_ok(full: str, short: str) -> bool:
+    return rdf_report.agency_short(full) == short
