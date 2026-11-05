@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0F8A45">
+<title>New meeting invite</title>
+<link rel="preload" href="{{ url_for('static', filename='landing/fonts/pagella-400.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='landing/fonts/pagella-700.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{ url_for('static', filename='peshi/peshi.css') }}?v={{ v }}">
+<script defer src="{{ url_for('static', filename='peshi/html-to-image.min.js') }}?v={{ v }}"></script>
+<script defer src="{{ url_for('static', filename='peshi/peshi.js') }}?v={{ v }}"></script>
+</head>
+<body>
+<div class="layout">
+
+  <form class="panel form" id="form" autocomplete="off">
+    <div class="form-head">
+      <div>
+        <div class="eyebrow">PA to MD, SAC</div>
+        <h1 class="h1">New meeting invite</h1>
+      </div>
+      <a class="signout" href="{{ url_for('peshi.logout') }}">Sign out</a>
+    </div>
+
+    <label class="field"><span class="label">Meeting title</span>
+      <input class="input" id="title" placeholder="e.g. Review of ULB-wise progress">
+    </label>
+
+    <div class="group">
+      <div class="label">Meeting for</div>
+      <div class="dept-pick" role="radiogroup" aria-label="Meeting for">
+        <button type="button" class="dept dept-u" data-dept="SBM-U" role="radio" aria-checked="true">
+          <span class="dept-code">SBM-U</span><span class="dept-sub">Urban · green invite</span>
+        </button>
+        <button type="button" class="dept dept-g" data-dept="SBM-G" role="radio" aria-checked="false">
+          <span class="dept-code">SBM-G</span><span class="dept-sub">Gramin · orange invite</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Chaired by</div>
+      <div class="radios radios-row">
+        <label class="radio"><input type="radio" name="chair" value="md" checked><span>Managing Director, SAC</span></label>
+        <label class="radio"><input type="radio" name="chair" value="other"><span>Other</span></label>
+      </div>
+      <input class="input" id="chairOther" placeholder="Enter chairperson" hidden>
+    </div>
+
+    <div class="two">
+      <label class="field"><span class="label">Date</span><input class="input" type="date" id="date"></label>
+      <label class="field"><span class="label">Time</span><input class="input" type="time" id="time"></label>
+    </div>
+
+    <div class="group">
+      <div class="label">Required participants</div>
+      <div class="hint up">Tap to add. New roles go in by seniority; press and drag <b>⠿</b> to change the order.</div>
+      <div id="chips" class="chip-groups"></div>
+      <div class="plist">
+        <ol id="plist" class="plist-rows"></ol>
+        <div id="pempty" class="plist-empty" hidden>No participants yet. Tap a role above or add one below.</div>
+        <div class="plist-add">
+          <input class="input" id="draft" placeholder="Add someone else" enterkeyhint="done">
+          <button type="button" class="btn btn-secondary btn-sm" id="addDraft">Add</button>
+        </div>
+      </div>
+      <button type="button" class="linkbtn" id="sortBtn">Sort by seniority</button>
+    </div>
+
+    <div class="group">
+      <div class="label">Venue</div>
+      <div class="radios">
+        <label class="radio"><input type="radio" name="venue" value="tidco"><span>Conference Hall, TIDCO</span></label>
+        <label class="radio"><input type="radio" name="venue" value="sac" checked><span>Conference Hall, SAC</span></label>
+        <label class="radio"><input type="radio" name="venue" value="other"><span>Other</span></label>
+      </div>
+      <input class="input" id="venueOther" placeholder="Enter venue" hidden>
+    </div>
+
+    <label class="field"><span class="label">Zoom link</span>
+      <input class="input" id="zoom" type="url" inputmode="url" placeholder="https://zoom.us/j/…">
+      <span class="hint">Leave empty for in-person only. It won't appear on the invite.</span>
+    </label>
+
+    <label class="field"><span class="label">Important instructions</span>
+      <textarea class="input" id="notes" rows="3" placeholder="e.g. All are requested to attend with updated data.">All are requested to attend the meeting.</textarea>
+    </label>
+
+    <div class="toggle-row">
+      <div>
+        <div class="label">Help contact footer</div>
+        <div class="hint">Gideon, PA to MD, SAC · 9392914488</div>
+      </div>
+      <button type="button" class="switch" id="helpFooter" role="switch" aria-checked="true" aria-label="Help contact footer"><span></span></button>
+    </div>
+  </form>
+
+  <div class="actions">
+    <div class="actions-in">
+      <button type="button" class="btn btn-primary" id="copyBtn">Copy for WhatsApp</button>
+      <button type="button" class="btn btn-secondary" id="dlBtn">Download</button>
+    </div>
+  </div>
+
+  <section class="preview-col" aria-label="Preview">
+    <div class="eyebrow pad">Preview</div>
+    <div class="preview-box" id="box">
+      <div class="preview-scale" id="scaler">
+
+        <div class="card theme-u" id="card">
+          <div class="c-frame">
+            <div class="c-band" id="oDeptFull">Swachh Bharat Mission – Urban</div>
+            <div class="c-head">
+              <img src="{{ url_for('static', filename='peshi/left.png') }}?v={{ v }}" alt="" width="112" height="112">
+              <div class="c-head-mid">
+                <div class="c-kicker">Meeting notice</div>
+                <div class="c-title" id="oTitle">Meeting title</div>
+              </div>
+              <img src="{{ url_for('static', filename='peshi/right.png') }}?v={{ v }}" alt="" width="112" height="112">
+            </div>
+            <div class="c-grid">
+              <div class="c-k">Chaired by</div><div class="c-v c-bold" id="oChair">Managing Director, SAC</div>
+              <div class="c-k">Date</div><div class="c-v" id="oDate">—</div>
+              <div class="c-k">Time</div><div class="c-v" id="oTime">—</div>
+              <div class="c-k">Required participants</div><div class="c-v c-list" id="oParts"></div>
+              <div class="c-k">Venue</div><div class="c-v" id="oVenue">Conference Hall, SAC</div>
+              <div class="c-k" id="oZoomK" hidden>Zoom link</div><div class="c-v c-zoom" id="oZoom" hidden></div>
+            </div>
+            <div class="c-note" id="oNoteRow"><b>Note: </b><span id="oNote"></span></div>
+            <div class="c-help" id="oHelp">For any queries, contact Gideon, PA to MD, SAC at <b>9392914488</b></div>
+            <div class="c-foot">Swachh Andhra Corporation · O/o Managing Director</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
