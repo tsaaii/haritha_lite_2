@@ -13,6 +13,7 @@ Routes:
     GET  /record-images/... -> weighbridge image proxy + 2x2 viewer
     GET  /rdf_planning/ + /rdf_planning/api/* -> agency RDF form (views/rdf.py)
     GET  /rdf/ (and / on rdf.advitiaum.com) -> RDF disposal report (views/rdf_report.py)
+    GET  /peshi/ -> meeting invite builder, password + captcha (views/peshi.py)
 """
 from __future__ import annotations
 
@@ -42,6 +43,7 @@ from views.rdf_report import bp as rdf_report_bp
 from views.landing import bp as landing_bp
 from views.landing_api import bp as landing_api_bp
 from views.ttd import bp as ttd_bp
+from views.peshi import bp as peshi_bp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -106,6 +108,8 @@ def create_app() -> Flask:
     app.register_blueprint(landing_api_bp)
     # /TTD: TTD legacy-waste dashboard (views/ttd.py)
     app.register_blueprint(ttd_bp)
+    # /peshi: meeting invite builder for the MD Peshi (views/peshi.py)
+    app.register_blueprint(peshi_bp)
 
     # Swachha Andhra dashboard. Endpoint name stays "overview" so every
     # url_for("overview") back-link follows it to /sac.

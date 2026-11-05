@@ -9,6 +9,7 @@ Flask + Jinja rebuild of the Swachh Andhra Pradesh dashboard, plus the Advitia L
 | `POST /api/contact`, `/api/seen` | Landing contact form and visit tracker → Google Sheet (setup in [docs/landing.md](docs/landing.md)) |
 | `rdf.advitiaum.com/` | RDF disposal report (unchanged) |
 | `/TTD` | TTD legacy-waste dashboard: sign-in with captcha, progress vs 51,290 MT, reports, PDF, live cameras ([docs/ttd-dashboard.md](docs/ttd-dashboard.md)) |
+| `/peshi` | Meeting invite builder for the MD Peshi: password + captcha, green/orange WhatsApp invite image ([docs/peshi.md](docs/peshi.md)) |
 
 ## Top 4 cards
 

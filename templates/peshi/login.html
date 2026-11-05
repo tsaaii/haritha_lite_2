@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0F8A45">
+<title>Meeting invite · Sign in</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='peshi/peshi.css') }}?v={{ v }}">
+</head>
+<body class="login">
+<main class="login-shell">
+  <section class="panel login-card" aria-labelledby="login-title">
+    <div class="eyebrow">PA to MD, SAC</div>
+    <h1 class="h1" id="login-title">Meeting invite</h1>
+    {% if error %}<div class="msg-err" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="{{ url_for('peshi.login') }}" autocomplete="off" novalidate>
+      <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}">
+      <label class="field"><span class="label">Password</span>
+        <input class="input" type="password" name="password" autocomplete="current-password" maxlength="64" required autofocus>
+      </label>
+      <label class="field"><span class="label">Security check: what is <b>{{ captcha_question }}</b>?</span>
+        <input class="input" name="captcha_answer" inputmode="numeric" autocomplete="off" maxlength="4" required pattern="-?[0-9]*">
+      </label>
+      <button type="submit" class="btn btn-primary">Open</button>
+    </form>
+    <p class="hint">Five wrong tries lock sign-in for 15 minutes.</p>
+  </section>
+</main>
+</body>
+</html>

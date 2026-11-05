@@ -74,6 +74,13 @@ handlers:
     expiration: "7d"
     http_headers:
       X-Content-Type-Options: nosniff
+  # /peshi builder assets: fetched with ?v=<content hash> (views/peshi.py), so cache long.
+  - url: /static/peshi
+    static_dir: static/peshi
+    secure: always
+    expiration: "7d"
+    http_headers:
+      X-Content-Type-Options: nosniff
   - url: /static
     static_dir: static
     secure: always
