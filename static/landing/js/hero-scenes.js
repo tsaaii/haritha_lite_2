@@ -90,73 +90,117 @@
       return tl;
     } };
 
-  /* 2. Processing — a rotating trommel drum tumbles the letters with debris; letters fall
-        through the screen in order, oversize debris rolls out of the far end. */
-  SCENES.processing = { word: 'Processing.', blurb: 'A rotating trommel tumbles the letters with stones and plastic; letters fall through the screen in order, the overs roll out the end.',
+  /* 2. Processing — a rotating trommel: the letters tumble inside the drum (seen through the
+        perforated screen), then one by one each drops through the screen, flashes green as it
+        passes the mesh, and falls into place. Oversize debris rolls out of the discharge end. */
+  SCENES.processing = { word: 'Processing.', blurb: 'Letters tumble inside a rotating trommel; one by one each drops through the screen, flashes as it passes the mesh, and falls into place. The overs roll out the far end.',
     build: function (c) {
-      var tl = g.timeline(), fs = c.fs, R = rng(7);
-      var x0 = c.wx0 - fs * 0.3, x1 = c.wx1 + fs * 0.15, r = fs * 0.34, cy = c.B - fs * 1.32;
-      var drum = el('g', { transform: 'rotate(-2.5 ' + f1((x0 + x1) / 2) + ' ' + f1(cy) + ')' }, c.back);
-      var clipId = 'hs-clip-' + Date.now();
-      var cp = el('clipPath', { id: clipId }, el('defs', {}, c.back));
-      el('rect', { x: x0, y: cy - r, width: x1 - x0, height: 2 * r, rx: r * 0.45 }, cp);
-      el('rect', { x: x0, y: cy - r, width: x1 - x0, height: 2 * r, rx: r * 0.45, fill: '#EEF2EF', stroke: C.i5, 'stroke-width': fs * 0.014 }, drum);
-      var holes = el('g', { 'clip-path': 'url(#' + clipId + ')' }, drum), s = fs * 0.1;
-      for (var hx = x0 - s * 3; hx < x1 + s * 3; hx += s)
-        for (var hy = cy - r + s * 0.6, row = 0; hy < cy + r; hy += s * 0.8, row++)
-          el('circle', { cx: f1(hx + (row % 2) * s / 2), cy: f1(hy), r: fs * 0.024, fill: C.i3, opacity: 0.6 }, holes);
-      var ribs = el('g', { 'clip-path': 'url(#' + clipId + ')' }, drum), rs = fs * 0.55;
-      for (var rx = x0 - rs; rx < x1 + rs; rx += rs) el('path', { d: 'M' + f1(rx) + ',' + f1(cy - r) + ' q' + f1(rs * 0.18) + ',' + f1(r) + ' 0,' + f1(2 * r), fill: 'none', stroke: C.i3, 'stroke-width': fs * 0.016 }, ribs);
-      el('ellipse', { cx: x0 + r * 0.3, cy: cy, rx: r * 0.28, ry: r, fill: 'none', stroke: C.i5, 'stroke-width': fs * 0.018 }, drum);
-      el('ellipse', { cx: x1 - r * 0.3, cy: cy, rx: r * 0.28, ry: r, fill: 'none', stroke: C.i5, 'stroke-width': fs * 0.018 }, drum);
-      el('path', { d: 'M' + f1(x0 - fs * 0.45) + ',' + f1(cy - r * 1.25) + ' L' + f1(x0 + r * 0.2) + ',' + f1(cy - r * 0.2) + ' L' + f1(x0 + r * 0.2) + ',' + f1(cy + r * 0.2) + ' L' + f1(x0 - fs * 0.45) + ',' + f1(cy - r * 0.55) + ' Z', fill: C.i1, stroke: C.i5, 'stroke-width': fs * 0.012 }, c.back);
-      [x0 + (x1 - x0) * 0.25, x0 + (x1 - x0) * 0.75].forEach(function (sx) {
-        el('line', { x1: sx, y1: cy + r, x2: sx - fs * 0.08, y2: c.B - fs * 0.85, stroke: C.i3, 'stroke-width': fs * 0.02 }, c.back);
-        el('circle', { cx: sx, cy: cy + r, r: fs * 0.05, fill: C.i7 }, c.back);
-      });
-      var shine = el('rect', { x: x0 + r * 0.3, y: cy - r * 0.86, width: x1 - x0 - r * 0.6, height: r * 0.32, rx: r * 0.16, fill: '#fff', opacity: 0.55 }, c.front);
-      var pileX = x1 + fs * 0.35, pile = el('path', { d: 'M' + f1(pileX - fs * 0.3) + ',' + f1(c.B) + ' Q' + f1(pileX) + ',' + f1(c.B - fs * 0.3) + ' ' + f1(pileX + fs * 0.3) + ',' + f1(c.B) + ' Z', fill: C.amber, opacity: 0.85 }, c.back);
-      g.set(pile, { scaleY: 0, transformOrigin: '50% 100%' });
-      el('path', { d: 'M' + f1(x1 - r * 0.2) + ',' + f1(cy + r * 0.1) + ' L' + f1(pileX + fs * 0.05) + ',' + f1(c.B - fs * 0.32), stroke: C.i5, 'stroke-width': fs * 0.03, 'stroke-linecap': 'round' }, c.back);
+      var tl = g.timeline(), fs = c.fs, u = c.u, R = rng(7), uid = 'tr' + Date.now();
+      var x0 = c.wx0 - u * 0.4, x1 = c.wx1 + u * 0.25, r = u * 0.36, cy = c.B - u * 1.32, mid = (x0 + x1) / 2;
+      var TILT = 2, tan = Math.tan(TILT * Math.PI / 180), yAt = function (x) { return cy + (x - mid) * tan; };
+      var rot = 'rotate(' + TILT + ' ' + f1(mid) + ' ' + f1(cy) + ')';
+      var bd = el('defs', {}, c.back), fd = el('defs', {}, c.front);
+      function grad(defs, id, stops) { var lg = el('linearGradient', { id: id, x1: 0, x2: 0, y1: 0, y2: 1 }, defs); stops.forEach(function (s) { el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] }, lg); }); }
+      grad(bd, uid + 'in', [[0, '#55635A', 1], [0.55, '#2C3832', 1], [1, '#1B2520', 1]]);
+      grad(fd, uid + 'sh', [[0, '#FFFFFF', 0.7], [0.18, '#EEF2EF', 0.42], [0.5, '#C9D2CC', 0.22], [0.82, '#8F9C94', 0.38], [1, '#5E6B63', 0.65]]);
+      var bodyAttrs = { x: x0, y: cy - r, width: x1 - x0, height: 2 * r, rx: r * 0.42 };
+      el('rect', bodyAttrs, el('clipPath', { id: uid + 'cb' }, bd));
+      el('rect', bodyAttrs, el('clipPath', { id: uid + 'cf' }, fd));
+      var sx0 = x0 + r * 0.9, sx1 = x1 - r * 0.9;          // screen (perforated) section
+      el('rect', { x: sx0, y: cy - r, width: sx1 - sx0, height: 2 * r }, el('clipPath', { id: uid + 'cs' }, fd));
 
-      // Endless drum spin runs beside the scene timeline (an infinite child would stop it ever completing).
-      var spin = c.loop(g.timeline({ repeat: -1 }).to(holes, { x: s, duration: 0.32, ease: 'none' }).set(holes, { x: 0 }));
-      var spin2 = c.loop(g.timeline({ repeat: -1 }).to(ribs, { x: rs, duration: 0.95, ease: 'none' }).set(ribs, { x: 0 }));
-      // letters start inside the drum, small and tumbling
-      var inside = function () { return { x: x0 + r + R() * (x1 - x0 - 2 * r), y: cy - r * 0.45 + R() * r * 0.8 }; };
-      c.L.forEach(function (L, i) { var p = inside(), b = c.R[i]; g.set(L, { x: p.x - b.cx, y: p.y - b.cyv, scale: 0.5, rotation: R() * 360, color: MIX[i % MIX.length], opacity: 0 }); });
+      // --- supports + base (behind everything)
+      var base = c.back, by = cy + r + u * 0.2;
+      [x0 + r * 0.55, x1 - r * 0.55].forEach(function (sx) {
+        var yy = yAt(sx) + r;
+        el('path', { d: 'M' + f1(sx - u * 0.16) + ',' + f1(by) + ' L' + f1(sx - u * 0.05) + ',' + f1(yy) + ' L' + f1(sx + u * 0.05) + ',' + f1(yy) + ' L' + f1(sx + u * 0.16) + ',' + f1(by) + ' Z', fill: C.i5 }, base);
+        el('circle', { cx: sx - u * 0.06, cy: yy + u * 0.015, r: u * 0.035, fill: C.i7 }, base);
+        el('circle', { cx: sx + u * 0.06, cy: yy + u * 0.015, r: u * 0.035, fill: C.i7 }, base);
+        el('rect', { x: sx - u * 0.22, y: by, width: u * 0.44, height: u * 0.035, rx: u * 0.012, fill: C.i7 }, base);
+      });
+      // --- drum interior (dark), with lifter bars that sweep past
+      var drumB = el('g', { transform: rot }, c.back);
+      el('rect', Object.assign({ fill: 'url(#' + uid + 'in)' }, bodyAttrs), drumB);
+      var lifters = el('g', {}, el('g', { 'clip-path': 'url(#' + uid + 'cb)' }, drumB)), ls = u * 0.42;
+      for (var lx = x0 - ls; lx < x1 + ls; lx += ls) el('line', { x1: lx, y1: cy - r, x2: lx + u * 0.12, y2: cy + r, stroke: '#3D4A43', 'stroke-width': u * 0.03 }, lifters);
+      // feed chute (left, higher end) and discharge chute (right) + overs pile
+      el('path', { d: 'M' + f1(x0 - u * 0.55) + ',' + f1(yAt(x0) - r * 1.35) + ' L' + f1(x0 + r * 0.25) + ',' + f1(yAt(x0) - r * 0.25) + ' L' + f1(x0 + r * 0.25) + ',' + f1(yAt(x0) + r * 0.15) + ' L' + f1(x0 - u * 0.55) + ',' + f1(yAt(x0) - r * 0.7) + ' Z', fill: '#DDE4DF', stroke: C.i5, 'stroke-width': u * 0.012 }, c.back);
+      var pileX = x1 + u * 0.42, pileY = by + u * 0.035;
+      el('path', { d: 'M' + f1(x1 - r * 0.15) + ',' + f1(yAt(x1) + r * 0.35) + ' L' + f1(pileX + u * 0.06) + ',' + f1(pileY - u * 0.3) + ' L' + f1(pileX - u * 0.06) + ',' + f1(pileY - u * 0.36) + ' L' + f1(x1 - r * 0.3) + ',' + f1(yAt(x1) + r * 0.05) + ' Z', fill: '#DDE4DF', stroke: C.i5, 'stroke-width': u * 0.012 }, c.back);
+      var pile = el('path', { d: 'M' + f1(pileX - u * 0.32) + ',' + f1(pileY) + ' Q' + f1(pileX) + ',' + f1(pileY - u * 0.34) + ' ' + f1(pileX + u * 0.32) + ',' + f1(pileY) + ' Z', fill: C.amber, opacity: 0.9 }, c.back);
+      g.set(pile, { scaleY: 0, transformOrigin: '50% 100%' });
+
+      // --- debris tumbling inside (behind the letters)
+      var inside = function () { var x = sx0 + R() * (sx1 - sx0); return { x: x, y: yAt(x) - r * 0.4 + R() * r * 0.75 }; };
       var debris = [];
-      for (var k = 0; k < 11; k++) {
-        var p = inside(), kind = k % 3, dEl;
-        debris.push(dEl = kind === 0 ? el('circle', { cx: p.x, cy: p.y, r: fs * (0.035 + R() * 0.03), fill: C.i5 }, c.front)
-          : kind === 1 ? el('rect', { x: p.x, y: p.y, width: fs * 0.1, height: fs * 0.05, rx: fs * 0.01, fill: R() > 0.5 ? C.skyL : C.amber }, c.front)
-            : el('path', { d: poly(p.x, p.y, fs * 0.045, 6, 0.6, R), fill: C.dirtD }, c.front));
-        dEl._p = p;
+      for (var k = 0; k < 12; k++) {
+        var p = inside(), kind = k % 3, d = kind === 0 ? el('circle', { cx: p.x, cy: p.y, r: u * (0.03 + R() * 0.03), fill: '#9AA79F' }, drumB)
+          : kind === 1 ? el('rect', { x: p.x, y: p.y, width: u * 0.1, height: u * 0.045, rx: u * 0.01, fill: R() > 0.5 ? C.skyL : C.amber }, drumB)
+            : el('path', { d: poly(p.x, p.y, u * 0.045, 6, 0.6, R), fill: '#8B8070' }, drumB);
+        d._p = p; debris.push(d);
       }
-      tl.to(c.L, { opacity: 1, duration: 0.3, stagger: 0.03 }, 0)
-        .from(debris, { opacity: 0, duration: 0.3, stagger: 0.02 }, 0);
-      // tumble ~1.8 s
+
+      // --- the shell you look through (in front of the letters): shaded, perforated, ringed
+      var drumF = el('g', { transform: rot }, c.front);
+      el('rect', Object.assign({ fill: 'url(#' + uid + 'sh)' }, bodyAttrs), drumF);
+      var mesh = el('g', {}, el('g', { 'clip-path': 'url(#' + uid + 'cs)' }, drumF)), s = u * 0.085, hr = u * 0.024;
+      for (var hx = sx0 - s * 3; hx < sx1 + s * 3; hx += s)
+        for (var hy = cy - r + s * 0.5, row = 0; hy < cy + r; hy += s * 0.78, row++) {
+          var shade = Math.abs(hy - cy) / r;                      // holes foreshorten towards the edges
+          el('rect', { x: f1(hx + (row % 2) * s / 2 - hr), y: f1(hy - hr * (1 - shade * 0.55)), width: f1(hr * 2), height: f1(hr * 2 * (1 - shade * 0.55)), rx: f1(hr * 0.5), fill: '#26312B', opacity: f1(0.42 - shade * 0.18) }, mesh);
+        }
+      var bands = el('g', {}, el('g', { 'clip-path': 'url(#' + uid + 'cf)' }, drumF)), bs = (sx1 - sx0) / 4;
+      for (var bx = sx0 - bs; bx <= sx1 + bs; bx += bs) el('path', { d: 'M' + f1(bx) + ',' + f1(cy - r) + ' q' + f1(u * 0.07) + ',' + f1(r) + ' 0,' + f1(2 * r), fill: 'none', stroke: '#B9C4BD', 'stroke-width': u * 0.028 }, bands);
+      el('rect', Object.assign({ fill: 'none', stroke: C.i7, 'stroke-width': u * 0.014 }, bodyAttrs), drumF);
+      [x0 + r * 0.34, x1 - r * 0.34].forEach(function (ex) { el('ellipse', { cx: ex, cy: cy, rx: r * 0.3, ry: r * 1.04, fill: 'none', stroke: C.i7, 'stroke-width': u * 0.03 }, drumF); });
+      el('ellipse', { cx: x1 - r * 0.34, cy: cy, rx: r * 0.2, ry: r * 0.78, fill: '#1B2520', opacity: 0.55 }, drumF);
+      var gear = el('ellipse', { cx: x0 + r * 0.85, cy: cy, rx: r * 0.2, ry: r * 1.1, fill: 'none', stroke: C.i9, 'stroke-width': u * 0.035, 'stroke-dasharray': f1(u * 0.025) + ' ' + f1(u * 0.02) }, drumF);
+      el('rect', { x: x0 + r * 0.25, y: cy - r * 1.6, width: u * 0.34, height: u * 0.2, rx: u * 0.03, fill: C.i7 }, drumF);
+      el('line', { x1: x0 + r * 0.25 + u * 0.17, y1: cy - r * 1.4, x2: x0 + r * 0.85, y2: cy - r * 1.05, stroke: C.i5, 'stroke-width': u * 0.02 }, drumF);
+      el('path', { d: 'M' + f1(x0 + r * 0.5) + ',' + f1(cy - r * 0.86) + ' L' + f1(x1 - r * 0.5) + ',' + f1(cy - r * 0.86), stroke: '#fff', 'stroke-width': u * 0.03, 'stroke-linecap': 'round', opacity: 0.75 }, drumF);
+      var lab = el('text', { x: mid, y: cy - r - u * 0.1, 'text-anchor': 'middle', 'font-size': u * 0.075, fill: C.i5, 'font-family': 'var(--font-mono)', 'letter-spacing': '0.12em' }, c.front); lab.textContent = 'TROMMEL SCREEN';
+
+      // rotation: mesh, bands, lifters and gear teeth sweep endlessly (beside the scene timeline)
+      var spin = c.loop(g.timeline({ repeat: -1 }).to(mesh, { x: s, duration: 0.28, ease: 'none' }).set(mesh, { x: 0 }));
+      var spin2 = c.loop(g.timeline({ repeat: -1 }).to(bands, { x: bs, duration: 1.1, ease: 'none' }).set(bands, { x: 0 }));
+      var spin3 = c.loop(g.timeline({ repeat: -1 }).to(lifters, { x: -ls, duration: 0.7, ease: 'none' }).set(lifters, { x: 0 }));
+      var spin4 = c.loop(g.to(gear, { strokeDashoffset: -u * 0.45, duration: 1, repeat: -1, ease: 'none' }));
+
+      // letters start inside the drum, small and tumbling
+      c.L.forEach(function (L, i) { var p = inside(), b = c.R[i]; g.set(L, { x: p.x - b.cx, y: p.y - b.cyv, scale: 0.48, rotation: R() * 360, color: MIX[i % MIX.length], opacity: 0, transformOrigin: '50% 60%' }); });
+      tl.to(c.L, { opacity: 1, duration: 0.35, stagger: 0.03 }, 0).from(debris, { opacity: 0, duration: 0.3, stagger: 0.02 }, 0);
+      var TUMBLE = 1.4;
       c.L.concat(debris).forEach(function (t, i) {
         var isL = i < c.L.length, b = isL ? c.R[i] : null, kf = [];
-        for (var j = 0; j < 3; j++) { var q = inside(); kf.push(isL ? { x: q.x - b.cx, y: q.y - b.cyv, rotation: '+=' + (140 + R() * 120), duration: 0.6 } : { x: q.x - t._p.x, y: q.y - t._p.y, rotation: '+=200', duration: 0.6 }); }
-        tl.to(t, { keyframes: kf, ease: 'sine.inOut', transformOrigin: '50% 50%' }, 0.15);
+        for (var j = 0; j < 3; j++) { var q = inside(); kf.push(isL ? { x: q.x - b.cx, y: q.y - b.cyv, rotation: '+=' + (150 + R() * 120), duration: TUMBLE / 3 } : { x: q.x - t._p.x, y: q.y - t._p.y, rotation: '+=220', duration: TUMBLE / 3 }); }
+        tl.to(t, { keyframes: kf, ease: 'sine.inOut', transformOrigin: '50% 50%' }, 0.1);
       });
-      // fines falling through the screen during the tumble
-      for (var fdot = 0; fdot < 22; fdot++) {
-        var fx = x0 + r + R() * (x1 - x0 - 2 * r), dot = el('circle', { cx: fx, cy: cy + r * 0.8, r: fs * 0.014, fill: C.dirt, opacity: 0 }, c.back);
-        tl.fromTo(dot, { opacity: 0.9, y: 0 }, { y: c.B - (cy + r * 0.8), opacity: 0, duration: 0.7, ease: 'power2.in', immediateRender: false }, 0.3 + R() * 2.2);
+      // fines dusting through the screen while it tumbles
+      for (var fdot = 0; fdot < 18; fdot++) {
+        var fx = sx0 + R() * (sx1 - sx0), dot = el('circle', { cx: fx, cy: yAt(fx) + r * 0.95, r: u * 0.013, fill: '#8B8070', opacity: 0 }, c.back);
+        tl.fromTo(dot, { opacity: 0.9, y: 0 }, { y: c.B - yAt(fx) - r, opacity: 0, duration: 0.65, ease: 'power2.in', immediateRender: false }, 0.2 + R() * 1.3);
       }
-      tl.addLabel('drop', 2.05);
+      // one by one: to the screen floor -> through the mesh (flash + spray) -> fall and land
+      var t0 = TUMBLE + 0.15, STEP = 0.3;
       c.L.forEach(function (L, i) {
-        tl.to(L, { x: 0, y: 0, rotation: 0, scale: 1, duration: 0.8, ease: 'bounce.out' }, 'drop+=' + (i * 0.13).toFixed(2))
-          .to(L, { color: C.i9, duration: 0.4 }, 'drop+=' + (i * 0.13 + 0.55).toFixed(2));
+        var b = c.R[i], at = t0 + i * STEP, floor = yAt(b.cx) + r * 0.55, exitY = yAt(b.cx) + r;
+        tl.to(L, { x: 0, y: floor - b.cyv, rotation: 0, scale: 0.55, duration: 0.22, ease: 'power2.out' }, at);
+        var flash = el('ellipse', { cx: b.cx, cy: exitY, rx: u * 0.1, ry: u * 0.03, fill: C.g3, opacity: 0 }, c.front);
+        tl.fromTo(flash, { opacity: 0.95, attr: { rx: u * 0.08 } }, { opacity: 0, attr: { rx: u * 0.28, ry: u * 0.07 }, duration: 0.45, ease: 'power2.out', immediateRender: false }, at + 0.2);
+        for (var sp = 0; sp < 5; sp++) {
+          var spd = el('circle', { cx: b.cx, cy: exitY, r: u * 0.012, fill: sp % 2 ? C.g6 : '#8B8070', opacity: 0 }, c.back);
+          tl.fromTo(spd, { opacity: 1, x: 0, y: 0 }, { opacity: 0, x: (R() - 0.5) * u * 0.35, y: u * (0.25 + R() * 0.25), duration: 0.5, ease: 'power1.in', immediateRender: false }, at + 0.2);
+        }
+        tl.to(L, { y: 0, scale: 1, color: C.i9, duration: 0.42, ease: 'power2.in' }, at + 0.22)
+          .to(L, { scaleY: 0.86, scaleX: 1.08, duration: 0.07, yoyo: true, repeat: 1, ease: 'power1.out', transformOrigin: '50% 100%' }, at + 0.64);
       });
+      var tEnd = t0 + c.L.length * STEP;
       debris.forEach(function (d, i) {
-        tl.to(d, { x: '+=' + (pileX - (x0 + x1) / 2), y: c.B - cy - fs * 0.15, scale: 0.5, opacity: 0, duration: 0.7, ease: 'power2.in' }, 'drop+=' + (0.5 + i * 0.09).toFixed(2));
+        tl.to(d, { x: (x1 - r * 0.4) - d._p.x, y: yAt(x1) - d._p.y, duration: 0.45, ease: 'power1.in' }, tEnd - 0.6 + i * 0.06)
+          .to(d, { x: '+=' + (pileX - x1 + r * 0.4), y: '+=' + (pileY - yAt(x1) - u * 0.15), scale: 0.6, opacity: 0, duration: 0.5, ease: 'power2.in' }, '>');
       });
-      tl.to(pile, { scaleY: 1, duration: 1.2, ease: 'power2.out' }, 'drop+=0.6')
-        .to(shine, { opacity: 0.2, duration: 0.6 }, 'drop+=1.4')
-        .call(function () { spin.timeScale(0.4); spin2.timeScale(0.4); }, null, 'drop+=1.8');
+      tl.to(pile, { scaleY: 1, duration: 1, ease: 'power2.out' }, tEnd - 0.2)
+        .call(function () { [spin, spin2, spin3, spin4].forEach(function (t) { g.to(t, { timeScale: 0.35, duration: 1 }); }); }, null, tEnd + 0.3);
       return tl;
     } };
 
@@ -347,43 +391,7 @@
       return tl;
     } };
 
-  /* 7. Weighing — letters drop onto a weighbridge deck; the display counts up to the weight. */
-  SCENES.weighing = { word: 'Weighing.', blurb: 'Letters drop onto a weighbridge deck that dips with each one; the display counts up to the tonnage.',
-    build: function (c) {
-      var tl = g.timeline(), fs = c.fs, R = rng(5);
-      var dx0 = c.wx0 - fs * 0.25, dx1 = c.wx1 + fs * 0.25, dy = c.B + fs * 0.06;
-      el('path', { d: 'M' + f1(dx0 - fs * 0.5) + ',' + f1(dy + fs * 0.14) + ' L' + f1(dx0) + ',' + f1(dy) + ' L' + f1(dx0) + ',' + f1(dy + fs * 0.14) + ' Z', fill: C.i2 }, c.back);
-      el('path', { d: 'M' + f1(dx1 + fs * 0.5) + ',' + f1(dy + fs * 0.14) + ' L' + f1(dx1) + ',' + f1(dy) + ' L' + f1(dx1) + ',' + f1(dy + fs * 0.14) + ' Z', fill: C.i2 }, c.back);
-      var deck = el('g', {}, c.back);
-      el('rect', { x: dx0, y: dy, width: dx1 - dx0, height: fs * 0.09, rx: fs * 0.02, fill: C.i7 }, deck);
-      for (var k = 1; k < 8; k++) el('line', { x1: dx0 + (dx1 - dx0) * k / 8, x2: dx0 + (dx1 - dx0) * k / 8, y1: dy + fs * 0.015, y2: dy + fs * 0.075, stroke: C.i5, 'stroke-width': fs * 0.008 }, deck);
-      [0.15, 0.5, 0.85].forEach(function (u) { el('rect', { x: dx0 + (dx1 - dx0) * u - fs * 0.05, y: dy + fs * 0.09, width: fs * 0.1, height: fs * 0.05, fill: C.i5 }, c.back); });
-      var bw = fs * 1.55, bh = fs * 0.5, bx = c.wx1 - bw + fs * 0.1, by = c.B - fs * 1.68;
-      var box = el('g', {}, c.front);
-      el('rect', { x: bx, y: by, width: bw, height: bh, rx: fs * 0.06, fill: C.i9 }, box);
-      var lab = el('text', { x: bx + fs * 0.08, y: by - fs * 0.06, 'font-size': fs * 0.075, fill: C.i5, 'font-family': 'var(--font-mono)', 'letter-spacing': '0.1em' }, box); lab.textContent = 'WEIGHBRIDGE 01';
-      var read = el('text', { x: bx + bw - fs * 0.38, y: by + bh * 0.68, 'text-anchor': 'end', 'font-size': fs * 0.27, fill: C.g3, 'font-family': 'var(--font-mono)' }, box); read.textContent = '0.00';
-      var unit = el('text', { x: bx + bw - fs * 0.1, y: by + bh * 0.68, 'text-anchor': 'end', 'font-size': fs * 0.12, fill: C.g2, 'font-family': 'var(--font-mono)' }, box); unit.textContent = 'MT';
-      var led = el('circle', { cx: bx + fs * 0.12, cy: by + fs * 0.12, r: fs * 0.03, fill: C.amber }, box);
-      var stable = el('text', { x: bx + fs * 0.2, y: by + fs * 0.145, 'font-size': fs * 0.06, fill: C.i3, 'font-family': 'var(--font-mono)' }, box); stable.textContent = 'WEIGHING';
-      g.set(c.L, { y: -fs * 1.6, opacity: 0 });
-      tl.from(box, { opacity: 0, y: -fs * 0.2, duration: 0.4 }, 0);
-      var total = 12.48, w = 0, shares = c.R.map(function () { return 0.6 + R(); }), sum = shares.reduce(function (a, b) { return a + b; }, 0);
-      var counter = { v: 0 };
-      c.L.forEach(function (L, i) {
-        var at = 0.35 + i * 0.26, nw = w + total * shares[i] / sum; w = nw;
-        tl.to(L, { opacity: 1, duration: 0.1 }, at)
-          .to(L, { y: 0, duration: 0.55, ease: 'bounce.out' }, at)
-          .to(deck, { y: fs * 0.025, duration: 0.08, yoyo: true, repeat: 1, ease: 'power1.out' }, at + 0.22)
-          .to(counter, { v: nw, duration: 0.35, ease: 'power2.out', onUpdate: function () { read.textContent = counter.v.toFixed(2); } }, at + 0.22);
-      });
-      tl.to(led, { attr: { fill: C.g3 }, duration: 0.2 }, '>+0.1')
-        .call(function () { stable.textContent = 'STABLE'; stable.setAttribute('fill', C.g3); }, null, '<')
-        .fromTo(box, { scale: 1 }, { scale: 1.04, transformOrigin: '50% 50%', yoyo: true, repeat: 1, duration: 0.15 }, '<');
-      return tl;
-    } };
-
-  /* 8. Auditing — a camera viewfinder frames the word, focuses, flashes; VERIFIED stamp lands. */
+  /* 7. Auditing — a camera viewfinder frames the word, focuses, flashes; VERIFIED stamp lands. */
   SCENES.auditing = { word: 'Auditing.', blurb: 'A camera viewfinder frames the word with REC and a running clock, pulls focus, flashes, and a VERIFIED stamp lands.',
     build: function (c) {
       var tl = g.timeline(), fs = c.fs, pad = fs * 0.28;
@@ -421,46 +429,95 @@
       return tl;
     } };
 
-  /* 9. Fuelling — coal lumps ride a conveyor and turn into green RDF pellets that become the word;
-        the kiln flame turns clean. */
-  SCENES.fuelling = { word: 'Fuelling.', blurb: 'Coal lumps ride a conveyor and turn into green RDF pellets that become the letters; the kiln flame burns cleaner.',
+  /* 8. Alternate Fuel Research — a cement kiln switches from coal to RDF pellets. Two hoppers
+        feed an overhead conveyor; the diverter flips from COAL to RDF, the fuel-mix gauge swings
+        over, the flame turns clean and the smoke clears, and the sooty letters turn green. */
+  SCENES.afr = { word: 'Alternate Fuel Research.', wordTop: 1.42, blurb: 'A cement kiln running on coal switches over to RDF pellets: the diverter flips, the fuel mix swings from coal to RDF, the flame and smoke clean up, and the sooty letters turn green.',
     build: function (c) {
-      var tl = g.timeline(), fs = c.fs, R = rng(13);
-      var by = c.B + fs * 0.14, bx0 = c.wx0 - fs * 0.9, bx1 = c.wx1 + fs * 0.5;
-      el('rect', { x: bx0, y: by, width: bx1 - bx0, height: fs * 0.07, rx: fs * 0.035, fill: C.i1, stroke: C.i5, 'stroke-width': fs * 0.01 }, c.back);
-      var belt = el('line', { x1: bx0 + fs * 0.04, x2: bx1 - fs * 0.04, y1: by + fs * 0.035, y2: by + fs * 0.035, stroke: C.i3, 'stroke-width': fs * 0.012, 'stroke-dasharray': f1(fs * 0.06) + ' ' + f1(fs * 0.06) }, c.back);
-      // kiln at the right
-      var kx = bx1 + fs * 0.12, ky = c.B - fs * 0.05, kw = fs * 0.9, kh = fs * 0.36;
-      var kiln = el('g', { transform: 'rotate(-6 ' + f1(kx) + ' ' + f1(ky) + ')' }, c.back);
-      el('rect', { x: kx, y: ky - kh / 2, width: kw, height: kh, rx: kh / 2.4, fill: C.i7 }, kiln);
-      el('rect', { x: kx + kw * 0.2, y: ky - kh / 2, width: fs * 0.05, height: kh, fill: C.i5 }, kiln);
-      el('rect', { x: kx + kw * 0.6, y: ky - kh / 2, width: fs * 0.05, height: kh, fill: C.i5 }, kiln);
-      var fx = kx - fs * 0.02, fy = ky;
-      var flame = el('path', { d: 'M' + f1(fx) + ',' + f1(fy - kh * 0.32) + ' C' + f1(fx - fs * 0.35) + ',' + f1(fy - kh * 0.3) + ' ' + f1(fx - fs * 0.32) + ',' + f1(fy + kh * 0.3) + ' ' + f1(fx) + ',' + f1(fy + kh * 0.32) + ' C' + f1(fx - fs * 0.16) + ',' + f1(fy + kh * 0.1) + ' ' + f1(fx - fs * 0.2) + ',' + f1(fy - kh * 0.1) + ' ' + f1(fx) + ',' + f1(fy - kh * 0.32) + ' Z', fill: '#C2402F', opacity: 0.9 }, c.back);
-      var smoke = [];
-      for (var k = 0; k < 4; k++) smoke.push(el('circle', { cx: kx + kw * 0.85, cy: ky - kh * 0.6, r: fs * (0.08 + k * 0.03), fill: C.coal, opacity: 0 }, c.back));
-      smoke.forEach(function (s, i) { tl.fromTo(s, { opacity: 0.55, y: 0, x: 0 }, { opacity: 0, y: -fs * 0.6, x: fs * 0.15, duration: 1.2, repeat: 1, ease: 'sine.out' }, i * 0.3); });
-      tl.to(flame, { scaleX: 1.15, scaleY: 0.92, svgOrigin: f1(fx) + ' ' + f1(fy), duration: 0.18, yoyo: true, repeat: 26, ease: 'sine.inOut' }, 0)
-        .to(belt, { strokeDashoffset: -fs * 2.4, duration: 4.6, ease: 'none' }, 0);
-      g.set(c.L, { opacity: 0, y: fs * 0.22, scale: 0.35 });
-      var pellet = function (x, y) { return poly(x, y, fs * 0.075, 10, 0.08, null); }, lastAt = 0;
-      c.R.forEach(function (r, i) {
-        var lump = el('path', { d: poly(0, 0, fs * 0.09, 7, 0.55, R), fill: C.coal }, c.back);
-        var start = bx0 - fs * 0.2, travel = r.cx - start, v = fs * 2.2, dur = travel / v, at = 0.1 + i * 0.22;
-        g.set(lump, { x: start, y: by - fs * 0.08, transformOrigin: '50% 50%', opacity: 0 });
-        lastAt = Math.max(lastAt, at + dur + 0.7);
-        tl.to(lump, { opacity: 1, duration: 0.15 }, at)
-          .to(lump, { x: r.cx, duration: dur, ease: 'none' }, at)
-          .to(lump, { morphSVG: pellet(0, 0), fill: C.g6, duration: 0.3 }, at + dur - 0.1)
-          .to(lump, { y: by - fs * 0.45, scale: 0.4, opacity: 0, duration: 0.3, ease: 'power2.in' }, at + dur + 0.15)
-          .to(c.L[i], { opacity: 1, y: 0, scale: 1, color: C.g6, duration: 0.45, ease: 'back.out(2.5)' }, at + dur + 0.25);
+      var tl = g.timeline(), fs = c.fs, u = c.u * 1.3, R = rng(29), W = c.W;   // machines a size up: the word sits lower here
+      var top = c.B - fs * 0.78;                                   // top of the letters
+      var xL = Math.max(u * 0.3, c.wx0 + u * 0.05), beltY = Math.min(top - c.u * 0.22, u * 1.0);
+      var xK = Math.min(W - u * 0.3, c.wx1 + u * 0.1) - u * 1.45;  // kiln inlet
+      // hoppers
+      function hopper(x, label, col, fill) {
+        var gH = el('g', {}, c.back), w = u * 0.5, y0 = u * 0.2, y1 = beltY - u * 0.24;
+        el('path', { d: 'M' + f1(x) + ',' + f1(y0) + ' L' + f1(x + w) + ',' + f1(y0) + ' L' + f1(x + w * 0.66) + ',' + f1(y1) + ' L' + f1(x + w * 0.34) + ',' + f1(y1) + ' Z', fill: fill, stroke: col, 'stroke-width': u * 0.016 }, gH);
+        for (var k = 0; k < 6; k++) el(label === 'COAL' ? 'path' : 'rect', label === 'COAL' ? { d: poly(x + w * (0.2 + 0.12 * k), y0 + u * 0.08 + (k % 2) * u * 0.05, u * 0.04, 6, 0.6, R), fill: C.coal } : { x: x + w * (0.16 + 0.12 * k), y: y0 + u * 0.06 + (k % 2) * u * 0.05, width: u * 0.07, height: u * 0.035, rx: u * 0.017, fill: C.g6 }, gH);
+        var t = el('text', { x: x + w / 2, y: y0 - u * 0.05, 'text-anchor': 'middle', 'font-size': u * 0.08, fill: col, 'font-family': 'var(--font-mono)', 'letter-spacing': '0.12em', 'font-weight': 700 }, gH); t.textContent = label;
+        var gate = el('rect', { x: x + w * 0.34, y: y1 - u * 0.012, width: w * 0.32, height: u * 0.024, fill: col }, gH);
+        return { out: x + w / 2, gate: gate };
+      }
+      var coal = hopper(xL, 'COAL', C.i9, '#E8E4DE'), rdf = hopper(xL + u * 0.72, 'RDF', C.g7, C.g1);
+      // overhead conveyor
+      el('rect', { x: xL - u * 0.05, y: beltY, width: xK - xL + u * 0.1, height: u * 0.06, rx: u * 0.03, fill: C.i1, stroke: C.i5, 'stroke-width': u * 0.01 }, c.back);
+      var belt = el('line', { x1: xL, x2: xK, y1: beltY + u * 0.03, y2: beltY + u * 0.03, stroke: C.i3, 'stroke-width': u * 0.012, 'stroke-dasharray': f1(u * 0.05) + ' ' + f1(u * 0.05) }, c.back);
+      var diverter = el('line', { x1: rdf.out - u * 0.36, y1: beltY - u * 0.02, x2: rdf.out - u * 0.36, y2: beltY - u * 0.2, stroke: C.i9, 'stroke-width': u * 0.03, 'stroke-linecap': 'round' }, c.back);
+      // rotary kiln + stack
+      var kx0 = xK, kx1 = kx0 + u * 1.25, ky = beltY - u * 0.12, kr = u * 0.17;
+      var kiln = el('g', { transform: 'rotate(-4 ' + f1(kx0) + ' ' + f1(ky) + ')' }, c.back);
+      el('rect', { x: kx0, y: ky - kr, width: kx1 - kx0, height: kr * 2, rx: kr * 0.8, fill: C.i7 }, kiln);
+      [0.3, 0.7].forEach(function (q) { el('rect', { x: kx0 + (kx1 - kx0) * q, y: ky - kr - u * 0.015, width: u * 0.05, height: kr * 2 + u * 0.03, rx: u * 0.01, fill: C.i5 }, kiln); });
+      var glow = el('ellipse', { cx: kx0 + u * 0.12, cy: ky, rx: u * 0.09, ry: kr * 0.72, fill: '#8E2A1A' }, kiln);
+      var flame = el('path', { d: 'M' + f1(kx0 + u * 0.08) + ',' + f1(ky - kr * 0.45) + ' Q' + f1(kx0 + u * 0.45) + ',' + f1(ky) + ' ' + f1(kx0 + u * 0.08) + ',' + f1(ky + kr * 0.45) + ' Z', fill: '#B23A22', opacity: 0.9 }, kiln);
+      var stTop = u * 0.42, stx = kx1 - u * 0.12, stack = el('rect', { x: stx - u * 0.05, y: stTop, width: u * 0.1, height: ky - kr - stTop, fill: C.i5 }, c.back);
+      var gauge = el('g', {}, c.front), gx = (xL + u * 1.3 + xK) / 2 - u * 0.65, gy = u * 0.2, gw = u * 1.3, gh = u * 0.08;
+      var gl = el('text', { x: gx, y: gy - u * 0.04, 'font-size': u * 0.07, fill: C.i5, 'font-family': 'var(--font-mono)', 'letter-spacing': '0.12em' }, gauge); gl.textContent = 'KILN FUEL MIX';
+      el('rect', { x: gx, y: gy, width: gw, height: gh, rx: gh / 2, fill: C.i1 }, gauge);
+      var gC = el('rect', { x: gx, y: gy, width: gw, height: gh, rx: gh / 2, fill: C.coal }, gauge);
+      var gR = el('rect', { x: gx, y: gy, width: 0, height: gh, rx: gh / 2, fill: C.g6 }, gauge);
+      var gtC = el('text', { x: gx, y: gy + gh + u * 0.09, 'font-size': u * 0.065, fill: C.i9, 'font-family': 'var(--font-mono)' }, gauge); gtC.textContent = 'COAL';
+      var gtR = el('text', { x: gx + gw, y: gy + gh + u * 0.09, 'text-anchor': 'end', 'font-size': u * 0.065, fill: C.g7, 'font-family': 'var(--font-mono)', opacity: 0.35 }, gauge); gtR.textContent = 'RDF';
+      // smoke from the stack (dark while on coal, thinning after the switch)
+      var puffs = [];
+      for (var k = 0; k < 8; k++) {
+        var pf = el('circle', { cx: stx, cy: stTop, r: u * (0.06 + R() * 0.05), fill: '#3B3631', opacity: 0 }, c.back);
+        puffs.push(pf);
+        var at = k * 0.45;
+        tl.fromTo(pf, { opacity: 0.65, x: 0, y: 0, scale: 0.6 }, { opacity: 0, x: u * (0.25 + R() * 0.2), y: -u * 0.35, scale: 1.6, duration: 1.4, ease: 'sine.out', immediateRender: false }, at);
+      }
+      // letters start sooty
+      g.set(c.L, { color: '#3A3530', y: function () { return (R() - 0.5) * fs * 0.03; }, rotation: function () { return (R() - 0.5) * 3; } });
+      tl.to(belt, { strokeDashoffset: -u * 2.4, duration: 5.6, ease: 'none' }, 0);
+      // fuel items riding the belt into the kiln
+      function ride(kind, at, hop) {
+        var item = kind === 'coal' ? el('path', { d: poly(0, 0, u * 0.055, 7, 0.55, R), fill: C.coal }, c.back)
+          : el('rect', { x: -u * 0.045, y: -u * 0.02, width: u * 0.09, height: u * 0.04, rx: u * 0.02, fill: C.g6 }, c.back);
+        g.set(item, { x: hop.out, y: beltY - u * 0.3, opacity: 0, transformOrigin: '50% 50%' });
+        var dur = (xK - hop.out) / (u * 1.6);
+        tl.to(item, { opacity: 1, duration: 0.1 }, at)
+          .to(item, { y: beltY - u * 0.03, duration: 0.22, ease: 'power2.in' }, at)
+          .to(item, { x: xK + u * 0.05, duration: dur, ease: 'none' }, at + 0.22)
+          .to(item, { opacity: 0, scale: 0.5, duration: 0.15 }, at + 0.22 + dur - 0.1);
+      }
+      for (var i = 0; i < 8; i++) ride('coal', 0.1 + i * 0.2, coal);
+      var SW = 1.75;
+      tl.to(coal.gate, { attr: { x: '+=' + u * 0.0 }, scaleX: 0, transformOrigin: '50% 50%', duration: 0.01 }, SW - 0.05)
+        .to(diverter, { rotation: 38, svgOrigin: f1(rdf.out - u * 0.36) + ' ' + f1(beltY - u * 0.02), duration: 0.3, ease: 'back.out(3)' }, SW)
+        .to(rdf.gate, { scaleX: 0, transformOrigin: '50% 50%', duration: 0.2 }, SW);
+      for (var j = 0; j < 18; j++) ride('rdf', SW + 0.15 + j * 0.15, rdf);
+      // gauge, flame, smoke follow the switch
+      tl.to(gC, { attr: { width: gw * 0.18 }, duration: 2.6, ease: 'power2.inOut' }, SW + 0.4)
+        .to(gR, { attr: { x: gx + gw * 0.18, width: gw * 0.82 }, duration: 2.6, ease: 'power2.inOut' }, SW + 0.4)
+        .to(gtR, { opacity: 1, duration: 0.6 }, SW + 0.8)
+        .to(gtC, { opacity: 0.4, duration: 0.6 }, SW + 1.6)
+        .to(flame, { fill: '#F6B53C', duration: 1.6 }, SW + 0.6)
+        .to(glow, { fill: '#F9D27A', duration: 1.6 }, SW + 0.6)
+        .to(puffs, { fill: '#C9CFCB', duration: 1.2 }, SW + 0.8)
+        .to(flame, { scaleX: 1.18, svgOrigin: f1(kx0 + u * 0.08) + ' ' + f1(ky), duration: 0.16, yoyo: true, repeat: 23, ease: 'sine.inOut' }, 0);
+      // the green wave across the letters, with a pellet popping off each one
+      var w0 = c.wx0, w1 = c.wx1, WAVE = 2.4, tw = SW + 1.0;
+      c.R.forEach(function (b, i) {
+        var at = tw + WAVE * (b.cx - w0) / Math.max(1, w1 - w0);
+        tl.to(c.L[i], { color: C.g6, y: 0, rotation: 0, duration: 0.3, ease: 'back.out(2.5)' }, at);
+        if (c.L[i].textContent.trim() === '' || c.L[i].textContent === ' ') return;
+        var pel = el('rect', { x: b.cx - u * 0.035, y: top - u * 0.02, width: u * 0.07, height: u * 0.032, rx: u * 0.016, fill: C.g6, opacity: 0 }, c.front);
+        tl.fromTo(pel, { opacity: 1, y: 0, rotation: 0 }, { opacity: 0, y: -u * 0.22, rotation: 90, transformOrigin: '50% 50%', duration: 0.5, ease: 'power2.out', immediateRender: false }, at);
       });
-      tl.to(flame, { fill: '#F2A93B', duration: 1.4 }, 1.6)
-        .to(c.L, { color: C.i9, duration: 0.6, stagger: 0.04 }, lastAt);
+      tl.to(c.L, { color: C.i9, duration: 0.6, stagger: 0.015 }, tw + WAVE + 0.5);
       return tl;
     } };
 
-  var ORDER = ['tracing', 'processing', 'sorting', 'reclaiming', 'recovery', 'remediating', 'weighing', 'auditing', 'fuelling'];
+  var ORDER = ['tracing', 'processing', 'sorting', 'reclaiming', 'recovery', 'remediating', 'auditing', 'afr'];
 
   // ------------------------------------------------------------------ runner
   function mount(stage, opts) {
@@ -480,7 +537,7 @@
       var B = base.getBoundingClientRect().top - sr.top; word.removeChild(base);
       var spans = Array.prototype.slice.call(word.querySelectorAll('.hs-l'));
       var R = spans.map(function (s) { var r = s.getBoundingClientRect(); return { x: r.left - sr.left, w: r.width, cx: r.left - sr.left + r.width / 2, cyv: B - fs * 0.34 }; });
-      return { W: sr.width, H: sr.height, fs: fs, B: B, L: spans, R: R, wx0: R[0].x, wx1: R[R.length - 1].x + R[R.length - 1].w, back: back, front: front, stage: stage,
+      return { W: sr.width, H: sr.height, u: sr.height / 2.45, fs: fs, B: B, L: spans, R: R, wx0: R[0].x, wx1: R[R.length - 1].x + R[R.length - 1].w, back: back, front: front, stage: stage,
         loop: function (t) { loops.push(t); if (paused || !visible) t.pause(); return t; } };
     }
     function clear() {
@@ -498,6 +555,11 @@
       word.setAttribute('role', 'img'); word.setAttribute('aria-label', sc.word);
       word.innerHTML = sc.word.split('').map(function (ch) { return '<span class="hs-l" aria-hidden="true">' + (ch === ' ' ? '&nbsp;' : ch.replace('&', '&amp;').replace('<', '&lt;')) + '</span>'; }).join('');
       var r = stage.getBoundingClientRect();
+      // Long words (e.g. "Alternate Fuel Research.") shrink to fit the width; machines keep their size (ctx.u).
+      word.style.fontSize = '';
+      word.style.top = sc.wordTop ? (r.height / 2.45 * sc.wordTop).toFixed(1) + 'px' : '';
+      var ww = word.scrollWidth ? Array.prototype.reduce.call(word.children, function (a, s) { return a + s.getBoundingClientRect().width; }, 0) : 0;
+      if (ww > r.width * 0.92) word.style.fontSize = (parseFloat(getComputedStyle(word).fontSize) * r.width * 0.92 / ww).toFixed(1) + 'px';
       back.setAttribute('viewBox', '0 0 ' + f1(r.width) + ' ' + f1(r.height)); front.setAttribute('viewBox', '0 0 ' + f1(r.width) + ' ' + f1(r.height));
       if (opts.onChange) opts.onChange(cur, names[cur], sc);
       if (REDUCED) return;
