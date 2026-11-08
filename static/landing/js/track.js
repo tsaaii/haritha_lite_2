@@ -8,7 +8,7 @@
   var nav = window.navigator || {};
   // Automation and obvious bots never report (the server filters again).
   if (nav.webdriver || /bot|crawl|spider|headless|lighthouse|preview/i.test(nav.userAgent || '')) {
-    window.__adv = { vid: '', ref: '', mark: function () {} };
+    window.__adv = { vid: '', ref: '', visitId: '', mark: function () {}, form: function () {} };
     return;
   }
 

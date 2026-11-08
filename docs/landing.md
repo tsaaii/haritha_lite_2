@@ -9,7 +9,9 @@ Built from the Claude Design export "Advitia Website v2". Canonical URL: `https:
 | `views/landing.py` | Blueprint. Serves `/` and `/main`, sets CSP + cache headers, computes the `?v=` asset hash. |
 | `templates/landing/index.html` | All copy, server-rendered (readable without JS, indexable). |
 | `static/landing/css/landing.css` | Tokens + styles. Edit colours/type here. |
-| `static/landing/js/landing.js` | React islands: animated hero word, platform steps + site scene, ledger bar, forecast chart. |
+| `static/landing/js/landing.js` | React islands: platform steps + site scene, ledger bar, forecast chart. |
+| `static/landing/js/hero-scenes.js`, `hero-init.js`, `css/hero-scenes.css` | Hero word scenes (GSAP): Tracing, Processing (trommel), Sorting, Reclaiming, Recovery, Remediating, Auditing, Alternate Fuel Resource. Pick and order them in `SCENES` in `hero-init.js`; preview any scene at `/lab/hero` (not linked, noindex). |
+| `static/landing/vendor/gsap/` | GSAP 3.15.1 + MorphSVG, MotionPath, DrawSVG (free incl. commercial use, `GSAP-LICENSE.txt`). |
 | `static/landing/js/calculator.js` | Methane / CO₂ / credit calculator (vanilla JS). Factors at the top of the file. |
 | `static/landing/vendor/` | React 18.3.1 UMD production builds (vendored: no CDN, no build step). |
 | `static/landing/fonts/` | TeX Gyre Pagella woff2 (GUST Font License), a free Palatino-style face. |
@@ -29,7 +31,13 @@ Built from the Claude Design export "Advitia Website v2". Canonical URL: `https:
 - **Calculator factors:** `CF` and `GWP` in `calculator.js`.
 
 Figures in the dashboard mock, the live scene and the calculator are illustrative and labelled as such on the page.
-Traction figures (120+ sites, 12M MT, 400+ acres) are presented as real.
+Traction figures (123 sites, 12M MT, 400+ acres) are presented as real.
+
+Copy follows the white paper "Tracing Every Tonne" (v1.81): the verification gap, ADEX event records, mass balance,
+live audit layer, alternative-fuel marketplace, four revenue lines (platform fee, recovered material, RDF as AFR,
+carbon and EPR credits) and the market table. Third-party figures carry a source line; keep them in step with the
+paper when it is updated. The two product lines are named **ADEX Legacy** and **ADEX Household** (`ARMS` in `landing.js`).
+Layout width is `--max` (1536px) with a responsive `--gutter` in `landing.css`.
 
 ## Caching
 

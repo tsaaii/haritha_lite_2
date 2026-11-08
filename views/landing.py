@@ -26,7 +26,7 @@ bp = Blueprint("landing", __name__, template_folder="../templates")
 
 _STATIC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "landing")
 _VERSIONED = ("css/landing.css", "js/landing.js", "js/calculator.js", "js/contact.js", "js/track.js",
-              "js/whitepaper.js")
+              "js/whitepaper.js", "css/hero-scenes.css", "js/hero-scenes.js", "js/hero-lab.js", "js/hero-init.js")
 
 CANONICAL_URL = "https://advitiaum.com/"
 CONTACT_EMAIL = "wecare@advitiaum.com"
@@ -87,4 +87,15 @@ def index():
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     resp.headers["X-Frame-Options"] = "DENY"
+    return resp
+
+
+@bp.route("/lab/hero", strict_slashes=False)
+def lab_hero():
+    """Preview of the hero word scenes (static/landing/js/hero-scenes.js). Not linked, not indexed."""
+    resp = make_response(render_template("landing/lab_hero.html", v=ASSET_V))
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Content-Security-Policy"] = _CSP
+    resp.headers["X-Robots-Tag"] = "noindex, nofollow"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
