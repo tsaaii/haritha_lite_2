@@ -173,6 +173,21 @@ assert.strictEqual(W[5][WH.indexOf('Action')][0], "'", 'formula injection neutra
 assert.strictEqual(mails.length, 1, 'one email: the human open, not the datacenter download');
 assert.ok(/White paper opened — Pune, IN-MH, IN/.test(mails[0].subject), mails[0].subject);
 assert.ok(mails[0].body.includes('IP: 203.0.113.7') && mails[0].body.includes('linkedin.com') && mails[0].body.includes('yc-garry'));
-assert.strictEqual(ctx.doGet().build, '2026-11-08-v4');
+assert.strictEqual(ctx.doGet().build, '2026-11-08-v5');
+
+// WP downloads tab: created on the first white-paper event, two live QUERY formulas over the White paper tab
+const D = sheets['WP downloads'];
+assert.ok(D, 'downloads tab created automatically');
+const fA = D.formulas['2,1'], fL = D.formulas['2,12'];
+assert.ok(/^=IFERROR\(QUERY\('White paper'!A2:[A-Z]+, "select A, B, C, D, E, F, H, N, O, K where \(B = 'Downloaded PDF' or B = 'Opened PDF'\) and J <> 'yes' order by A desc label A 'Time \(IST\)'/.test(fA), fA);
+assert.ok(/select C, D, F, H, count\(B\), min\(A\), max\(A\) where .* group by C, D, F, H order by max\(A\) desc label C 'IP address', count\(B\) 'Downloads \+ opens'.*", 0\), "No downloads yet"\)$/.test(fL), fL);
+// balanced quotes in both formulas
+[fA, fL].forEach(f => assert.strictEqual((f.match(/"/g) || []).length % 2, 0, f));
+console.log(fA + '\n' + fL);
+// daily summary mentions white paper activity
+mails.length = 0;
+const sumLines = ctx.dailySummary();
+const wpLine = sumLines.find(l => l[0] === 'White paper');
+assert.ok(wpLine && /0 downloaded, 1 opened: Pune, IN \(Bharti Airtel\)/.test(wpLine[1]), JSON.stringify(wpLine));
 
 console.log('apps script: all assertions passed');

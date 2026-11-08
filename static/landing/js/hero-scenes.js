@@ -8,7 +8,7 @@
    Layout contract (css/hero-scenes.css): .hs-stage is 2.45 font-sizes tall; the word sits
    on a baseline about 1.75 font-sizes down, leaving room above for machines (trommel, robot,
    cameras) and a little below for decks and conveyors. Pauses off-screen and in hidden tabs.
-   prefers-reduced-motion: the word is shown still, no scene. */
+   prefers-reduced-motion (or html.a11y-still from js/prefs.js): the word is shown still, no scene. */
 (function () {
   'use strict';
   var g = window.gsap;
@@ -20,6 +20,8 @@
     g9: '#0B3D22', g8: '#0E5230', g7: '#0F7A3E', g6: '#0FA14E', g4: '#57C97F', g3: '#7ED356', g2: '#BFEBC9', g1: '#E4F6E9',
     amber: '#C77D1B', red: '#C2402F', sky: '#2380B8', skyL: '#6FB8DE', dirt: '#8B8070', dirtD: '#6E6457', coal: '#26231F' };
   var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // The site's own "Stop animations" setting (js/prefs.js) counts the same as the OS setting.
+  function still() { return REDUCED || document.documentElement.classList.contains('a11y-still'); }
 
   // ------------------------------------------------------------------ helpers
   function el(tag, attrs, parent) {
@@ -562,7 +564,7 @@
       if (ww > r.width * 0.92) word.style.fontSize = (parseFloat(getComputedStyle(word).fontSize) * r.width * 0.92 / ww).toFixed(1) + 'px';
       back.setAttribute('viewBox', '0 0 ' + f1(r.width) + ' ' + f1(r.height)); front.setAttribute('viewBox', '0 0 ' + f1(r.width) + ' ' + f1(r.height));
       if (opts.onChange) opts.onChange(cur, names[cur], sc);
-      if (REDUCED) return;
+      if (still()) return;
       var c = measure();
       tl = g.timeline({ paused: paused || !visible });
       tl.add(sc.build(c));

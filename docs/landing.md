@@ -86,23 +86,33 @@ Both go through one Google Apps Script (`apps_script/landing/Code.gs`) bound to 
 6. **Deploy → New deployment →** gear icon **→ Web app**. Description `website`, Execute as **Me**,
    Who has access **Anyone**. **Deploy**, then copy the **Web app URL** (ends in `/exec`).
 7. Open that URL in a browser. You should see `{"ok":true,"service":"advitia-landing","build":"2026-11-01-v2"}`.
-8. In `app.yaml` set:
-   ```yaml
-   LANDING_SCRIPT_URL: "https://script.google.com/macros/s/…/exec"
-   LANDING_SCRIPT_TOKEN: "<the same string as CONFIG.TOKEN>"
+8. Next to `app.yaml` (in Cloud Shell: `~/haritha_lite_2`), create **`secrets.yaml`** from the template and fill it in:
+   ```bash
+   cp secrets.example.yaml secrets.yaml && nano secrets.yaml
    ```
+   ```yaml
+   env_variables:
+     LANDING_SCRIPT_URL: "https://script.google.com/macros/s/…/exec"
+     LANDING_SCRIPT_TOKEN: "<the same string as CONFIG.TOKEN>"
+     IPINFO_TOKEN: ""
+   ```
+   `secrets.yaml` is git-ignored, so `git pull` never overwrites it and it never reaches GitHub. `app.yaml`
+   includes it on every deploy, and the deploy stops with an error if it is missing, rather than going live
+   with a contact form that cannot send.
 9. `gcloud app deploy app.yaml`.
 10. **Test:** open <https://advitiaum.com/#contact>, send a message using an address you can read.
     Within a minute: a row in **Leads**, a "New lead" email in both inboxes, and the confirmation in the
     address you entered. Nothing arrived? See *Troubleshooting* below.
 
-After any later change to `Code.gs`: **Deploy → Manage deployments → pencil → Version: New version → Deploy**
-(the URL stays the same; check step 7 shows the new `build`).
+After any later change to `Code.gs`: in the editor, **replace only the part from
+`// ---------- nothing below this line needs editing ----------` to the end**, so your `CONFIG` (and its TOKEN)
+stays as it is. Then **Deploy → Manage deployments → pencil → Version: New version → Deploy**
+(the URL stays the same; check step 7 shows the new `build`), and run **setup** once if the release notes add a tab.
 
 ### Part B — Use the location tracker
 
 1. **Optional, adds company / ISP names:** sign up free at <https://ipinfo.io/signup>, copy the token from the
-   dashboard into `IPINFO_TOKEN` in `app.yaml`, redeploy. Without it everything works except the Network column.
+   dashboard into `IPINFO_TOKEN` in `secrets.yaml`, redeploy. Without it everything works except the Network column.
 2. **Make a link per person** you send the site to: `https://advitiaum.com/?r=yc-garry`,
    `https://advitiaum.com/?r=greenfund-priya`. Letters, digits and `. _ - @ +` only.
 3. **Open the site yourself** (once, from your phone) to check it works. A row appears in **Visits** after
@@ -121,7 +131,8 @@ After any later change to `Code.gs`: **Deploy → Manage deployments → pencil 
 
 | Symptom | Fix |
 | --- | --- |
-| Form says "We couldn't send that just now" | `LANDING_SCRIPT_URL` empty or wrong, or the token differs from `CONFIG.TOKEN`. Check step 7 and redeploy. |
+| Form says "We couldn't send that just now" | Run `gcloud app logs read --limit=200 \| grep "forward failed"`. `not-configured`: `secrets.yaml` is missing or has an empty URL (step 8). `unauthorised`: `LANDING_SCRIPT_TOKEN` differs from `CONFIG.TOKEN`, or `CONFIG.TOKEN` still starts with `CHANGE-ME`. `HTTP 401/403`: the web app's access is not **Anyone**. |
+| Deploy fails: `secrets.yaml` not found | Create it (step 8). It lives only on the machine you deploy from. |
 | Row in Leads but no email | The script owner hit Gmail's daily quota (≈100 recipients/day on a personal account, 1,500 on Workspace), or the mail is in Spam. Apps Script editor → **Executions** shows the error. |
 | No rows in Visits | Ad blockers can block the beacon for some visitors; ensure the deploy has `track.js`. Logs Explorer `textPayload:"LANDING_VISIT"` shows what the server received. |
 | Network column empty | `IPINFO_TOKEN` not set, or the free quota is exhausted. |
@@ -174,12 +185,30 @@ also written to Cloud Logging. Find them in Logs Explorer with `textPayload:"LAN
 - **Disclosure:** the popup tells visitors their IP, location, device and referrer are recorded when they
   choose. Keep that line if you edit the popup: unlike Visits (anonymised IP), these rows hold full IPs.
   Rows older than `RETENTION_MONTHS` are deleted daily, like Visits.
+- **Who downloaded it: the WP downloads tab.** A live view of the White paper tab (bots and datacenters
+  left out). On the left, every download and open, newest first: time, IP, city, region, country, network, referrer,
+  `?r=` tag, device. On the right, one row per IP address: city, country, network, how many downloads + opens,
+  first and last time. The daily traffic email also has a *White paper* line.
 - Also in Cloud Logging: search `WHITEPAPER` in Logs Explorer.
 
-**After deploying this version, update the Apps Script once:** paste the new `apps_script/landing/Code.gs`
-(keep your `TOKEN`), run **setup**, then **Deploy → Manage deployments → ✎ → Version: New version → Deploy**.
-Opening the `/exec` URL should show `"build":"2026-11-08-v4"`. Until then the white paper rows are only in
-Cloud Logging.
+**After deploying this version, update the Apps Script once:** replace everything from
+`// ---------- nothing below this line needs editing ----------` to the end with the new
+`apps_script/landing/Code.gs` (your `CONFIG` stays), run **setup**, then **Deploy → Manage deployments → ✎ →
+Version: New version → Deploy**. Opening the `/exec` URL should show `"build":"2026-11-08-v5"`. Until then the
+white paper rows are only in Cloud Logging.
+
+## Legal pages, accessibility and translation
+
+- **Footer › Legal:** `/privacy`, `/terms`, `/cookies`, `/accessibility` (templates in `templates/landing/legal/`,
+  routes and `LEGAL_UPDATED` in `views/landing.py`). Change `LEGAL_UPDATED` whenever you edit one. They describe
+  what this site really collects, so update them if tracking changes. Have a lawyer review them, and add your
+  registered company name and address to the privacy policy once the entity is final.
+- **Accessibility & language** (header button, footer link): `static/landing/js/prefs.js` + `templates/landing/_prefs.html`.
+  Text size, high contrast, stop animations, underline links, wider spacing and plain font, saved in the
+  visitor's browser (`adv_prefs`).
+- **Translation:** Google's translate widget, loaded only after a visitor picks a language (16 are listed in `LANGS`
+  in `prefs.js`). The CSP in `views/landing.py` allows Google's translate hosts for this. The hero animation and
+  the brand name are marked `notranslate`.
 
 **New version of the paper:** replace the PDF in `data/whitepaper/` (same file name), and bump `VERSION`
 in `whitepaper.js` and `WHITEPAPER["version"]` in `views/landing_api.py` (and the kicker in the popup) so

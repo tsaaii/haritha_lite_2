@@ -1,0 +1,43 @@
+{% extends "landing/legal/_base.html" %}
+{% block body %}
+<p class="legal-lead">We want everyone to be able to use advitiaum.com, and we aim to meet the
+  <a href="https://www.w3.org/TR/WCAG22/" rel="noopener" target="_blank">Web Content Accessibility Guidelines (WCAG) 2.2</a> at level AA.</p>
+
+<h2>Settings you can change</h2>
+<p>Open <button type="button" class="legal-inline-btn" data-prefs-open>Accessibility &amp; language</button>
+  from the header or footer of any page to:</p>
+<ul>
+  <li>make text larger (two steps);</li>
+  <li>switch on high contrast;</li>
+  <li>stop animations, including the moving headline;</li>
+  <li>underline every link;</li>
+  <li>widen letter, word and line spacing;</li>
+  <li>use a plain sans-serif font;</li>
+  <li>read the site in another language (machine translation by Google).</li>
+</ul>
+<p>Your choices are saved in your browser and apply on every page. If your device is set to reduce motion, the site
+  respects that automatically.</p>
+
+<h2>What we have done</h2>
+<ul>
+  <li>Every page can be used with a keyboard alone, with a visible focus outline and a "Skip to content" link.</li>
+  <li>Headings, landmarks and form labels are marked up so screen readers can navigate them, and the animated
+    headline has a text alternative.</li>
+  <li>Charts and figures come with text that states the same information.</li>
+  <li>The layout works from phone width up, and the page can be zoomed to 200% without losing content.</li>
+  <li>Form errors are announced and describe how to fix them.</li>
+</ul>
+
+<h2>Known limitations</h2>
+<ul>
+  <li>The white paper PDF may not be fully tagged for screen readers yet. Write to us and we will send an accessible
+    version.</li>
+  <li>Some interactive diagrams are easier to read visually. The information in them is also given in the surrounding text.</li>
+  <li>Machine translation can break the meaning of technical terms.</li>
+</ul>
+
+<h2>Feedback</h2>
+<p>If something on the site is hard to use, tell us at <a href="mailto:{{ email }}?subject=Accessibility">{{ email }}</a>,
+  with the page and what happened. We aim to reply within 5 working days and, where we can, to send you the
+  information in another format in the meantime.</p>
+{% endblock %}

@@ -6,6 +6,11 @@ entrypoint: gunicorn -b :$PORT --workers 2 --threads 8 --timeout 60 main:app
 
 instance_class: F2
 
+# Values that must not be in this public repo: copy secrets.example.yaml to secrets.yaml and fill it in.
+# `gcloud app deploy` refuses to run if secrets.yaml is missing, instead of deploying a broken contact form.
+includes:
+  - secrets.yaml
+
 env_variables:
   # Single source of truth — local path or gs:// URL. That's it.
   SITES_MASTER_CSV: "gs://advitia-weighbridge-data/dashboard_config/sites_master.csv"
@@ -44,12 +49,9 @@ env_variables:
   RDF_TRACKER_DIR: "gs://advitia-weighbridge-data/rdf_report"
   RDF_DEADLINE: "2026-11-15"
 
-  # Landing page contact form + visit tracker (docs/landing.md, apps_script/landing/Code.gs).
-  # Until LANDING_SCRIPT_URL is set the form shows an "email us" fallback and visits go
-  # to Cloud Logging only. IPINFO_TOKEN (free at ipinfo.io) adds the visitor's network name.
-  LANDING_SCRIPT_URL: ""
-  LANDING_SCRIPT_TOKEN: ""
-  IPINFO_TOKEN: ""
+  # Landing page contact form + visit/white-paper tracker: LANDING_SCRIPT_URL, LANDING_SCRIPT_TOKEN
+  # and IPINFO_TOKEN are NOT here. They live in secrets.yaml (git-ignored, see secrets.example.yaml
+  # and docs/landing.md), so a fresh clone or `git pull` can no longer deploy them empty.
 
   # /TTD dashboard (docs/ttd-dashboard.md). The read key is NOT put here: it is read from
   # Secret Manager by the App Engine service account. Until ADEX_API_URL is set, /TTD shows
