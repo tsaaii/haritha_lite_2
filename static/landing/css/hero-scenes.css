@@ -1,9 +1,9 @@
 /* Hero word scenes (js/hero-scenes.js). The stage is 2.45 font-sizes tall: room above the word for
    machines and a little below for decks and conveyors. --hs-fs matches the hero word size. */
-.hs-stage { --hs-fs: clamp(40px, 11.5vw, 160px); position: relative; width: 100%; height: calc(var(--hs-fs) * 2.45); overflow: visible; }
+.hs-stage { display: block; --hs-fs: clamp(40px, 11.5vw, 160px); position: relative; width: 100%; height: calc(var(--hs-fs) * 2.45); overflow: visible; }
 .hs-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .hs-back { z-index: 0; } .hs-front { z-index: 2; }
-.hs-word { position: absolute; left: 0; right: 0; top: calc(var(--hs-fs) * 1.0); z-index: 1; text-align: center; white-space: nowrap;
+.hs-word { display: block; position: absolute; left: 0; right: 0; top: calc(var(--hs-fs) * 1.0); z-index: 1; text-align: center; white-space: nowrap;
   font-family: var(--font-serif); font-weight: 400; font-size: var(--hs-fs); line-height: 1; letter-spacing: -0.04em; color: var(--ink-900); }
 .hs-l { display: inline-block; will-change: transform; }
 .hs-base { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
@@ -27,3 +27,7 @@
 .lab-ctrl button { border: 1px solid var(--ink-200); background: #fff; border-radius: 999px; min-width: 44px; height: 44px; padding: 0 16px; font: inherit; font-size: 15px; cursor: pointer; color: var(--ink-900); }
 .lab-ctrl button:hover { border-color: var(--green-600); background: var(--green-050); }
 .lab-ctrl label { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; color: var(--ink-700); margin-left: 6px; }
+
+/* In the landing hero (#hero-stage inside the <h1>) */
+.hero-word.hero-scenes { font-size: inherit; line-height: 1; min-height: 0; letter-spacing: normal; }
+.hero-scenes .hs-stage { --hs-fs: clamp(40px, 11vw, 156px); margin: 14px 0 -12px; }

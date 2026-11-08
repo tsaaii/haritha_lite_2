@@ -21,6 +21,7 @@
   <link rel="icon" type="image/svg+xml" href="{{ S }}img/favicon.svg">
   <link rel="preload" href="{{ S }}fonts/pagella-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ S }}css/landing.css?v={{ v }}">
+  <link rel="stylesheet" href="{{ S }}css/hero-scenes.css?v={{ v }}">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Advitia Labs","url":"{{ canonical_url }}","email":"{{ email }}","description":"ADEX: verifiable waste accounting and alternative-fuel markets for methane and coal abatement."}</script>
 </head>
 <body>
@@ -44,7 +45,7 @@
   <section id="top" class="hero wrap" aria-labelledby="hero-title">
     <div class="hero-inner">
       <a class="pill-link" href="/whitepaper?src=hero" target="_blank" rel="noopener"><span class="tag">New white paper</span><span>Tracing Every Tonne · v1.81</span>{{ arrow() }}</a>
-      <h1 id="hero-title" class="hero-word"><span id="hero-word">Recovery.</span></h1>
+      <h1 id="hero-title" class="hero-word hero-scenes"><span class="sr-only">Advitia Labs: tracing every tonne of waste, from processing and sorting to reclaiming land and alternate fuel.</span><span class="hs-stage" id="hero-stage" aria-hidden="true"><span class="hs-word">Tracing.</span></span></h1>
       <h2 class="hero-sub">Verifiable waste accounting that turns every tonne into <span class="green">audited climate value.</span></h2>
       <p class="hero-p">ADEX records every custody transfer of waste with weight, evidence and approval, enforces site-level mass balance, and opens the full record to auditors. On that record, a marketplace matches quality-verified fuel with cement kilns, power stations and industrial boilers to replace coal.</p>
       <div class="cta-row">
@@ -414,5 +415,11 @@
 <script src="{{ S }}vendor/react.production.min.js" defer></script>
 <script src="{{ S }}vendor/react-dom.production.min.js" defer></script>
 <script src="{{ S }}js/landing.js?v={{ v }}" defer></script>
+<script src="{{ S }}vendor/gsap/gsap.min.js" defer></script>
+<script src="{{ S }}vendor/gsap/MorphSVGPlugin.min.js" defer></script>
+<script src="{{ S }}vendor/gsap/MotionPathPlugin.min.js" defer></script>
+<script src="{{ S }}vendor/gsap/DrawSVGPlugin.min.js" defer></script>
+<script src="{{ S }}js/hero-scenes.js?v={{ v }}" defer></script>
+<script src="{{ S }}js/hero-init.js?v={{ v }}" defer></script>
 </body>
 </html>

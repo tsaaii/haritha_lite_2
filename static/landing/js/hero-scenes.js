@@ -429,10 +429,10 @@
       return tl;
     } };
 
-  /* 8. Alternate Fuel Research — a cement kiln switches from coal to RDF pellets. Two hoppers
+  /* 8. Alternate Fuel Resource — a cement kiln switches from coal to RDF pellets. Two hoppers
         feed an overhead conveyor; the diverter flips from COAL to RDF, the fuel-mix gauge swings
         over, the flame turns clean and the smoke clears, and the sooty letters turn green. */
-  SCENES.afr = { word: 'Alternate Fuel Research.', wordTop: 1.42, blurb: 'A cement kiln running on coal switches over to RDF pellets: the diverter flips, the fuel mix swings from coal to RDF, the flame and smoke clean up, and the sooty letters turn green.',
+  SCENES.afr = { word: 'Alternate Fuel Resource.', wordTop: 1.42, blurb: 'A cement kiln running on coal switches over to RDF pellets: the diverter flips, the fuel mix swings from coal to RDF, the flame and smoke clean up, and the sooty letters turn green.',
     build: function (c) {
       var tl = g.timeline(), fs = c.fs, u = c.u * 1.3, R = rng(29), W = c.W;   // machines a size up: the word sits lower here
       var top = c.B - fs * 0.78;                                   // top of the letters
@@ -527,7 +527,7 @@
     var cur = -1, tl = null, paused = false, visible = true, loops = [];
     var back = el('svg', { class: 'hs-svg hs-back', 'aria-hidden': 'true' });
     var front = el('svg', { class: 'hs-svg hs-front', 'aria-hidden': 'true' });
-    var word = document.createElement('div'); word.className = 'hs-word';
+    var word = document.createElement('span'); word.className = 'hs-word';   // span: the stage may sit inside an <h1>
     stage.textContent = '';
     stage.appendChild(back); stage.appendChild(word); stage.appendChild(front);
 

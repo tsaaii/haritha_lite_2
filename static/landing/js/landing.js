@@ -1,7 +1,7 @@
 /* Advitia Labs landing page — interactive islands.
    Ported from the Claude Design export "Advitia Website v2". No build step:
    plain JS on the vendored React 18 UMD build (static/landing/vendor).
-   Islands: #hero-word, #platform-app, #balance-viz, #forecast-viz. */
+   Islands: #platform-app, #balance-viz, #forecast-viz. (The hero word is js/hero-scenes.js.) */
 (function () {
 'use strict';
 if (!window.React || !window.ReactDOM) return;
@@ -682,63 +682,6 @@ function LegacyViz({ step, onNext, halted }) {
       h('div', { style: { height: '100%', background: K.g600, width: (i < step ? 100 : i === step ? cl(t / LG_DUR) * 100 : 0) + '%' } })))));
 }
 
-const SCAT = [K.sky, K.amber, K.i500, K.g600, K.i300, K.g400, K.i700, K.red];
-const WORDS = [{ w: 'Recovery.', m: 'recover' }, { w: 'Processing.', m: 'process' }, { w: 'Sorting.', m: 'sort' }, { w: 'Reclaiming.', m: 'reclaim' }, { w: 'Remediating.', m: 'remediate' }];
-const SORTC = [K.sky, K.amber, K.g600, K.i500];
-function ScatterWord() {
-  if (REDUCED) return h('span', null, 'Recovery.');
-  const [st, setSt] = React.useState({ wi: 0, ph: 'pre' });
-  const refs = React.useRef([]), [lefts, setLefts] = React.useState({});
-  React.useEffect(() => {
-    const tms = []; let alive = true;
-    const run = (wi) => { if (!alive) return; setSt({ wi, ph: 'pre' });
-      tms.push(setTimeout(() => setSt({ wi, ph: 'a' }), 60), setTimeout(() => setSt({ wi, ph: 'on' }), 850),
-        setTimeout(() => setSt({ wi, ph: 'out' }), 4600), setTimeout(() => run((wi + 1) % WORDS.length), 5500)); };
-    run(0); return () => { alive = false; tms.forEach(clearTimeout); };
-  }, []);
-  const { wi, ph } = st, W = WORDS[wi], w = W.w, m = W.m, n = w.length, R = rng(wi * 37 + 11);
-  React.useLayoutEffect(() => { if (m === 'sort' && ph === 'pre') setLefts({ wi, l: refs.current.slice(0, n).map(e => e ? e.offsetLeft : 0) }); }, [wi, ph]);
-  const perm = (() => { const p = [...Array(n).keys()], r2 = rng(wi * 13 + 5); for (let i = n - 1; i > 0; i--) { const j = Math.floor(r2() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } return p; })();
-  const L = lefts.wi === wi ? lefts.l : null;
-  const vis = ph === 'a' || ph === 'on', on = ph === 'on';
-  const letter = (ch, i) => {
-    const rx = (R() - 0.5) * 5, ry = (R() - 0.5) * 1.6, rr = (R() - 0.5) * 240, c = SCAT[Math.floor(R() * SCAT.length)], ox = (R() - 0.5) * 6, oy = 0.6 + R() * 0.8;
-    let st2 = { display: 'inline-block', willChange: 'transform' };
-    if (m === 'recover') {
-      const d = i * 55;
-      st2.transform = on ? 'none' : ph === 'out' ? 'translate(' + ox.toFixed(2) + 'em,' + oy.toFixed(2) + 'em) rotate(' + (rr * 0.7).toFixed(0) + 'deg) scale(0.4)' : 'translate(' + rx.toFixed(2) + 'em,' + ry.toFixed(2) + 'em) rotate(' + rr.toFixed(0) + 'deg) scale(0.55)';
-      st2.color = on ? K.i900 : c; st2.opacity = vis ? 1 : 0;
-      st2.transition = ph === 'pre' ? 'none' : ph === 'a' ? 'opacity 400ms ease ' + d * 0.4 + 'ms' : on ? 'transform 1100ms ' + EASE + ' ' + d + 'ms, color 700ms ease ' + (d + 650) + 'ms' : 'transform 800ms cubic-bezier(0.55,0,0.8,0.4) ' + d * 0.6 + 'ms, opacity 600ms ease ' + (d * 0.6 + 200) + 'ms';
-    } else if (m === 'process') {
-      const d = 250 + i * 85;
-      st2.transform = on ? 'none' : ph === 'out' ? 'translateY(0.9em) scaleY(0.6)' : 'translate(' + (rx * 0.12).toFixed(2) + 'em,-1.25em) rotate(' + (rr * 0.15).toFixed(0) + 'deg)';
-      st2.color = on ? K.i900 : c; st2.opacity = vis ? 1 : 0;
-      st2.transition = ph === 'pre' ? 'none' : ph === 'a' ? 'opacity 300ms ease ' + i * 30 + 'ms' : on ? 'transform 900ms cubic-bezier(0.34,1.45,0.64,1) ' + d + 'ms, color 600ms ease ' + (d + 700) + 'ms' : 'transform 700ms ease-in ' + i * 40 + 'ms, opacity 500ms ease ' + (i * 40 + 200) + 'ms';
-    } else if (m === 'sort') {
-      const dx = L ? L[perm[i]] - L[i] : 0, d = 200 + i * 70;
-      st2.transform = on ? 'none' : ph === 'out' ? 'translateY(-0.35em)' : 'translate(' + dx + 'px,' + (ph === 'a' ? (perm[i] % 2 ? -0.28 : 0.28) : 0) + 'em)';
-      st2.color = on ? K.i900 : SORTC[i % SORTC.length]; st2.opacity = vis ? 1 : 0;
-      st2.transition = ph === 'pre' ? 'none' : ph === 'a' ? 'opacity 300ms ease, transform 500ms ' + EASE : on ? 'transform 1000ms ' + EASE + ' ' + d + 'ms, color 500ms ease ' + (d + 800) + 'ms' : 'transform 600ms ease ' + i * 30 + 'ms, opacity 500ms ease ' + i * 30 + 'ms';
-    } else if (m === 'reclaim') {
-      const d = 150 + i * 95;
-      const inner = h('span', { style: { display: 'inline-block', transformOrigin: '50% 100%', transform: on ? 'none' : ph === 'out' ? 'translateY(105%)' : 'translateY(105%) rotate(' + (i % 2 ? 8 : -8) + 'deg)', color: on ? K.i900 : K.g600,
-        transition: ph === 'pre' || ph === 'a' ? 'none' : on ? 'transform 1000ms cubic-bezier(0.34,1.3,0.64,1) ' + d + 'ms, color 800ms ease ' + (d + 900) + 'ms' : 'transform 700ms ease-in ' + i * 40 + 'ms' } }, ch);
-      return h('span', { key: wi + '_' + i, ref: e => refs.current[i] = e, 'aria-hidden': true, style: { display: 'inline-block', overflow: 'hidden', paddingBottom: '0.26em', marginBottom: '-0.26em', paddingTop: '0.1em', marginTop: '-0.1em' } }, inner);
-    } else {
-      const d = 300 + i * 85;
-      st2.color = on ? K.i900 : '#8A978F'; st2.opacity = vis ? 1 : ph === 'out' ? 0 : 0;
-      st2.filter = on ? 'blur(0)' : 'blur(0.07em)'; st2.transform = on ? 'none' : ph === 'out' ? 'scale(0.96)' : 'translate(' + (rx * 0.03).toFixed(2) + 'em,' + (ry * 0.05).toFixed(2) + 'em) rotate(' + (rr * 0.03).toFixed(1) + 'deg)';
-      st2.transition = ph === 'pre' ? 'none' : ph === 'a' ? 'opacity 500ms ease' : on ? 'filter 450ms ease ' + d + 'ms, color 450ms ease ' + d + 'ms, transform 450ms ' + EASE + ' ' + d + 'ms' : 'opacity 600ms ease ' + i * 40 + 'ms, transform 600ms ease';
-    }
-    return h('span', { key: wi + '_' + i, ref: e => refs.current[i] = e, 'aria-hidden': true, style: st2 }, ch);
-  };
-  const extras = [];
-  if (m === 'process') extras.push(h('span', { key: 'sv', 'aria-hidden': true, style: { position: 'absolute', left: '-4%', right: '-4%', top: '-0.06em', height: 0, borderTop: '0.045em dashed ' + K.i500, opacity: ph === 'a' || (on) ? 1 : 0, transition: on ? 'opacity 500ms ease ' + (250 + n * 85 + 600) + 'ms' : 'opacity 300ms ease', animation: 'adv-shake 0.18s linear infinite' } }),
-    h('span', { key: 'sv2', 'aria-hidden': true, style: { position: 'absolute', left: '-4%', right: '-4%', top: '0.02em', height: 0, borderTop: '0.02em solid ' + K.i300, opacity: ph === 'a' || on ? 1 : 0, transition: on ? 'opacity 500ms ease ' + (250 + n * 85 + 600) + 'ms' : 'opacity 300ms ease' } }));
-  if (m === 'reclaim') extras.push(h('span', { key: 'gr', 'aria-hidden': true, style: { position: 'absolute', left: 0, right: 0, bottom: '0.02em', height: '0.04em', borderRadius: 99, background: K.g600, transformOrigin: 'left', transform: vis ? 'scaleX(1)' : 'scaleX(0)', opacity: on ? 0 : 1, transition: ph === 'a' ? 'transform 600ms ' + EASE : on ? 'opacity 600ms ease ' + (150 + n * 95 + 900) + 'ms' : 'none' } }));
-  if (m === 'remediate') { const T = 300 + n * 85; extras.push(h('span', { key: 'sw', 'aria-hidden': true, style: { position: 'absolute', top: '0.05em', bottom: '0.05em', width: '0.05em', borderRadius: 99, background: K.g600, left: on ? '100%' : '0%', opacity: on ? 0 : vis ? 1 : 0, transition: on ? 'left ' + (T - 200) + 'ms linear 300ms, opacity 300ms ease ' + (T + 150) + 'ms' : 'opacity 300ms ease' } })); }
-  return h('span', { role: 'img', 'aria-label': w, style: { display: 'inline-flex', justifyContent: 'center', whiteSpace: 'nowrap', position: 'relative' } }, [...w].map(letter), extras);
-}
 function StepBar({ dur, paused, halted, onResume }) {
   return h('div', { className: 'stepbar' },
     h('div', { className: 'stepbar-track' },
@@ -892,7 +835,6 @@ function mount(id, el, fallback) {
   const node = document.getElementById(id); if (!node) return;
   ReactDOM.createRoot(node).render(h(Island, { fallback }, el));
 }
-mount('hero-word', h(ScatterWord), 'Recovery.');
 mount('platform-app', h(Platform));
 mount('balance-viz', h(BalanceViz));
 mount('forecast-viz', h(ForecastViz));
