@@ -236,3 +236,10 @@ class HelperTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WhitePaperNameTests(unittest.TestCase):
+    def test_download_name(self):
+        with mock.patch.object(api, "forward", return_value=(True, "")):
+            r = app.test_client().get("/whitepaper?dl=1", headers={"User-Agent": UA})
+        self.assertEqual(r.headers["Content-Disposition"], "attachment; filename=Advitia_Labs_ADEX_White_paper.pdf")

@@ -29,7 +29,13 @@ Built from the Claude Design export "Advitia Website v2". Canonical URL: `https:
 - **Calculator factors:** `CF` and `GWP` in `calculator.js`.
 
 Figures in the dashboard mock, the live scene and the calculator are illustrative and labelled as such on the page.
-Traction figures (120+ sites, 12M MT, 400+ acres) are presented as real.
+Traction figures (123 sites, 12M MT, 400+ acres) are presented as real.
+
+Copy follows the white paper "Tracing Every Tonne" (v1.81): the verification gap, ADEX event records, mass balance,
+live audit layer, alternative-fuel marketplace, four revenue lines (platform fee, recovered material, RDF as AFR,
+carbon and EPR credits) and the market table. Third-party figures carry a source line; keep them in step with the
+paper when it is updated. The two product lines are named **ADEX Legacy** and **ADEX Household** (`ARMS` in `landing.js`).
+Layout width is `--max` (1536px) with a responsive `--gutter` in `landing.css`.
 
 ## Caching
 

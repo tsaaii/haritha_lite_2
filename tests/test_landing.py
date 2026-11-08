@@ -28,7 +28,9 @@ class LandingTests(unittest.TestCase):
             r = self.c.get(path, base_url="https://advitiaum.com")
             self.assertEqual(r.status_code, 200, path)
             body = r.get_data(as_text=True)
-            self.assertIn("Two platforms. Two jobs.", body)
+            self.assertIn("One ledger. Two jobs.", body)
+            self.assertIn("Four ways every site makes money.", body)
+            self.assertIn("RDF as alternative fuel", body)
             self.assertIn("Every tonne, accounted for.", body)
             self.assertIn('rel="canonical" href="https://advitiaum.com/"', body)
             self.assertIn("script-src 'self'", r.headers["Content-Security-Policy"])
@@ -61,7 +63,7 @@ class LandingTests(unittest.TestCase):
 
     def test_rdf_host_root_still_serves_rdf_report(self):
         r = self.c.get("/", base_url="https://rdf.advitiaum.com")
-        self.assertNotIn("Two platforms. Two jobs.", r.get_data(as_text=True))
+        self.assertNotIn("One ledger. Two jobs.", r.get_data(as_text=True))
 
     def test_existing_endpoints_untouched(self):
         rules = {r.rule for r in app.url_map.iter_rules()}

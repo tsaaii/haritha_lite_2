@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Advitia Labs · Material recovery intelligence for landfills and household waste</title>
-  <meta name="description" content="Advitia Labs runs two platforms: one to clean up legacy landfills, one to manage household waste end to end. Every metric tonne weighed, every fraction traced, and methane avoided made ready for carbon and EPR credits.">
+  <title>Advitia Labs · ADEX: verifiable waste accounting and alternative-fuel markets</title>
+  <meta name="description" content="ADEX records every custody transfer of waste with weight, evidence and approval, enforces site-level mass balance, opens the record to auditors through a live audit layer, and matches quality-verified RDF with cement kilns, power stations and industrial boilers to replace coal.">
   <link rel="canonical" href="{{ canonical_url }}">
   <meta name="theme-color" content="#0B3D22">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Advitia Labs">
-  <meta property="og:title" content="Advitia Labs · Every tonne in. Every fraction out.">
-  <meta property="og:description" content="Material recovery intelligence. 120+ sites and 12 million MT of waste measured, with 400+ acres of land reclaimed.">
+  <meta property="og:title" content="Advitia Labs · Tracing every tonne">
+  <meta property="og:description" content="ADEX: verifiable waste accounting and alternative-fuel markets for methane and coal abatement. In production across 123 sites and 12 million MT of waste.">
   <meta property="og:url" content="{{ canonical_url }}">
   <meta property="og:image" content="{{ canonical_url }}static/landing/img/og.png">
   <meta property="og:image:width" content="1200">
@@ -21,7 +21,7 @@
   <link rel="icon" type="image/svg+xml" href="{{ S }}img/favicon.svg">
   <link rel="preload" href="{{ S }}fonts/pagella-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ S }}css/landing.css?v={{ v }}">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Advitia Labs","url":"{{ canonical_url }}","email":"{{ email }}","description":"Material recovery intelligence for legacy landfills and household waste."}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Advitia Labs","url":"{{ canonical_url }}","email":"{{ email }}","description":"ADEX: verifiable waste accounting and alternative-fuel markets for methane and coal abatement."}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -30,12 +30,12 @@
   <nav class="nav" aria-label="Primary">
     <a href="#top" class="brand" aria-label="Advitia Labs, back to top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Advitia <span>Labs</span></span></a>
     <div class="nav-right">
-      <a class="nav-link" href="#traction">Traction</a>
-      <a class="nav-link" href="#platform">Product</a>
-      <a class="nav-link" href="#ledger">Ledger</a>
-      <a class="nav-link" href="#business">Business model</a>
-      <a class="nav-link" href="/whitepaper?src=nav" target="_blank" rel="noopener">White paper</a>
-      <a class="btn-nav" href="#contact">Request a pilot</a>
+      <a class="nav-link" href="#platform">ADEX</a>
+      <a class="nav-link" href="#audit">Live audit</a>
+      <a class="nav-link" href="#marketplace">Marketplace</a>
+      <a class="nav-link" href="#business">Business</a>
+      <a class="btn-nav-ghost" href="/whitepaper?src=nav" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>White paper</a>
+      <a class="btn-nav" href="#contact">Request a pilot{{ arrow() }}</a>
     </div>
   </nav>
 </header>
@@ -43,27 +43,33 @@
 <main id="main">
   <section id="top" class="hero wrap" aria-labelledby="hero-title">
     <div class="hero-inner">
-      <a class="pill-link" href="#contact"><span class="tag">Climate tech</span><span>Now onboarding pilot sites</span>{{ arrow() }}</a>
+      <a class="pill-link" href="/whitepaper?src=hero" target="_blank" rel="noopener"><span class="tag">New white paper</span><span>Tracing Every Tonne · v1.81</span>{{ arrow() }}</a>
       <h1 id="hero-title" class="hero-word"><span id="hero-word">Recovery.</span></h1>
-      <h2 class="hero-sub">Material recovery intelligence that turns waste into <span class="green">measured, sellable value.</span></h2>
-      <p class="hero-p">Two platforms: one to clean up legacy landfills, one to run household waste end to end. Every metric tonne weighed, every fraction traced, and every tonne of greenhouse gas avoided made ready for carbon and EPR credits.</p>
+      <h2 class="hero-sub">Verifiable waste accounting that turns every tonne into <span class="green">audited climate value.</span></h2>
+      <p class="hero-p">ADEX records every custody transfer of waste with weight, evidence and approval, enforces site-level mass balance, and opens the full record to auditors. On that record, a marketplace matches quality-verified fuel with cement kilns, power stations and industrial boilers to replace coal.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#contact">Request a pilot{{ arrow() }}</a>
-        <a class="btn btn-outline" href="#platform">See the platforms{{ arrow() }}</a>
+        <a class="btn btn-outline" href="/whitepaper?src=hero-cta" target="_blank" rel="noopener">Read the white paper{{ arrow() }}</a>
       </div>
       <ul class="audience" aria-label="Who it is for">
-        <li>For municipalities</li><li>Landfill operators</li><li>EPR-obligated producers</li><li>Credit buyers</li>
+        <li>Municipalities</li><li>Waste processors</li><li>Cement and power plants</li><li>Carbon and EPR buyers</li>
       </ul>
     </div>
+    <ul class="proof" aria-label="ADEX in production">
+      <li><span class="proof-v">123</span><span class="proof-k">sites in production with a public-sector waste operator</span></li>
+      <li><span class="proof-v">12M MT</span><span class="proof-k">of municipal solid waste measured and reconciled</span></li>
+      <li><span class="proof-v">400+ acres</span><span class="proof-k">of land reclaimed from legacy dumps</span></li>
+      <li><span class="proof-v">Live</span><span class="proof-k">camera-linked audit trail for external auditors</span></li>
+    </ul>
   </section>
 
   <section id="traction" class="traction wrap" aria-labelledby="traction-title">
     <div class="split-head">
       <div class="head-col">
-        <div class="kicker"><span class="dot"></span><span>Traction · already in the field</span></div>
-        <h2 id="traction-title" class="h-section">120+ sites. <span class="green">12 million MT</span> measured.</h2>
+        <div class="kicker"><span class="dot"></span><span>Traction · in production</span></div>
+        <h2 id="traction-title" class="h-section">123 sites. <span class="green">12 million MT</span> measured.</h2>
       </div>
-      <p class="lede">Every tonne of municipal solid waste weighed in, screened, and scientifically disposed — fraction by fraction — helping reclaim more than 400 acres of land.</p>
+      <p class="lede">ADEX runs in production with a public-sector waste operator. Every tonne of municipal solid waste is weighed in, screened and disposed of fraction by fraction, with the record reconciled end to end. More than 400 acres of land have been reclaimed so far.</p>
     </div>
     <div class="mix">
       <div class="mix-bar" role="img" aria-label="12 million MT measured: bio soil 8 million, inerts 2 million, C&amp;D waste 1 million, metal scrap 200 thousand, RDF 150 thousand MT">
@@ -96,39 +102,76 @@
 
   <section id="problem" class="band-deep on-dark" aria-labelledby="problem-title">
     <div class="problem wrap">
-      <div class="head-col">
-        <div class="kicker"><span class="n">01</span><span class="rule"></span><span>Problem</span></div>
-        <h2 id="problem-title" class="h-section">Waste is the climate problem hiding in plain sight.</h2>
+      <div class="split-head">
+        <div class="head-col">
+          <div class="kicker"><span class="n">01</span><span class="rule"></span><span>The verification gap</span></div>
+          <h2 id="problem-title" class="h-section">Once waste is collected, it leaves no record.</h2>
+        </div>
+        <p class="lede on-dark-lede">Waste passes through collectors, transporters, processors, recyclers and fuel buyers, each keeping separate records. Weight is measured at the gate, then the material leaves the record. The abatement technologies exist. The evidence that they were applied does not.</p>
       </div>
       <div class="stats">
-        <div class="stat"><div class="stat-v">80×</div><p>Methane traps around eighty times the heat of carbon dioxide over its first twenty years.</p></div>
-        <div class="stat"><div class="stat-v">Top 3</div><p>Landfills rank among the largest human-made sources of methane on earth.</p></div>
-        <div class="stat"><div class="stat-v">24 / 7</div><p>Legacy dumps leak methane, CO<sub>2</sub> and other greenhouse gases around the clock until the waste is removed. We remove the source.</p></div>
-        <div class="stat"><div class="stat-v">0</div><p>Ledgers that reconcile what enters a site with what leaves it. What isn't measured can't be recovered, credited, or regulated.</p></div>
+        <div class="stat"><div class="stat-v">38%</div><p>of the world's municipal solid waste, 810 Mt, was dumped or openly burned in 2020.</p></div>
+        <div class="stat"><div class="stat-v">3.8 bn t</div><p>of municipal waste a year by 2050, up from 2.1 billion tonnes in 2023.</p></div>
+        <div class="stat"><div class="stat-v">~20%</div><p>of human-made methane (71 Mt) comes from waste, mostly landfills. Methane is the second-largest driver of warming after CO<sub>2</sub>.</p></div>
+        <div class="stat"><div class="stat-v">&lt;10%</div><p>of cement kiln fuel is alternative fuel today, against an industry target of 22% by 2030. European plants average about 52%.</p></div>
       </div>
+      <div class="gap-row">
+        <div><strong>Authorities</strong><span>cannot confirm the outcome of processing contracts.</span></div>
+        <div><strong>Industrial buyers</strong><span>cannot rely on the quality of waste-derived fuel.</span></div>
+        <div><strong>Carbon and EPR markets</strong><span>cannot accept claims they cannot audit.</span></div>
+      </div>
+      <p class="src">Sources: UNEP &amp; ISWA, Global Waste Management Outlook 2024; UNEP &amp; CCAC, Global Methane Status Report 2025; Mordor Intelligence, AFR for Cement 2026.</p>
     </div>
   </section>
 
   <section id="platform" class="band-mist" aria-labelledby="platform-title">
     <div id="legacy" class="platform wrap">
       <div class="head-col">
-        <div class="kicker"><span class="n">02</span><span class="rule"></span><span>Product</span></div>
-        <h2 id="platform-title" class="h-section">Two platforms. Two jobs.</h2>
-        <p class="lede">A dedicated platform to clean up the landfills of the past, and another to run the household waste of today. Choose one to see how it works.</p>
+        <div class="kicker"><span class="n">02</span><span class="rule"></span><span>ADEX</span></div>
+        <h2 id="platform-title" class="h-section">One ledger. Two jobs.</h2>
+        <p class="lede">ADEX cleans up the landfills of the past and runs the household waste of today on the same event ledger, from the first truck to the final destination. Choose one to see how it works.</p>
       </div>
       <div id="platform-app">
-        <noscript><div class="noscript"><strong>Platform 01 · Clean up legacy landfills.</strong> Drone study, DSM model, waste quantification, composition, baseline study, tracking from excavation to processing, and audit.<br><strong>Platform 02 · Manage household waste.</strong> Door-to-door collection, weighbridge and CCTV, manual picking, trommel processing, weigh-out and disposal, and reconciliation for credits.</div></noscript>
+        <noscript><div class="noscript"><strong>ADEX Legacy · Clean up legacy landfills.</strong> Drone study, DSM model, waste quantification, composition, baseline study, tracking from excavation to processing, and audit.<br><strong>ADEX Household · Manage household waste.</strong> Door-to-door collection, weighbridge and CCTV, manual picking, trommel processing, weigh-out and disposal, and reconciliation for credits.</div></noscript>
       </div>
     </div>
+  </section>
+
+  <section id="events" class="events wrap" aria-labelledby="events-title">
+    <div class="split-head">
+      <div class="head-col">
+        <div class="kicker"><span class="n">03</span><span class="rule"></span><span>Event records</span></div>
+        <h2 id="events-title" class="h-section">Every movement is an event. <span class="green">Nothing is overwritten.</span></h2>
+      </div>
+      <p class="lede">ADEX records each movement or treatment of waste as one event: which batch, how much it weighed, who handed it to whom and when, the evidence, and who approved it. Events that share a batch form a chain from collection to final destination. Corrections are appended as new events that reference the original.</p>
+    </div>
+    <div class="event-anatomy" aria-label="What one ADEX event holds">
+      <div><span class="mono-n">b</span><strong>Batch</strong><span>A unique identifier that follows the material.</span></div>
+      <div><span class="mono-n">m</span><strong>Measured mass</strong><span>From the weighbridge, in metric tonnes.</span></div>
+      <div><span class="mono-n">c</span><strong>Custody</strong><span>Sender, receiver and time of transfer.</span></div>
+      <div><span class="mono-n">E</span><strong>Evidence</strong><span>Weighbridge slip, GPS trace, photos, drone survey or lab report.</span></div>
+      <div><span class="mono-n">a</span><strong>Approval</strong><span>Who signed off, and when.</span></div>
+    </div>
+    <ol class="chain" aria-label="The ADEX event chain">
+      <li class="chain-stage"><span class="caps">Intake</span>
+        <ul><li><strong>Collected</strong><span>Vehicle, GPS, time</span></li><li><strong>Weighed in</strong><span>Weighbridge slip</span></li><li><strong>Characterised</strong><span>Composition split</span></li><li><strong>Processed</strong><span>Plant records</span></li></ul></li>
+      <li class="chain-stage"><span class="caps">Outputs</span>
+        <ul><li><strong>Compost</strong><span>Organics diverted</span></li><li><strong>Recyclables</strong><span>Sold to recyclers</span></li><li><strong>Fuel (RDF)</strong><span>Processed fuel batches</span></li><li><strong>Inert residue</strong><span>Sanitary landfill</span></li></ul></li>
+      <li class="chain-stage chain-deep"><span class="caps">Verified outcomes</span>
+        <ul><li><strong>Methane saved</strong><span>For every tonne diverted</span></li><li><strong>Carbon credits</strong><span>Linked to disposal records</span></li><li><strong>EPR linkage</strong><span>Plastic recovery proven</span></li><li><strong>Alternative fuel</strong><span>Cement, power, boilers</span></li></ul></li>
+    </ol>
   </section>
 
   <section id="ledger" class="ledger wrap" aria-labelledby="ledger-title">
     <div class="split-head">
       <div class="head-col">
-        <div class="kicker"><span class="n">03</span><span class="rule"></span><span>The ledger</span></div>
+        <div class="kicker"><span class="n">04</span><span class="rule"></span><span>Mass balance</span></div>
         <h2 id="ledger-title" class="h-section">In must equal out.</h2>
       </div>
-      <p class="lede">Every inbound tonne is reconciled against every outward fraction, daily. Gaps are flagged before they become disputes — so recovery claims hold up to auditors, regulators and credit buyers.</p>
+      <div class="head-col">
+        <p class="lede">For every site and period, ADEX checks that the weight that came in equals the products, residues, moisture change and documented process loss that went out, within a set tolerance. Any gap is flagged for investigation before it becomes a dispute.</p>
+        <p class="formula" aria-label="M in minus the sum of M out, minus M residue, minus delta M water, minus M loss, is at most epsilon times M in">M<sub>in</sub> − ΣM<sub>out</sub> − M<sub>res</sub> − ΔM<sub>w</sub> − M<sub>loss</sub> ≤ ε · M<sub>in</sub></p>
+      </div>
     </div>
     <div id="balance-viz" class="ledger-viz" role="img" aria-label="Example daily mass balance: 1,284.6 MT inbound against 1,258.9 MT outbound, leaving 25.7 MT unaccounted and flagged for reconciliation."></div>
   </section>
@@ -164,19 +207,82 @@
     </div>
   </section>
 
+  <section id="audit" class="band-deep on-dark" aria-labelledby="audit-title">
+    <div class="audit wrap">
+      <div class="split-head">
+        <div class="head-col">
+          <div class="kicker"><span class="n">05</span><span class="rule"></span><span>Live audit layer</span></div>
+          <h2 id="audit-title" class="h-section">Auditors see what we see, <span class="leaf">as it happens.</span></h2>
+        </div>
+        <p class="lede on-dark-lede">External carbon-credit auditors get read-only access to the ADEX dashboard, including live camera feeds from weighbridges, processing lines and fuel dispatch points. Nothing has to be taken on trust.</p>
+      </div>
+      <div class="audit-grid">
+        <div><span class="audit-n">01</span><strong>Live camera feeds</strong><span>Weighbridges, processing lines and dispatch points, streamed into the same dashboard.</span></div>
+        <div><span class="audit-n">02</span><strong>Linked evidence</strong><span>Every weighment and dispatch is tied to the footage, GPS and photographs captured at that moment.</span></div>
+        <div><span class="audit-n">03</span><strong>Full audit trail</strong><span>The complete approval history of every batch, with corrections appended, never edited.</span></div>
+        <div><span class="audit-n">04</span><strong>Remote spot checks</strong><span>Auditors pick any batch and trace it from collection to final destination without a site visit.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="marketplace" class="market wrap" aria-labelledby="market-title">
+    <div class="split-head">
+      <div class="head-col">
+        <div class="kicker"><span class="n">06</span><span class="rule"></span><span>Alternative-fuel marketplace</span></div>
+        <h2 id="market-title" class="h-section">Replace coal with <span class="green">verified fuel.</span></h2>
+      </div>
+      <p class="lede">The marketplace exists first to cut emissions; the economic value follows from verified reductions. It matches quality-verified refuse-derived fuel (RDF) with cement kilns, coal-fired power stations and industrial boilers, and ranks every transaction by its verified carbon saving.</p>
+    </div>
+    <div class="models market-steps">
+      <div class="model"><span class="mono-n">1</span><span class="model-t">List</span><p>A processor lists an RDF batch with its full ADEX history and laboratory results: calorific value, moisture, chlorine, ash and sulphur.</p></div>
+      <div class="model"><span class="mono-n">2</span><span class="model-t">Match</span><p>Cement plants, power stations and other industrial consumers state their fuel requirements. Every match shows its expected carbon saving.</p></div>
+      <div class="model deep"><span class="mono-n">3</span><span class="model-t">Prove</span><p>Weighbridge confirmation and buyer acceptance close the deal, and ADEX computes the coal displaced and the CO<sub>2</sub> avoided against a declared baseline.</p></div>
+    </div>
+    <div class="market-facts">
+      <div class="fact"><span class="fact-v">~8%</span><span>of global CO<sub>2</sub> comes from cement, roughly 40% of it from burning fuel in kilns.</span></div>
+      <div class="fact"><span class="fact-v">⅓</span><span>of the world's electricity still came from coal in 2025: 10,476 TWh.</span></div>
+      <div class="fact"><span class="fact-v">~100 Mt</span><span>of CO<sub>2</sub> a year could be avoided if global cement kilns reached 22% alternative fuel (order-of-magnitude estimate).</span></div>
+      <div class="fact fact-note"><strong>Conservative by design.</strong><span>Plastic-derived RDF is not carbon neutral, so its fossil carbon is counted against the coal it displaces. Boilers tolerate lower RDF shares than kilns because of chlorine and ash, so substitution limits are set per consumer.</span></div>
+    </div>
+  </section>
+
   <section id="business" class="band-mist" aria-labelledby="biz-title">
     <div class="business wrap">
       <div class="split-head">
         <div class="head-col">
-          <div class="kicker"><span class="n">04</span><span class="rule"></span><span>Business model</span></div>
-          <h2 id="biz-title" class="h-section">Three ways every site makes money.</h2>
+          <div class="kicker"><span class="n">07</span><span class="rule"></span><span>Business model</span></div>
+          <h2 id="biz-title" class="h-section">Four ways every site makes money.</h2>
         </div>
-        <p class="lede">The same measured tonne is billed three times: as software, as recovered material, and as verified climate impact.</p>
+        <p class="lede">Fuel, carbon and producer-responsibility markets all pay for evidenced outcomes, which is exactly what ADEX records. The same tonne earns as software, as recovered material, as alternative fuel, and as verified climate impact.</p>
       </div>
-      <div class="models">
-        <div class="model"><span class="mono-n">A</span><span class="model-t">Platform fee</span><p>A per-site subscription for the weighbridge, CCTV and ledger software, paid by the municipality or operator.</p><span class="model-f">Recurring · per site, per month</span></div>
-        <div class="model"><span class="mono-n">B</span><span class="model-t">Recovered material</span><p>A share of sales of RDF, recyclables, metals, compost and soil, matched to offtakers through the platform.</p><span class="model-f">Volume-linked · per metric tonne</span></div>
-        <div class="model deep"><span class="mono-n">C</span><span class="model-t">Carbon and EPR credits</span><p>A take rate on credits issued from measured recovery: methane avoided for carbon buyers, plastic recovered for EPR-obligated producers.</p><span class="model-f">Margin · per credit issued</span></div>
+      <div class="models models-4">
+        <div class="model"><span class="mono-n">A</span><span class="model-t">ADEX platform fee</span><p>A per-site subscription for the event ledger, weighbridge and camera integration, mass balance and live audit, paid by the municipality or operator.</p><span class="model-f">Recurring · per site, per month</span></div>
+        <div class="model"><span class="mono-n">B</span><span class="model-t">Recovered material</span><p>A share of sales of recyclables, metals, compost and soil, matched to recyclers and offtakers through ADEX.</p><span class="model-f">Volume-linked · per metric tonne</span></div>
+        <div class="model"><span class="mono-n">C</span><span class="model-t">RDF as alternative fuel</span><p>The RDF our sites generate is supplied as AFR to cement kilns, power stations and industrial boilers, replacing coal, with every batch's quality and origin proven in ADEX.</p><span class="model-f">Fuel sales · per metric tonne of RDF</span></div>
+        <div class="model deep"><span class="mono-n">D</span><span class="model-t">Carbon and EPR credits</span><p>A take rate on credits backed by verified disposal records: methane avoided and coal displaced for carbon buyers, plastic recovered for EPR-obligated producers. Credits are issued only by the relevant registries and authorities.</p><span class="model-f">Margin · per credit issued</span></div>
+      </div>
+
+      <div class="mkt">
+        <div class="mkt-head"><span class="caps">Markets addressed by ADEX</span><span class="mkt-sub">2025 size and outlook, USD</span></div>
+        <table class="mkt-table">
+          <thead><tr><th scope="col">Market</th><th scope="col">2025 size</th><th scope="col">Outlook</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Waste management</th><td>~1.5 trillion</td><td>—</td></tr>
+            <tr><th scope="row">Alternative fuels and raw materials for cement</th><td>10.3 billion</td><td>16.4 billion by 2031</td></tr>
+            <tr><th scope="row">Refuse-derived fuel</th><td>5–8 billion</td><td>Estimates vary</td></tr>
+            <tr><th scope="row">Voluntary carbon credits</th><td>~1.4 billion</td><td>5–20 billion by 2030</td></tr>
+            <tr><th scope="row">Extended producer responsibility</th><td>6.8 billion</td><td>14.0 billion by 2032</td></tr>
+          </tbody>
+        </table>
+        <p class="src">Third-party estimates (Grand View Research, Mordor Intelligence, Bosson Research, Market Intelo, MSCI, Stratistics MRC), not projections of Advitia Labs' performance. Full references in the <a href="/whitepaper?src=markets" target="_blank" rel="noopener">white paper</a>.</p>
+      </div>
+
+      <div class="claims">
+        <div class="claims-t"><span class="caps">Climate accounting</span><strong>GHG<sub>avoided</sub> = E<sub>baseline</sub> − E<sub>project</sub></strong>
+          <span>Calculated under an applicable methodology covering waste composition, degradable organic carbon, transport, treatment emissions, uncertainty and leakage. Overlapping claims on the same material are blocked.</span></div>
+        <ul class="claims-labels" aria-label="Every result is labelled">
+          <li><span class="lbl lbl-1">Potential</span></li><li><span class="lbl lbl-2">Modelled</span></li><li><span class="lbl lbl-3">Independently verified</span></li>
+        </ul>
       </div>
 
       <div id="calculator" class="calc" data-calc>
@@ -211,22 +317,22 @@
 
   <section id="why" class="why wrap" aria-labelledby="why-title">
     <div class="head-col">
-      <div class="kicker"><span class="n">05</span><span class="rule"></span><span>Why now</span></div>
-      <h2 id="why-title" class="h-section">Regulation, markets and methane just lined up.</h2>
+      <div class="kicker"><span class="n">08</span><span class="rule"></span><span>Why now</span></div>
+      <h2 id="why-title" class="h-section">The money is there. The evidence isn't. Yet.</h2>
     </div>
     <div class="points">
-      <div class="point"><strong>Proof is now mandatory.</strong><span>Extended producer responsibility rules require evidence of recovery, not promises.</span></div>
-      <div class="point"><strong>Methane is the fast lever.</strong><span>Cutting methane is the quickest way to slow near-term warming, and waste is where it starts.</span></div>
-      <div class="point"><strong>Greenhouse gases, removed.</strong><span>Biomining and aerobic composting stop methane, CO<sub>2</sub> and other greenhouse gases at the source, measured tonne by tonne.</span></div>
-      <div class="point"><strong>Waste replaces coal.</strong><span>Non-recyclables become RDF, an alternative fuel for cement kilns and waste-to-energy plants, cutting coal use and the CO<sub>2</sub>, SO<sub>2</sub> and NO<sub>x</sub> it releases.</span></div>
-      <div class="point"><strong>Buyers want audited data.</strong><span>Credit markets now demand measured, traceable tonnes. Most sites still run on paper and spreadsheets.</span></div>
+      <div class="point"><strong>Landfills are now visible from space.</strong><span>Satellite monitoring attributes some of the world's largest methane sources to landfills. Waste-sector measures could cut 13 Mt of methane a year by 2030.</span></div>
+      <div class="point"><strong>Cement needs fuel that isn't coal.</strong><span>Kilns run below 10% alternative fuel against a 22% target for 2030. Buyers will take waste-derived fuel only if its quality and origin are proven.</span></div>
+      <div class="point"><strong>Proof is becoming mandatory.</strong><span>Extended producer responsibility rules require evidence of recovery, not promises. The EPR market is set to double to $14 billion by 2032.</span></div>
+      <div class="point"><strong>Credits need audited tonnes.</strong><span>Carbon and EPR markets reject claims they cannot audit. Most waste sites still run on paper and spreadsheets.</span></div>
+      <div class="point"><strong>Waste is outgrowing the system.</strong><span>Municipal waste is on track to rise from 2.1 to 3.8 billion tonnes a year by 2050. Every extra tonne needs a record.</span></div>
     </div>
   </section>
 
   <section id="contact" class="band-deep" aria-labelledby="contact-title">
     <div class="closing wrap">
       <h2 id="contact-title">Every tonne, accounted for.</h2>
-      <p>We're onboarding pilot sites and partners. Bring us a landfill or a city's household waste — we'll bring the ledger.</p>
+      <p>We're onboarding municipalities, processors, fuel buyers and credit partners. Bring us a landfill, a city's household waste or a kiln that needs fuel. We'll bring the ledger.</p>
 
       <form id="contact-form" class="cform" action="/api/contact" method="post" novalidate data-state="{{ 'sent' if sent == '1' else 'idle' }}">
         <div class="cform-body">
@@ -274,12 +380,12 @@
       </form>
       <p class="cform-alt">Prefer email? <a href="mailto:{{ email }}">{{ email }}</a></p>
       <footer class="foot">
-        <div class="foot-col"><span class="foot-brand">Advitia Labs</span><span class="foot-tag">Material recovery intelligence for legacy landfills and household waste.</span></div>
-        <nav class="foot-col" aria-label="Platform"><span class="caps">Platform</span><a href="#platform">Product</a><a href="#ledger">Ledger</a><a href="#calculator">Calculator</a></nav>
+        <div class="foot-col"><span class="foot-brand">Advitia Labs</span><span class="foot-tag">ADEX: verifiable waste accounting and alternative-fuel markets for methane and coal abatement.</span></div>
+        <nav class="foot-col" aria-label="ADEX"><span class="caps">ADEX</span><a href="#platform">Product</a><a href="#events">Event records</a><a href="#audit">Live audit</a><a href="#marketplace">Marketplace</a><a href="#calculator">Calculator</a></nav>
         <nav class="foot-col" aria-label="Company"><span class="caps">Company</span><a href="/whitepaper?src=footer" target="_blank" rel="noopener">White paper</a><a href="#business">Business model</a><a href="mailto:{{ email }}?subject=Careers">Careers</a></nav>
         <div class="foot-col"><span class="caps">Contact</span><a href="mailto:{{ email }}">{{ email }}</a></div>
       </footer>
-      <div class="foot-base caps"><span>© {{ year }} Advitia Labs</span><span>Every tonne in. Every fraction out.</span></div>
+      <div class="foot-base caps"><span>© {{ year }} Advitia Labs</span><span>Tracing every tonne.</span></div>
     </div>
   </section>
 </main>

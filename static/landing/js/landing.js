@@ -808,9 +808,9 @@ LEGACY.forEach((l, i) => Object.assign(l, LEGACY_X[i]));
 
 /* ---------- Platform section (replaces the design tool's Component class) ---------- */
 const ARMS = [
-  { id: 'legacy', num: 'Platform 01', title: 'Clean up legacy landfills', sub: 'Survey, excavate, process and reclaim old dump sites, with every metric tonne accounted for.',
+  { id: 'legacy', num: 'ADEX Legacy', title: 'Clean up legacy landfills', sub: 'Survey, excavate, process and reclaim old dump sites, with every metric tonne accounted for.',
     kicker: 'Legacy landfill remediation · 7 steps', heading: 'From survey to audit, in seven steps.' },
-  { id: 'household', num: 'Platform 02', title: 'Manage household waste', sub: 'Collection, processing, segregation and disposal of fresh municipal waste, on one ledger.',
+  { id: 'household', num: 'ADEX Household', title: 'Manage household waste', sub: 'Collection, processing, segregation and disposal of fresh municipal waste, on one ledger.',
     kicker: 'Household waste management · 6 steps', heading: 'From doorstep to disposal, in six steps.' }
 ];
 const pad2 = n => String(n).padStart(2, '0');

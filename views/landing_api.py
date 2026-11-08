@@ -447,7 +447,7 @@ def whitepaper_pdf():
             "seconds_on_page": "",
         }, ua)
     resp = send_file(_WP_PATH, mimetype="application/pdf", as_attachment=request.args.get("dl") == "1",
-                     download_name=WHITEPAPER["file"], max_age=0)
+                     download_name="Advitia_Labs_ADEX_White_paper.pdf", max_age=0)
     resp.headers["Cache-Control"] = "private, no-cache"     # every open reaches the server, so it is counted
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Robots-Tag"] = "noindex"
