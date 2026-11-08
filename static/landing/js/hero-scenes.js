@@ -119,8 +119,9 @@
       g.set(pile, { scaleY: 0, transformOrigin: '50% 100%' });
       el('path', { d: 'M' + f1(x1 - r * 0.2) + ',' + f1(cy + r * 0.1) + ' L' + f1(pileX + fs * 0.05) + ',' + f1(c.B - fs * 0.32), stroke: C.i5, 'stroke-width': fs * 0.03, 'stroke-linecap': 'round' }, c.back);
 
-      var spin = g.timeline({ repeat: -1 }).to(holes, { x: s, duration: 0.32, ease: 'none' }).set(holes, { x: 0 });
-      var spin2 = g.timeline({ repeat: -1 }).to(ribs, { x: rs, duration: 0.95, ease: 'none' }).set(ribs, { x: 0 });
+      // Endless drum spin runs beside the scene timeline (an infinite child would stop it ever completing).
+      var spin = c.loop(g.timeline({ repeat: -1 }).to(holes, { x: s, duration: 0.32, ease: 'none' }).set(holes, { x: 0 }));
+      var spin2 = c.loop(g.timeline({ repeat: -1 }).to(ribs, { x: rs, duration: 0.95, ease: 'none' }).set(ribs, { x: 0 }));
       // letters start inside the drum, small and tumbling
       var inside = function () { return { x: x0 + r + R() * (x1 - x0 - 2 * r), y: cy - r * 0.45 + R() * r * 0.8 }; };
       c.L.forEach(function (L, i) { var p = inside(), b = c.R[i]; g.set(L, { x: p.x - b.cx, y: p.y - b.cyv, scale: 0.5, rotation: R() * 360, color: MIX[i % MIX.length], opacity: 0 }); });
@@ -132,8 +133,7 @@
             : el('path', { d: poly(p.x, p.y, fs * 0.045, 6, 0.6, R), fill: C.dirtD }, c.front));
         dEl._p = p;
       }
-      tl.add(spin, 0).add(spin2, 0)
-        .to(c.L, { opacity: 1, duration: 0.3, stagger: 0.03 }, 0)
+      tl.to(c.L, { opacity: 1, duration: 0.3, stagger: 0.03 }, 0)
         .from(debris, { opacity: 0, duration: 0.3, stagger: 0.02 }, 0);
       // tumble ~1.8 s
       c.L.concat(debris).forEach(function (t, i) {
@@ -467,7 +467,7 @@
     opts = opts || {};
     var names = (opts.scenes || ORDER).filter(function (n) { return SCENES[n]; });
     var HOLD = opts.hold != null ? opts.hold : 1.6, loop = opts.loop !== false;
-    var cur = -1, tl = null, paused = false, visible = true;
+    var cur = -1, tl = null, paused = false, visible = true, loops = [];
     var back = el('svg', { class: 'hs-svg hs-back', 'aria-hidden': 'true' });
     var front = el('svg', { class: 'hs-svg hs-front', 'aria-hidden': 'true' });
     var word = document.createElement('div'); word.className = 'hs-word';
@@ -480,10 +480,12 @@
       var B = base.getBoundingClientRect().top - sr.top; word.removeChild(base);
       var spans = Array.prototype.slice.call(word.querySelectorAll('.hs-l'));
       var R = spans.map(function (s) { var r = s.getBoundingClientRect(); return { x: r.left - sr.left, w: r.width, cx: r.left - sr.left + r.width / 2, cyv: B - fs * 0.34 }; });
-      return { W: sr.width, H: sr.height, fs: fs, B: B, L: spans, R: R, wx0: R[0].x, wx1: R[R.length - 1].x + R[R.length - 1].w, back: back, front: front, stage: stage };
+      return { W: sr.width, H: sr.height, fs: fs, B: B, L: spans, R: R, wx0: R[0].x, wx1: R[R.length - 1].x + R[R.length - 1].w, back: back, front: front, stage: stage,
+        loop: function (t) { loops.push(t); if (paused || !visible) t.pause(); return t; } };
     }
     function clear() {
       if (tl) { tl.kill(); tl = null; }
+      loops.forEach(function (t) { t.kill(); }); loops = [];
       g.killTweensOf([back, front, word, stage]);
       while (back.firstChild) back.removeChild(back.firstChild);
       while (front.firstChild) front.removeChild(front.firstChild);
@@ -506,7 +508,7 @@
       tl.to([back, front, word], { opacity: 0, duration: 0.5, ease: 'power1.in' });
       tl.eventCallback('onComplete', function () { if (loop) play(cur + 1); });
     }
-    function sync() { if (tl) { if (paused || !visible) tl.pause(); else tl.resume(); } }
+    function sync() { [tl].concat(loops).forEach(function (t) { if (t) { if (paused || !visible) t.pause(); else t.resume(); } }); }
     var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) { visible = es[0].isIntersecting && document.visibilityState === 'visible'; sync(); }, { threshold: 0.15 }) : null;
     if (io) io.observe(stage);
     function onVis() { visible = document.visibilityState === 'visible'; sync(); }
