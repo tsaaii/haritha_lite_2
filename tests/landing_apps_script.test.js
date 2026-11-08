@@ -156,4 +156,23 @@ assert.strictEqual(lines['Links opened'], 'yc-garry (1)');
 assert.strictEqual(lines['Leads'], 'Garry — Investing');
 assert.ok(mails[0].htmlBody.includes('https://docs.google.com/spreadsheets/d/TEST'));
 
+// white paper: every action is a row with the full IP; only real opens/downloads email
+mails.length = 0;
+post({ token: 'secret', action: 'whitepaper', data: { at: '2026-11-08 10:00:00', action: 'Popup shown', ip: '203.0.113.7', city: 'Pune', country: 'IN' } });
+post({ token: 'secret', action: 'whitepaper', data: { at: '2026-11-08 10:00:05', action: 'Skipped', ip: '203.0.113.7' } });
+assert.strictEqual(mails.length, 0, 'no email for shown / skipped');
+post({ token: 'secret', action: 'whitepaper', data: { at: '2026-11-08 10:01:00', action: 'Opened PDF', ip: '203.0.113.7', city: 'Pune', region: 'IN-MH', country: 'IN',
+  latlng: '18.52,73.85', network: 'Bharti Airtel', referrer: 'https://www.linkedin.com/', ref: 'yc-garry', device: 'Mobile', os: 'iOS', browser: 'Safari', paper_version: '1.81' } });
+post({ token: 'secret', action: 'whitepaper', data: { at: '2026-11-08 10:02:00', action: 'Downloaded PDF', ip: '198.51.100.9', datacenter: 'yes' } });
+post({ token: 'secret', action: 'whitepaper', data: { at: '2026-11-08 10:03:00', action: '=HYPERLINK("x")', ip: '1.1.1.1' } });
+const W = sheets['White paper'].rows, WH = W[0];
+assert.strictEqual(W.length, 6);
+assert.strictEqual(W[3][WH.indexOf('IP address')], '203.0.113.7', 'full IP kept');
+assert.ok(String(W[3][WH.indexOf('Map')]).includes('18.52,73.85'));
+assert.strictEqual(W[5][WH.indexOf('Action')][0], "'", 'formula injection neutralised');
+assert.strictEqual(mails.length, 1, 'one email: the human open, not the datacenter download');
+assert.ok(/White paper opened — Pune, IN-MH, IN/.test(mails[0].subject), mails[0].subject);
+assert.ok(mails[0].body.includes('IP: 203.0.113.7') && mails[0].body.includes('linkedin.com') && mails[0].body.includes('yc-garry'));
+assert.strictEqual(ctx.doGet().build, '2026-11-08-v4');
+
 console.log('apps script: all assertions passed');

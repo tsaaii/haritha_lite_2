@@ -7,9 +7,12 @@ Landing page APIs: contact form + visit tracker.
     POST /api/seen      -> visit beacon from static/landing/js/track.js. Enriched
                            here (App Engine geo headers, network name, device) and
                            forwarded to the same script ("Visits" sheet).
+    POST /api/wp        -> white-paper popup choice (static/landing/js/whitepaper.js)
+    GET  /whitepaper    -> the white paper PDF (?dl=1 download, ?r=<who> tag); each open logged
+                           Both go to the "White paper" sheet WITH the full IP (disclosed in the popup).
 
-Privacy: the visitor IP is anonymised here (IPv4 /24, IPv6 /48) before it is
-logged or forwarded. The full IP is only used in memory for the optional
+Privacy: for leads and visits the visitor IP is anonymised here (IPv4 /24, IPv6 /48)
+before it is logged or forwarded; white-paper events keep the full IP (see below). The full IP is only used in memory for the optional
 network lookup (IPINFO_TOKEN) and the per-IP rate limits.
 
 Config (app.yaml env_variables):
@@ -56,7 +59,8 @@ EMAIL_RE = re.compile(r"^[^@\s<>\"',;]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63
 BOT_UA_RE = re.compile(
     r"bot|crawl|spider|slurp|headless|phantom|puppeteer|playwright|selenium|lighthouse|pagespeed|"
     r"gtmetrix|pingdom|uptime|monitor|curl|wget|python-requests|httpclient|okhttp|go-http|java/|"
-    r"facebookexternalhit|embedly|preview|scrapy|ahrefs|semrush|bingpreview|petalbot|bytespider",
+    r"facebookexternalhit|embedly|preview|scrapy|ahrefs|semrush|bingpreview|petalbot|bytespider|"
+    r"^whatsapp/|telegrambot|skypeuripreview|discordbot|slackbot|linkedinbot|twitterbot|applebot",
     re.I)
 DATACENTER_RE = re.compile(
     r"amazon|aws|google llc|google cloud|microsoft|azure|digitalocean|ovh|hetzner|linode|akamai connected|"
@@ -353,3 +357,98 @@ def seen():
     if not ok and err != "not-configured":
         logger.warning("seen: forward failed: %s", err)
     return empty
+
+
+# ---------------------------------------------------------------------------
+# White paper: popup choices + every open of the PDF
+# ---------------------------------------------------------------------------
+# Unlike the visit tracker, these records keep the FULL IP address: the site owner
+# asked to know exactly who engaged with the white paper. The popup tells the
+# visitor this before they choose (templates/landing/index.html, #wp-dialog).
+
+WHITEPAPER = {
+    "title": "Tracing Every Tonne: Verifiable Waste Accounting and Alternative-Fuel Markets "
+             "for Methane and Coal Abatement",
+    "version": "1.81",
+    "file": "Tracing_Every_Tonne_ADEX_White_Paper.pdf",
+}
+_WP_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "whitepaper",
+                        WHITEPAPER["file"])
+WP_ACTIONS = {"shown": "Popup shown", "read": "Clicked Read", "download": "Clicked Download", "skip": "Skipped",
+              "dismiss": "Closed popup",
+              # Server-side only: the PDF actually reached the visitor (the emails fire on these).
+              "open": "Opened PDF", "downloaded": "Downloaded PDF"}
+_SERVER_ONLY = ("open", "downloaded")
+wp_limit = RateLimit(60, 600)        # 60 white-paper events / 10 min / IP
+
+_WP_FIELDS = {"visit_id": 40, "vid": 40, "n": 6, "ref": 80, "first_ref": 80, "utm_source": 80, "utm_medium": 80,
+              "utm_campaign": 120, "referrer": 300, "path": 200, "screen": 20, "lang": 40, "tz": 60,
+              "seconds_on_page": 8}
+
+
+def _wp_record(action: str, fields: dict, ua: str) -> dict:
+    ip = client_ip()
+    g = geo()
+    net, asn = network_of(ip)
+    rec = {"at": _now_ist(), "action": WP_ACTIONS[action], **fields, **g, **parse_ua(ua),
+           "ip": ip, "network": net, "asn": asn,
+           "datacenter": "yes" if net and DATACENTER_RE.search(net) else "",
+           "user_agent": _one_line(ua, 300), "paper_version": WHITEPAPER["version"]}
+    logger.warning("WHITEPAPER %s", json.dumps(rec, ensure_ascii=False))   # also kept in Cloud Logging
+    ok, err = forward("whitepaper", rec)
+    if not ok and err != "not-configured":
+        logger.warning("whitepaper: forward failed: %s", err)
+    return rec
+
+
+@bp.route("/api/wp", methods=["POST"])
+def whitepaper_event():
+    """Popup beacon: shown / read / download / skip / dismiss. Always 204."""
+    empty = ("", 204)
+    if request.content_length and request.content_length > 8192:
+        return empty
+    ua = request.headers.get("User-Agent", "")
+    if is_bot_ua(ua) or not same_origin():
+        return empty
+    try:
+        raw = json.loads(request.get_data(cache=False, as_text=True) or "{}")
+    except ValueError:
+        return empty
+    if not isinstance(raw, dict) or raw.get("action") not in WP_ACTIONS or raw.get("action") in _SERVER_ONLY:
+        return empty
+    if not wp_limit.allow(client_ip()):
+        return empty
+    d = {k: _one_line(raw.get(k), n) for k, n in _WP_FIELDS.items()}
+    if d["visit_id"] and not re.fullmatch(r"[A-Za-z0-9_-]{8,40}", d["visit_id"]):
+        d["visit_id"] = ""
+    _wp_record(raw["action"], d, ua)
+    return empty
+
+
+@bp.route("/whitepaper", strict_slashes=False)
+@bp.route("/whitepaper.pdf")
+@bp.route("/white-paper", strict_slashes=False)
+def whitepaper_pdf():
+    """The PDF itself. Every open is recorded, including links shared outside the site.
+
+    ?dl=1 downloads instead of opening; ?r=<who> tags a shared link like the landing page's ?r=.
+    """
+    from flask import send_file
+    ua = request.headers.get("User-Agent", "")
+    if not is_bot_ua(ua) and wp_limit.allow(client_ip()):
+        q = request.args
+        _wp_record("downloaded" if q.get("dl") == "1" else "open", {
+            "ref": _one_line(q.get("r") or q.get("ref"), 80), "vid": _one_line(q.get("vid"), 40),
+            "visit_id": "", "n": "", "first_ref": "",
+            "utm_source": _one_line(q.get("utm_source") or q.get("src"), 80),
+            "utm_medium": _one_line(q.get("utm_medium"), 80), "utm_campaign": _one_line(q.get("utm_campaign"), 120),
+            "referrer": _one_line(request.headers.get("Referer"), 300), "path": _one_line(request.full_path, 200),
+            "screen": "", "lang": _one_line(request.headers.get("Accept-Language"), 40), "tz": "",
+            "seconds_on_page": "",
+        }, ua)
+    resp = send_file(_WP_PATH, mimetype="application/pdf", as_attachment=request.args.get("dl") == "1",
+                     download_name=WHITEPAPER["file"], max_age=0)
+    resp.headers["Cache-Control"] = "private, no-cache"     # every open reaches the server, so it is counted
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Robots-Tag"] = "noindex"
+    return resp

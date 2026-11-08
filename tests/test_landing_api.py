@@ -148,6 +148,77 @@ class SeenTests(Base):
         self.assertLessEqual(len(self.fwd.call_args[0][1]["referrer"]), 300)
 
 
+class WhitePaperTests(Base):
+    """Popup choices (/api/wp) and PDF opens (/whitepaper): full IP, where they came from, device."""
+
+    def setUp(self):
+        super().setUp()
+        api.wp_limit = api.RateLimit(60, 600)
+
+    def beacon(self, action, headers=None, **kw):
+        body = {"action": action, "visit_id": "VISITabcdef12", "vid": "vid123", "ref": "yc-garry",
+                "referrer": "https://www.linkedin.com/feed/", "path": "/?r=yc-garry", "seconds_on_page": "6", **kw}
+        return self.c.post("/api/wp", data=json.dumps(body), content_type="application/json",
+                           base_url="https://advitiaum.com", headers=headers or self.h())
+
+    def test_popup_actions_are_recorded_with_full_ip(self):
+        for action, label in (("shown", "Popup shown"), ("read", "Clicked Read"), ("download", "Clicked Download"),
+                              ("skip", "Skipped"), ("dismiss", "Closed popup")):
+            self.fwd.reset_mock()
+            self.assertEqual(self.beacon(action).status_code, 204)
+            kind, rec = self.fwd.call_args[0]
+            self.assertEqual(kind, "whitepaper")
+            self.assertEqual(rec["action"], label)
+            self.assertEqual(rec["ip"], "49.36.12.77")                 # NOT anonymised
+            self.assertEqual((rec["city"], rec["country"]), ("Bengaluru", "IN"))
+            self.assertEqual(rec["referrer"], "https://www.linkedin.com/feed/")
+            self.assertEqual(rec["ref"], "yc-garry")
+            self.assertEqual((rec["device"], rec["os"]), ("Mobile", "iOS"))
+            self.assertEqual(rec["paper_version"], "1.81")
+
+    def test_beacon_cannot_fake_a_server_side_open(self):
+        for action in ("open", "downloaded", "nonsense"):
+            self.beacon(action)
+        self.fwd.assert_not_called()
+
+    def test_bots_and_cross_site_dropped(self):
+        self.beacon("read", headers=self.h(**{"User-Agent": "Googlebot/2.1"}))
+        self.beacon("read", headers={**self.h(), "Origin": "https://evil.example"})
+        self.fwd.assert_not_called()
+
+    def test_pdf_open_is_served_and_recorded(self):
+        r = self.c.get("/whitepaper?src=popup&vid=vid123&r=yc-garry", base_url="https://advitiaum.com",
+                       headers={**self.h(), "Referer": "https://advitiaum.com/?r=yc-garry"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.mimetype, "application/pdf")
+        self.assertTrue(r.data.startswith(b"%PDF"))
+        self.assertNotIn("attachment", r.headers.get("Content-Disposition", ""))
+        kind, rec = self.fwd.call_args[0]
+        self.assertEqual((kind, rec["action"], rec["ip"]), ("whitepaper", "Opened PDF", "49.36.12.77"))
+        self.assertEqual((rec["utm_source"], rec["vid"], rec["ref"]), ("popup", "vid123", "yc-garry"))
+        self.assertEqual(rec["referrer"], "https://advitiaum.com/?r=yc-garry")
+
+    def test_pdf_download_and_aliases(self):
+        r = self.c.get("/whitepaper?dl=1", base_url="https://advitiaum.com", headers=self.h())
+        self.assertIn("attachment", r.headers["Content-Disposition"])
+        self.assertEqual(self.fwd.call_args[0][1]["action"], "Downloaded PDF")
+        for path in ("/whitepaper.pdf", "/white-paper", "/whitepaper/"):
+            self.assertEqual(self.c.get(path, headers=self.h()).status_code, 200, path)
+
+    def test_pdf_for_bots_is_served_but_not_recorded(self):
+        for ua in ("WhatsApp/2.23.20.0 A", "TelegramBot (like TwitterBot)", "LinkedInBot/1.0", "Slackbot-LinkExpanding 1.0"):
+            r = self.c.get("/whitepaper", headers={"User-Agent": ua})
+            self.assertEqual(r.status_code, 200, ua)
+        self.fwd.assert_not_called()
+
+    def test_landing_page_has_popup_with_notice(self):
+        html = self.c.get("/").get_data(as_text=True)
+        self.assertIn('id="wp-dialog"', html)
+        self.assertIn("we record your IP address", html)
+        self.assertIn("js/whitepaper.js", html)
+        self.assertIn('href="/whitepaper?src=nav"', html)
+
+
 class HelperTests(unittest.TestCase):
     def test_anonymize(self):
         self.assertEqual(api.anonymize_ip("203.0.113.199"), "203.0.113.0")
