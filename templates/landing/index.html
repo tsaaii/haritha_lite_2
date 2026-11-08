@@ -34,6 +34,7 @@
       <a class="nav-link" href="#platform">Product</a>
       <a class="nav-link" href="#ledger">Ledger</a>
       <a class="nav-link" href="#business">Business model</a>
+      <a class="nav-link" href="/whitepaper?src=nav" target="_blank" rel="noopener">White paper</a>
       <a class="btn-nav" href="#contact">Request a pilot</a>
     </div>
   </nav>
@@ -275,7 +276,7 @@
       <footer class="foot">
         <div class="foot-col"><span class="foot-brand">Advitia Labs</span><span class="foot-tag">Material recovery intelligence for legacy landfills and household waste.</span></div>
         <nav class="foot-col" aria-label="Platform"><span class="caps">Platform</span><a href="#platform">Product</a><a href="#ledger">Ledger</a><a href="#calculator">Calculator</a></nav>
-        <nav class="foot-col" aria-label="Company"><span class="caps">Company</span><a href="#business">Business model</a><a href="mailto:{{ email }}?subject=Careers">Careers</a></nav>
+        <nav class="foot-col" aria-label="Company"><span class="caps">Company</span><a href="/whitepaper?src=footer" target="_blank" rel="noopener">White paper</a><a href="#business">Business model</a><a href="mailto:{{ email }}?subject=Careers">Careers</a></nav>
         <div class="foot-col"><span class="caps">Contact</span><a href="mailto:{{ email }}">{{ email }}</a></div>
       </footer>
       <div class="foot-base caps"><span>© {{ year }} Advitia Labs</span><span>Every tonne in. Every fraction out.</span></div>
@@ -283,7 +284,25 @@
   </section>
 </main>
 
+<dialog class="wp" id="wp-dialog" aria-labelledby="wp-title" aria-describedby="wp-desc">
+  <form method="dialog" class="wp-x-form"><button class="wp-x" value="dismiss" aria-label="Close">&times;</button></form>
+  <p class="caps wp-kicker">New white paper · v1.81</p>
+  <h2 id="wp-title" class="wp-title">Tracing Every Tonne</h2>
+  <p class="wp-sub">Verifiable waste accounting and alternative-fuel markets for methane and coal abatement</p>
+  <p id="wp-desc" class="wp-desc">How ADEX records every custody transfer of waste with weight, evidence and approval, enforces site-level mass balance,
+    and matches quality-verified RDF with cement kilns, power stations and industrial boilers, ranked by verified carbon saving.</p>
+  <p class="wp-meta">Sai S., Advitia Labs · 3 pages · PDF</p>
+  <div class="wp-actions">
+    <a class="btn btn-primary wp-btn" href="/whitepaper?src=popup" target="_blank" rel="noopener" data-wp="read" autofocus>Read the white paper</a>
+    <a class="btn btn-outline wp-btn" href="/whitepaper?src=popup&amp;dl=1" data-wp="download">Download PDF</a>
+    <button type="button" class="wp-skip" data-wp="skip">Skip for now</button>
+  </div>
+  <p class="wp-note">When you choose an option we record your IP address, approximate location, device and the page that
+    sent you here, so we know who is reading our research. Questions: <a href="mailto:{{ email }}">{{ email }}</a>.</p>
+</dialog>
+
 <script src="{{ S }}js/track.js?v={{ v }}" defer></script>
+<script src="{{ S }}js/whitepaper.js?v={{ v }}" defer></script>
 <script src="{{ S }}js/contact.js?v={{ v }}" defer></script>
 <script src="{{ S }}js/calculator.js?v={{ v }}" defer></script>
 <script src="{{ S }}vendor/react.production.min.js" defer></script>

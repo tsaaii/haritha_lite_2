@@ -5,14 +5,17 @@
 // Tabs (created automatically):
 //   Leads    one row per contact-form message; every lead is also emailed to NOTIFY_TO.
 //   Visits   one row per page view, updated with engagement (time, scroll, sections, clicks).
+//   White paper  one row per white-paper action (popup shown / read / download / skip / close, and every
+//                open of the PDF), with the FULL IP address; an email for each open or download.
 
 const CONFIG = {
   TOKEN: 'CHANGE-ME-long-random-string',                  // must equal LANDING_SCRIPT_TOKEN in app.yaml
   NOTIFY_TO: 'wecare@advitiaum.com, saiteja7050@gmail.com', // lead emails go here (comma-separated)
   NOTIFY_ON_LINK_OPEN: true,  // email when someone opens a ?r=<name> link (first view of that visit)
+  NOTIFY_ON_WHITEPAPER: true, // email when someone opens or downloads the white paper PDF
   AUTO_REPLY: true,           // send the person who filled the form a short "we've got your message" email
   REPLY_TO: 'wecare@advitiaum.com', // where their replies to the auto-reply go
-  RETENTION_MONTHS: 12,       // Visits older than this are deleted daily (run setup() once)
+  RETENTION_MONTHS: 12,       // Visits and White paper rows older than this are deleted daily (run setup() once)
   DAILY_SUMMARY: true,        // one short traffic email a day to NOTIFY_TO …
   SUMMARY_HOUR: 9,            // … at this hour (Google fires it within that hour) …
   SUMMARY_TZ: 'America/New_York', // … in this time zone (US Eastern, follows EST/EDT). Re-run setup() after changing.
@@ -20,8 +23,8 @@ const CONFIG = {
 };
 
 // ---------- nothing below this line needs editing ----------
-const BUILD = '2026-11-01-v3';
-const LEADS = 'Leads', VISITS = 'Visits';
+const BUILD = '2026-11-08-v4';
+const LEADS = 'Leads', VISITS = 'Visits', WHITEPAPER = 'White paper';
 const LEAD_COLS = [
   ['Received (IST)', 'received_at'], ['Name', 'name'], ['Email', 'email'], ['Looking for', 'interest'], ['Details', 'details'],
   ['Link (?r=)', 'ref'], ['Visitor ID', 'visitor_id'], ['City', 'city'], ['Region', 'region'], ['Country', 'country'],
@@ -35,6 +38,14 @@ const VISIT_COLS = [
   ['UTM medium', 'utm_medium'], ['UTM campaign', 'utm_campaign'], ['Path', 'path'], ['Visitor ID', 'vid'], ['Visit # (this browser)', 'n'],
   ['Engaged (s)', 'duration'], ['Scroll %', 'scroll'], ['Sections reached', 'sections'], ['Clicks', 'clicks'],
   ['Platform viewed', 'arm'], ['Form', 'form'],
+];
+const WP_COLS = [
+  ['Time (IST)', 'at'], ['Action', 'action'], ['IP address', 'ip'], ['City', 'city'], ['Region', 'region'], ['Country', 'country'],
+  ['Map', 'latlng'], ['Network', 'network'], ['ASN', 'asn'], ['Datacenter?', 'datacenter'], ['Device', 'device'], ['OS', 'os'],
+  ['Browser', 'browser'], ['Came from (referrer)', 'referrer'], ['Link (?r=)', 'ref'], ['UTM source', 'utm_source'],
+  ['UTM medium', 'utm_medium'], ['UTM campaign', 'utm_campaign'], ['Page', 'path'], ['Seconds on page', 'seconds_on_page'],
+  ['Screen', 'screen'], ['Language', 'lang'], ['Time zone', 'tz'], ['Visitor ID', 'vid'], ['Visit ID', 'visit_id'],
+  ['Paper version', 'paper_version'], ['User agent', 'user_agent'],
 ];
 // Columns an "update" event may overwrite.
 const VISIT_UPDATABLE = ['Last update (IST)', 'Engaged (s)', 'Scroll %', 'Sections reached', 'Clicks', 'Platform viewed', 'Form'];
@@ -51,6 +62,7 @@ function doPost(e) {
   try {
     if (body.action === 'lead') return json_(lead_(d));
     if (body.action === 'visit') return json_(visit_(d));
+    if (body.action === 'whitepaper') return json_(whitepaper_(d));
     return json_({ ok: false, error: 'unknown action' });
   } catch (err) {
     console.error(err);
@@ -160,6 +172,34 @@ function visit_(d) {
   return { ok: true };
 }
 
+// ---------- White paper ----------
+function whitepaper_(d) {
+  if (!d.action) return { ok: false, error: 'no action' };
+  const sh = sheet_(WHITEPAPER, WP_COLS);
+  withLock_(() => {
+    sh.appendRow(WP_COLS.map(c => {
+      if (c[0] === 'Map') return d.latlng ? '=HYPERLINK("https://maps.google.com/?q=' + String(d.latlng).replace(/[^0-9.,-]/g, '') + '","map")' : '';
+      return safe_(d[c[1]]);
+    }));
+  });
+  const opened = d.action === 'Opened PDF' || d.action === 'Downloaded PDF';
+  if (opened && CONFIG.NOTIFY_ON_WHITEPAPER && d.datacenter !== 'yes') {
+    const where = [d.city, d.region, d.country].filter(String).join(', ') || 'unknown location';
+    const from = d.referrer || (d.utm_source ? 'link source: ' + d.utm_source : 'direct link');
+    tryMail_('white paper notification', {
+      to: CONFIG.NOTIFY_TO, name: 'Advitia Labs website',
+      subject: 'White paper ' + (d.action === 'Downloaded PDF' ? 'downloaded' : 'opened') + ' — ' + where,
+      body: 'Someone ' + (d.action === 'Downloaded PDF' ? 'downloaded' : 'opened') + ' "Tracing Every Tonne" (v' + (d.paper_version || '') + ').\n\n'
+        + 'IP: ' + (d.ip || '—') + '\nWhere: ' + where + (d.latlng ? ' (https://maps.google.com/?q=' + String(d.latlng).replace(/[^0-9.,-]/g, '') + ')' : '')
+        + '\nNetwork: ' + (d.network || '—') + (d.asn ? ' (' + d.asn + ')' : '')
+        + '\nDevice: ' + [d.device, d.os, d.browser].filter(String).join(' · ')
+        + '\nCame from: ' + from + (d.ref ? '\nLink tag (?r=): ' + d.ref : '')
+        + '\nTime: ' + d.at + ' IST\n\nAll actions: the "White paper" tab of this sheet.',
+    });
+  }
+  return { ok: true };
+}
+
 // ---------- Housekeeping ----------
 // Run once from the editor: installs the daily retention cleanup.
 function setup() {
@@ -167,7 +207,7 @@ function setup() {
     .forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('purgeOldVisits').timeBased().everyDays(1).atHour(3).inTimezone(CONFIG.TZ).create();
   if (CONFIG.DAILY_SUMMARY) ScriptApp.newTrigger('dailySummary').timeBased().everyDays(1).atHour(CONFIG.SUMMARY_HOUR).inTimezone(CONFIG.SUMMARY_TZ).create();
-  sheet_(LEADS, LEAD_COLS); sheet_(VISITS, VISIT_COLS);
+  sheet_(LEADS, LEAD_COLS); sheet_(VISITS, VISIT_COLS); sheet_(WHITEPAPER, WP_COLS);
   buildSummary();
 }
 
@@ -215,11 +255,15 @@ function buildSummary() {
 function colLetter_(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; }
 
 function purgeOldVisits() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(VISITS);
+  purgeOld_(VISITS, 2);       // "Started (IST)"
+  purgeOld_(WHITEPAPER, 1);   // "Time (IST)": full IP addresses are not kept past RETENTION_MONTHS either
+}
+function purgeOld_(name, col) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(name);
   if (!sh || sh.getLastRow() < 2) return;
   const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - CONFIG.RETENTION_MONTHS);
   const stamp = Utilities.formatDate(cutoff, CONFIG.TZ, 'yyyy-MM-dd HH:mm:ss');
-  const started = sh.getRange(2, 2, sh.getLastRow() - 1, 1).getDisplayValues();
+  const started = sh.getRange(2, col, sh.getLastRow() - 1, 1).getDisplayValues();
   // Rows are appended in time order: delete the leading block that is older than the cutoff.
   let n = 0; while (n < started.length && started[n][0] && started[n][0] < stamp) n++;
   if (n) withLock_(() => sh.deleteRows(2, n));

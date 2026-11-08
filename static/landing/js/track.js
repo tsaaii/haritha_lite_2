@@ -107,7 +107,7 @@
   }, true);
 
   window.__adv = {
-    vid: vid, ref: ref || firstRef,
+    vid: vid, ref: ref || firstRef, visitId: visitId,
     mark: mark,
     form: function (state) { formState = state; mark('Form ' + state); if (state === 'sent') { lastUpdate = 0; flush(); } }
   };

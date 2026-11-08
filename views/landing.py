@@ -25,7 +25,8 @@ from views.landing_api import INTERESTS, form_token
 bp = Blueprint("landing", __name__, template_folder="../templates")
 
 _STATIC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "landing")
-_VERSIONED = ("css/landing.css", "js/landing.js", "js/calculator.js", "js/contact.js", "js/track.js")
+_VERSIONED = ("css/landing.css", "js/landing.js", "js/calculator.js", "js/contact.js", "js/track.js",
+              "js/whitepaper.js")
 
 CANONICAL_URL = "https://advitiaum.com/"
 CONTACT_EMAIL = "wecare@advitiaum.com"

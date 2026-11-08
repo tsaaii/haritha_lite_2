@@ -16,6 +16,8 @@ Built from the Claude Design export "Advitia Website v2". Canonical URL: `https:
 | `static/landing/img/og.png` | 1200×630 link-preview image. |
 | `views/landing_api.py` | `POST /api/contact` (lead form) and `POST /api/seen` (visit beacon). |
 | `static/landing/js/contact.js`, `track.js` | Form validation/submit; visit tracker beacon. |
+| `static/landing/js/whitepaper.js` | White paper popup (Read / Download / Skip) and its beacon. |
+| `data/whitepaper/*.pdf` | The white paper, served (and counted) at `/whitepaper`. |
 | `apps_script/landing/Code.gs` | Google Sheet + email backend for leads and visits. |
 | `tests/` | `python -m unittest discover -s tests -v` and `node tests/landing_apps_script.test.js` |
 
@@ -142,3 +144,35 @@ than 12 months are deleted daily. If someone asks for deletion, filter the Visit
 
 The form shows "We couldn't send that just now. Please email us at wecare@advitiaum.com", and every lead is
 also written to Cloud Logging. Find them in Logs Explorer with `textPayload:"LANDING_LEAD"` (visits: `"LANDING_VISIT"`).
+
+
+## White paper popup and tracker
+
+"Tracing Every Tonne" (v1.81) is served at **`https://advitiaum.com/whitepaper`** (also `/white-paper`,
+`/whitepaper.pdf`; `?dl=1` downloads). Share it per person with `?r=<who>`, e.g. `/whitepaper?r=yc-garry`.
+
+- **Popup:** on the landing page, after 4 s of the page being visible, once per browser:
+  *Read the white paper* (opens the PDF in a new tab), *Download PDF*, *Skip for now* (or ×/Esc).
+  After Read/Download it never shows again for that version; after Skip/close it returns in 14 days.
+  `advitiaum.com/?wp=1` always shows it. There is also a **White paper** link in the nav and footer.
+- **What is recorded** — the **White paper** tab of the same Google Sheet, one row per action:
+  Popup shown · Clicked Read · Clicked Download · Skipped · Closed popup, and from the server every
+  **Opened PDF** / **Downloaded PDF** (this also catches links shared outside the site). Each row has the
+  **full IP address**, city/region/country + map link, network/ASN (with `IPINFO_TOKEN`), device/OS/browser,
+  where they came from (referrer, `?r=` tag, UTM), seconds on page, and the visitor/visit IDs that join
+  it to the Visits tab. Bots, link-preview fetchers and automation are left out.
+- **Email** to `NOTIFY_TO` for every Opened/Downloaded PDF (`NOTIFY_ON_WHITEPAPER`), with IP, place,
+  network, device and source. Datacenter traffic doesn't email.
+- **Disclosure:** the popup tells visitors their IP, location, device and referrer are recorded when they
+  choose. Keep that line if you edit the popup: unlike Visits (anonymised IP), these rows hold full IPs.
+  Rows older than `RETENTION_MONTHS` are deleted daily, like Visits.
+- Also in Cloud Logging: search `WHITEPAPER` in Logs Explorer.
+
+**After deploying this version, update the Apps Script once:** paste the new `apps_script/landing/Code.gs`
+(keep your `TOKEN`), run **setup**, then **Deploy → Manage deployments → ✎ → Version: New version → Deploy**.
+Opening the `/exec` URL should show `"build":"2026-11-08-v4"`. Until then the white paper rows are only in
+Cloud Logging.
+
+**New version of the paper:** replace the PDF in `data/whitepaper/` (same file name), and bump `VERSION`
+in `whitepaper.js` and `WHITEPAPER["version"]` in `views/landing_api.py` (and the kicker in the popup) so
+everyone sees the popup again.

@@ -367,3 +367,25 @@ section[id], div[id] { scroll-margin-top: calc(var(--nav-h) + 8px); }
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; transition-delay: 0ms !important; }
   .btn:hover, .arm.is-on { transform: none; }
 }
+
+/* ---------- White paper popup (js/whitepaper.js) ---------- */
+dialog.wp { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 0; border-radius: var(--radius-xl);
+  padding: clamp(24px, 4vw, 36px); background: #fff; color: var(--ink-700); box-shadow: var(--shadow-lg); font-family: var(--font-serif); }
+dialog.wp::backdrop { background: rgba(11, 61, 34, 0.45); backdrop-filter: blur(2px); }
+dialog.wp[open] { animation: wp-in 320ms var(--ease); }
+@keyframes wp-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { dialog.wp[open] { animation: none; } }
+.wp-x-form { position: absolute; top: 14px; right: 14px; margin: 0; }
+.wp-x { width: 40px; height: 40px; border: 0; border-radius: 999px; background: var(--ink-050); color: var(--ink-700); font-size: 24px; line-height: 1; cursor: pointer; }
+.wp-x:hover { background: var(--ink-100); }
+.wp-kicker { margin: 0 0 8px; color: var(--green-700); }
+.wp-title { margin: 0; font-size: clamp(28px, 4vw, 36px); line-height: 1.1; color: var(--ink-900); padding-right: 40px; }
+.wp-sub { margin: 8px 0 0; font-size: var(--text-lg); line-height: 1.35; color: var(--ink-900); }
+.wp-desc { margin: 14px 0 0; font-size: var(--text-sm); line-height: 1.55; }
+.wp-meta { margin: 10px 0 0; font-size: var(--text-xs); color: var(--ink-500); }
+.wp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px; }
+.wp-btn { min-height: 52px; font-size: 17px; }
+.wp-skip { border: 0; background: none; padding: 10px 6px; color: var(--ink-500); font-size: var(--text-sm); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.wp-skip:hover { color: var(--ink-900); }
+.wp-note { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--ink-100); font-size: 12.5px; line-height: 1.5; color: var(--ink-500); }
+@media (max-width: 520px) { .wp-actions .btn { width: 100%; } .wp-skip { width: 100%; text-align: center; } }
