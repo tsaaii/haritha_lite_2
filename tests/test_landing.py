@@ -75,3 +75,17 @@ class LandingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeroLabTests(unittest.TestCase):
+    def test_lab_page(self):
+        r = app.test_client().get("/lab/hero")
+        self.assertEqual(r.status_code, 200)
+        body = r.get_data(as_text=True)
+        self.assertIn('id="lab-stage"', body)
+        self.assertIn("vendor/gsap/gsap.min.js", body)
+        self.assertIn("js/hero-scenes.js", body)
+        self.assertIn("noindex", r.headers["X-Robots-Tag"])
+        self.assertIn("script-src 'self'", r.headers["Content-Security-Policy"])
+        for f in ("gsap.min.js", "MorphSVGPlugin.min.js", "MotionPathPlugin.min.js", "DrawSVGPlugin.min.js"):
+            self.assertEqual(app.test_client().get("/static/landing/vendor/gsap/" + f).status_code, 200, f)

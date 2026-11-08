@@ -1,0 +1,41 @@
+{%- set S = url_for('static', filename='landing/') -%}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Hero animation lab · Advitia Labs</title>
+  <link rel="icon" type="image/svg+xml" href="{{ S }}img/favicon.svg">
+  <link rel="preload" href="{{ S }}fonts/pagella-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ S }}css/landing.css?v={{ v }}">
+  <link rel="stylesheet" href="{{ S }}css/hero-scenes.css?v={{ v }}">
+</head>
+<body>
+<main class="lab wrap">
+  <div class="lab-head">
+    <div>
+      <h1>Hero animation lab</h1>
+      <p>All nine word scenes, one after another. Pick any to replay it. Nothing here is on the live site yet; choose the ones to keep.</p>
+    </div>
+    <div class="lab-ctrl">
+      <button type="button" id="lab-prev" aria-label="Previous scene">&#8592;</button>
+      <button type="button" id="lab-pause">Pause</button>
+      <button type="button" id="lab-next" aria-label="Next scene">&#8594;</button>
+      <label><input type="checkbox" id="lab-loop" checked> Play all</label>
+    </div>
+  </div>
+  <div class="lab-card">
+    <div class="hs-stage" id="lab-stage"><span class="hs-word">Tracing.</span></div>
+    <div class="lab-now" aria-live="polite"><strong id="lab-name"></strong><span id="lab-blurb"></span></div>
+  </div>
+  <div class="lab-chips" id="lab-chips" role="group" aria-label="Scenes"></div>
+</main>
+<script src="{{ S }}vendor/gsap/gsap.min.js" defer></script>
+<script src="{{ S }}vendor/gsap/MorphSVGPlugin.min.js" defer></script>
+<script src="{{ S }}vendor/gsap/MotionPathPlugin.min.js" defer></script>
+<script src="{{ S }}vendor/gsap/DrawSVGPlugin.min.js" defer></script>
+<script src="{{ S }}js/hero-scenes.js?v={{ v }}" defer></script>
+<script src="{{ S }}js/hero-lab.js?v={{ v }}" defer></script>
+</body>
+</html>

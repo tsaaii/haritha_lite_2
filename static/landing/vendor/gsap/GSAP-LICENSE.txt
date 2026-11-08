@@ -1,0 +1,5 @@
+GSAP 3.15.1 (gsap, MorphSVGPlugin, MotionPathPlugin, DrawSVGPlugin), https://gsap.com
+Copyright GreenSock. Used under GreenSock's Standard "No Charge" License:
+https://gsap.com/standard-license
+Since 2025 GSAP, including all plugins, is free for commercial use (https://webflow.com/blog/gsap-becomes-free).
+Files are the unmodified builds from the npm package gsap@3.15.1 (dist/*.min.js).
