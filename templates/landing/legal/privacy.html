@@ -1,0 +1,96 @@
+{% extends "landing/legal/_base.html" %}
+{% block body %}
+<p class="legal-lead">This policy explains what advitiaum.com collects about visitors, why, how long it is kept, who
+  processes it for us, and how to ask us to see or delete it. It covers this website only. Data handled inside the
+  ADEX platform for our clients is governed by our contracts with those clients.</p>
+
+<h2 id="who">1. Who we are</h2>
+<p>advitiaum.com is run by Advitia Labs ("we", "us"). For anything in this policy, including requests about your
+  data, write to <a href="mailto:{{ email }}?subject=Privacy%20request">{{ email }}</a>. That address also reaches the
+  person responsible for handling grievances about personal data.</p>
+
+<h2 id="collect">2. What we collect</h2>
+<h3>When you visit the site</h3>
+<ul>
+  <li><strong>Approximate location</strong> (city, region, country) and the name of your network or internet provider,
+    worked out from your IP address. For page visits and contact messages <strong>we shorten the IP address before
+    storing it</strong> (we drop the last part: the last number of an IPv4 address, everything after the first 48 bits of an IPv6 address).</li>
+  <li><strong>Device details</strong>: device type, operating system, browser, screen size, language and time zone.</li>
+  <li><strong>How you arrived</strong>: the referring page, any campaign tags in the link (utm_*), and any link tag
+    we put in links we share (?r=).</li>
+  <li><strong>How you used the page</strong>: time on page, how far you scrolled, which sections you reached and
+    which buttons or links you clicked.</li>
+  <li>A <strong>random visitor ID</strong> kept in your browser's local storage, so repeat visits from the same browser
+    can be counted. It contains nothing about you. See <a href="/cookies">Cookies and local storage</a>.</li>
+</ul>
+<p>We do not collect this when your browser looks like an automated client (crawlers, link previews, test tools).</p>
+
+<h3 id="white-paper">When you use the white paper popup or open the white paper</h3>
+<p>When you choose an option in the white paper popup (read, download, skip or close), and whenever the white paper
+  PDF is opened or downloaded, we record <strong>your full IP address</strong>, together with the approximate
+  location, network, device, the page that sent you and the time. We use this to understand which organisations
+  read our research. The popup says so before you choose.</p>
+
+<h3>When you send the contact form</h3>
+<p>Your name, email address, the topic you chose and your message, along with the same shortened-IP visit details
+  as above. We send you one automatic confirmation email.</p>
+
+<h3>When you use the translate menu</h3>
+<p>If you pick a language, your browser loads Google's translation service and sends it the page text. Google
+  processes it under <a href="https://policies.google.com/privacy" rel="noopener" target="_blank">Google's privacy
+  policy</a>. If you never pick a language, nothing is sent to Google for translation.</p>
+
+<h2 id="why">3. Why we use it</h2>
+<ul>
+  <li>To answer your message and follow up on a pilot or partnership you asked about.</li>
+  <li>To understand how many people visit, from where, and which content they find useful.</li>
+  <li>To know which organisations read our white paper.</li>
+  <li>To keep the site secure: rate limits, spam filtering and abuse prevention.</li>
+</ul>
+<p>We rely on your consent where you give it (sending the form, choosing an option in the white paper popup) and on our
+  legitimate interest in running and improving a business website for the rest. We do not sell personal data, we do not
+  use it for advertising, and we do not build profiles to make automated decisions about you.</p>
+
+<h2 id="processors">4. Who processes it for us</h2>
+<ul>
+  <li><strong>Google Cloud</strong> (App Engine): hosts the site and keeps server logs.</li>
+  <li><strong>Google Workspace</strong> (Sheets, Apps Script, Gmail): stores visit, white paper and contact records and
+    sends the related emails.</li>
+  <li><strong>ipinfo.io</strong>: looks up the network name for an IP address.</li>
+  <li><strong>Google Translate</strong>: only if you use the translate menu.</li>
+</ul>
+<p>These providers may process data outside your country, including in the United States and India.</p>
+
+<h2 id="retention">5. How long we keep it</h2>
+<ul>
+  <li>Visit records and white paper records (including full IP addresses): <strong>12 months</strong>, then deleted
+    automatically.</li>
+  <li>Contact messages: for as long as the conversation or business relationship lasts, and then for as long as the
+    law requires us to keep business correspondence.</li>
+  <li>Server logs: under Google Cloud's standard log retention.</li>
+</ul>
+
+<h2 id="rights">6. Your rights</h2>
+<p>Depending on where you live (for example under India's Digital Personal Data Protection Act 2023, the EU and UK
+  GDPR, or US state privacy laws such as California's), you can ask us to:</p>
+<ul>
+  <li>tell you what data we hold about you and give you a copy;</li>
+  <li>correct it, or delete it;</li>
+  <li>stop using it for a particular purpose, or withdraw consent you gave;</li>
+  <li>name someone to exercise these rights for you.</li>
+</ul>
+<p>Write to <a href="mailto:{{ email }}?subject=Privacy%20request">{{ email }}</a>. Your IP address, or the email
+  address you used in the form, helps us find your records. We reply within 30 days. You can also complain to the data
+  protection authority where you live, for example the Data Protection Board of India or your EU/UK supervisory authority.</p>
+<p>To stop the visitor ID, clear this site's data in your browser, or use a private window.</p>
+
+<h2 id="children">7. Children</h2>
+<p>This site is meant for businesses and public bodies, and we do not knowingly collect data from children.</p>
+
+<h2 id="security">8. Security</h2>
+<p>The site is served only over HTTPS. Access to our records is limited to the people who need it. No system is
+  completely secure, but if a breach affects your data, we will tell you and the relevant authority as the law requires.</p>
+
+<h2 id="changes">9. Changes</h2>
+<p>When this policy changes, we update the date at the top. If a change is significant, we say so on the site.</p>
+{% endblock %}

@@ -22,6 +22,7 @@
   <link rel="preload" href="{{ S }}fonts/pagella-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ S }}css/landing.css?v={{ v }}">
   <link rel="stylesheet" href="{{ S }}css/hero-scenes.css?v={{ v }}">
+  <script src="{{ S }}js/prefs.js?v={{ v }}"></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Advitia Labs","url":"{{ canonical_url }}","email":"{{ email }}","description":"ADEX: verifiable waste accounting and alternative-fuel markets for methane and coal abatement."}</script>
 </head>
 <body>
@@ -29,13 +30,14 @@
 
 <header class="site-header">
   <nav class="nav" aria-label="Primary">
-    <a href="#top" class="brand" aria-label="Advitia Labs, back to top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Advitia <span>Labs</span></span></a>
+    <a href="#top" class="brand notranslate" translate="no" aria-label="Advitia Labs, back to top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Advitia <span>Labs</span></span></a>
     <div class="nav-right">
       <a class="nav-link" href="#platform">ADEX</a>
       <a class="nav-link" href="#audit">Live audit</a>
       <a class="nav-link" href="#marketplace">Marketplace</a>
       <a class="nav-link" href="#business">Business</a>
       <a class="btn-nav-ghost" href="/whitepaper?src=nav" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>White paper</a>
+      <button type="button" class="btn-prefs" data-prefs-open aria-haspopup="dialog" aria-label="Accessibility and language settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg><span class="btn-prefs-t">Accessibility &amp; language</span></button>
       <a class="btn-nav" href="#contact">Request a pilot{{ arrow() }}</a>
     </div>
   </nav>
@@ -45,7 +47,7 @@
   <section id="top" class="hero wrap" aria-labelledby="hero-title">
     <div class="hero-inner">
       <a class="pill-link" href="/whitepaper?src=hero" target="_blank" rel="noopener"><span class="tag">New white paper</span><span>Tracing Every Tonne · v1.81</span>{{ arrow() }}</a>
-      <h1 id="hero-title" class="hero-word hero-scenes"><span class="sr-only">Advitia Labs: tracing every tonne of waste, from processing and sorting to reclaiming land and alternate fuel.</span><span class="hs-stage" id="hero-stage" aria-hidden="true"><span class="hs-word">Tracing.</span></span></h1>
+      <h1 id="hero-title" class="hero-word hero-scenes"><span class="sr-only">Advitia Labs: tracing every tonne of waste, from processing and sorting to reclaiming land and alternate fuel.</span><span class="hs-stage notranslate" id="hero-stage" aria-hidden="true" translate="no"><span class="hs-word">Tracing.</span></span></h1>
       <h2 class="hero-sub">Verifiable waste accounting that turns every tonne into <span class="green">audited climate value.</span></h2>
       <p class="hero-p">ADEX records every custody transfer of waste with weight, evidence and approval, enforces site-level mass balance, and opens the full record to auditors. On that record, a marketplace matches quality-verified fuel with cement kilns, power stations and industrial boilers to replace coal.</p>
       <div class="cta-row">
@@ -384,9 +386,10 @@
         <div class="foot-col"><span class="foot-brand">Advitia Labs</span><span class="foot-tag">ADEX: verifiable waste accounting and alternative-fuel markets for methane and coal abatement.</span></div>
         <nav class="foot-col" aria-label="ADEX"><span class="caps">ADEX</span><a href="#platform">Product</a><a href="#events">Event records</a><a href="#audit">Live audit</a><a href="#marketplace">Marketplace</a><a href="#calculator">Calculator</a></nav>
         <nav class="foot-col" aria-label="Company"><span class="caps">Company</span><a href="/whitepaper?src=footer" target="_blank" rel="noopener">White paper</a><a href="#business">Business model</a><a href="mailto:{{ email }}?subject=Careers">Careers</a></nav>
-        <div class="foot-col"><span class="caps">Contact</span><a href="mailto:{{ email }}">{{ email }}</a></div>
+        <nav class="foot-col" aria-label="Legal"><span class="caps">Legal</span><a href="/privacy">Privacy policy</a><a href="/terms">Terms of use</a><a href="/cookies">Cookies and storage</a><a href="/accessibility">Accessibility</a></nav>
+        <div class="foot-col"><span class="caps">Contact</span><a href="mailto:{{ email }}">{{ email }}</a><a href="mailto:{{ email }}?subject=Privacy%20request">Privacy requests</a></div>
       </footer>
-      <div class="foot-base caps"><span>© {{ year }} Advitia Labs</span><span>Tracing every tonne.</span></div>
+      <div class="foot-base caps"><span>© {{ year }} Advitia Labs</span><span class="foot-legal"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/cookies">Cookies</a><button type="button" data-prefs-open>Accessibility &amp; language</button></span><span>Tracing every tonne.</span></div>
     </div>
   </section>
 </main>
@@ -405,8 +408,10 @@
     <button type="button" class="wp-skip" data-wp="skip">Skip for now</button>
   </div>
   <p class="wp-note">When you choose an option we record your IP address, approximate location, device and the page that
-    sent you here, so we know who is reading our research. Questions: <a href="mailto:{{ email }}">{{ email }}</a>.</p>
+    sent you here, so we know who is reading our research (<a href="/privacy#white-paper">privacy policy</a>). Questions: <a href="mailto:{{ email }}">{{ email }}</a>.</p>
 </dialog>
+
+{% include "landing/_prefs.html" %}
 
 <script src="{{ S }}js/track.js?v={{ v }}" defer></script>
 <script src="{{ S }}js/whitepaper.js?v={{ v }}" defer></script>

@@ -26,20 +26,25 @@ bp = Blueprint("landing", __name__, template_folder="../templates")
 
 _STATIC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "landing")
 _VERSIONED = ("css/landing.css", "js/landing.js", "js/calculator.js", "js/contact.js", "js/track.js",
-              "js/whitepaper.js", "css/hero-scenes.css", "js/hero-scenes.js", "js/hero-lab.js", "js/hero-init.js")
+              "js/whitepaper.js", "css/hero-scenes.css", "js/hero-scenes.js", "js/hero-lab.js", "js/hero-init.js",
+              "js/prefs.js", "css/legal.css")
 
 CANONICAL_URL = "https://advitiaum.com/"
 CONTACT_EMAIL = "wecare@advitiaum.com"
 
 # script-src has no 'unsafe-inline': all JS is in static files. style-src needs
 # 'unsafe-inline' for the style="" attributes on data-driven bar widths.
+# The Google hosts are for the translate menu (js/prefs.js). Google's script is loaded only
+# after a visitor picks a language, so nothing is fetched from Google until then.
+_GT = "https://translate.google.com https://translate.googleapis.com https://translate-pa.googleapis.com"
 _CSP = "; ".join([
     "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    f"script-src 'self' {_GT} https://www.gstatic.com",
+    f"style-src 'self' 'unsafe-inline' https://www.gstatic.com https://translate.googleapis.com",
+    f"img-src 'self' data: https://www.gstatic.com https://www.google.com {_GT}",
     "font-src 'self'",
-    "connect-src 'self'",
+    f"connect-src 'self' {_GT}",
+    f"frame-src {_GT}",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
@@ -99,3 +104,48 @@ def lab_hero():
     resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Legal / compliance pages (linked from the footer)
+# ---------------------------------------------------------------------------
+LEGAL_UPDATED = "8 November 2026"
+LEGAL_PAGES = {
+    "privacy": "Privacy policy",
+    "terms": "Terms of use",
+    "cookies": "Cookies and local storage",
+    "accessibility": "Accessibility statement",
+}
+
+
+def _legal(slug: str):
+    html = render_template(f"landing/legal/{slug}.html", v=ASSET_V, title=LEGAL_PAGES[slug], slug=slug,
+                           pages=LEGAL_PAGES, updated=LEGAL_UPDATED, email=CONTACT_EMAIL,
+                           canonical_url=f"{CANONICAL_URL}{slug}", year=datetime.now(config.IST).year)
+    resp = make_response(html)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    resp.headers["Content-Security-Policy"] = _CSP
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    resp.headers["X-Frame-Options"] = "DENY"
+    return resp
+
+
+@bp.route("/privacy", strict_slashes=False)
+def privacy():
+    return _legal("privacy")
+
+
+@bp.route("/terms", strict_slashes=False)
+def terms():
+    return _legal("terms")
+
+
+@bp.route("/cookies", strict_slashes=False)
+def cookies():
+    return _legal("cookies")
+
+
+@bp.route("/accessibility", strict_slashes=False)
+def accessibility():
+    return _legal("accessibility")

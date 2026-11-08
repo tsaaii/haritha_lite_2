@@ -1,0 +1,47 @@
+{%- set S = url_for('static', filename='landing/') -%}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ title }} · Advitia Labs</title>
+  <meta name="description" content="{{ title }} for advitiaum.com, the website of Advitia Labs.">
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta name="theme-color" content="#0B3D22">
+  <link rel="icon" type="image/svg+xml" href="{{ S }}img/favicon.svg">
+  <link rel="stylesheet" href="{{ S }}css/landing.css?v={{ v }}">
+  <link rel="stylesheet" href="{{ S }}css/legal.css?v={{ v }}">
+  <script src="{{ S }}js/prefs.js?v={{ v }}"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <nav class="nav" aria-label="Primary">
+    <a href="/" class="brand notranslate" translate="no" aria-label="Advitia Labs, home"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Advitia <span>Labs</span></span></a>
+    <div class="nav-right">
+      <a class="nav-link" href="/">Home</a>
+      <button type="button" class="btn-prefs" data-prefs-open aria-haspopup="dialog" aria-label="Accessibility and language settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg><span class="btn-prefs-t">Accessibility &amp; language</span></button>
+      <a class="btn-nav" href="/#contact">Contact us</a>
+    </div>
+  </nav>
+</header>
+<main id="main" class="legal wrap">
+  <nav class="legal-nav" aria-label="Legal pages">
+    {%- for k, name in pages.items() %}
+    <a href="/{{ k }}"{% if k == slug %} aria-current="page"{% endif %}>{{ name }}</a>
+    {%- endfor %}
+  </nav>
+  <article class="legal-doc">
+    <p class="caps legal-kicker">Legal</p>
+    <h1>{{ title }}</h1>
+    <p class="legal-updated">Last updated: {{ updated }}</p>
+    {% block body %}{% endblock %}
+  </article>
+</main>
+<footer class="legal-foot wrap">
+  <span>© {{ year }} Advitia Labs</span>
+  <span><a href="mailto:{{ email }}">{{ email }}</a></span>
+</footer>
+{% include "landing/_prefs.html" %}
+</body>
+</html>

@@ -1,0 +1,23 @@
+{% extends "landing/legal/_base.html" %}
+{% block body %}
+<p class="legal-lead">advitiaum.com sets <strong>no advertising or third-party tracking cookies</strong>. It
+  stores a few small values in your browser, listed below. You can clear them at any time in your browser's settings for this site.</p>
+
+<div class="legal-table-wrap">
+<table class="legal-table">
+  <thead><tr><th scope="col">Name</th><th scope="col">Where</th><th scope="col">What it is for</th><th scope="col">How long</th></tr></thead>
+  <tbody>
+    <tr><td><code>adv_vid</code></td><td>Local storage</td><td>A random visitor ID, so repeat visits from the same browser are counted once. It contains nothing about you.</td><td>Until you clear site data</td></tr>
+    <tr><td><code>adv_n</code>, <code>adv_first_ref</code></td><td>Local storage</td><td>How many times this browser has visited, and the first link tag (?r=) it arrived with.</td><td>Until you clear site data</td></tr>
+    <tr><td><code>adv_ref</code>, <code>adv_counted</code></td><td>Session storage</td><td>The link tag (?r=) for this tab, and whether this visit has already been counted.</td><td>Until the tab closes</td></tr>
+    <tr><td><code>adv_wp_&lt;version&gt;</code></td><td>Local storage</td><td>Remembers that you have already answered the white paper popup, so it isn't shown again (or only after 14 days if you skipped it).</td><td>Until you clear site data</td></tr>
+    <tr><td><code>adv_prefs</code></td><td>Local storage</td><td>Your accessibility settings (text size, contrast, animations, spacing, font).</td><td>Until you clear site data</td></tr>
+    <tr><td><code>googtrans</code></td><td>Cookie</td><td>Set only if you pick a language. It remembers that language, so the next page opens translated. Google's translation service may set its own cookies when it loads.</td><td>1 year, or until you choose English</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>If a visitor signs in to one of our client dashboards, a secure session cookie keeps them signed in. It is
+  strictly necessary for that service and is not used on the public pages.</p>
+<p>More about what we collect and why: <a href="/privacy">Privacy policy</a>.</p>
+{% endblock %}

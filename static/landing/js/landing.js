@@ -7,7 +7,7 @@
 if (!window.React || !window.ReactDOM) return;
 
 const mq = q => !!(window.matchMedia && window.matchMedia(q).matches);
-const REDUCED = mq('(prefers-reduced-motion: reduce)');
+const REDUCED = mq('(prefers-reduced-motion: reduce)') || document.documentElement.classList.contains('a11y-still');   // js/prefs.js setting
 const CAN_HOVER = mq('(hover: hover) and (pointer: fine)');
 const SUBS = { '₂': '2', '₄': '4', 'ₓ': 'x' };
 /* Pagella has no subscript digits; render CO₂ / CH₄ with real <sub>. */

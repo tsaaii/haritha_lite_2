@@ -89,3 +89,47 @@ class HeroLabTests(unittest.TestCase):
         self.assertIn("script-src 'self'", r.headers["Content-Security-Policy"])
         for f in ("gsap.min.js", "MorphSVGPlugin.min.js", "MotionPathPlugin.min.js", "DrawSVGPlugin.min.js"):
             self.assertEqual(app.test_client().get("/static/landing/vendor/gsap/" + f).status_code, 200, f)
+
+
+class LegalAndPrefsTests(unittest.TestCase):
+    def setUp(self):
+        self.c = app.test_client()
+
+    def test_footer_links_to_every_legal_page(self):
+        body = self.c.get("/").get_data(as_text=True)
+        for path, heading in (("/privacy", "Privacy policy"), ("/terms", "Terms of use"),
+                              ("/cookies", "Cookies and local storage"), ("/accessibility", "Accessibility statement")):
+            self.assertIn(f'href="{path}"', body)
+            r = self.c.get(path)
+            self.assertEqual(r.status_code, 200, path)
+            page = r.get_data(as_text=True)
+            self.assertIn(f"<h1>{heading}</h1>", page)
+            self.assertIn("wecare@advitiaum.com", page)
+            self.assertIn('id="prefs"', page)                         # settings panel on legal pages too
+            self.assertEqual(r.headers["X-Frame-Options"], "DENY")
+            for tag in re.findall(r"<script\b[^>]*>", page):
+                self.assertIn("src=", tag)
+
+    def test_privacy_matches_what_is_collected(self):
+        page = self.c.get("/privacy").get_data(as_text=True)
+        self.assertIn('id="white-paper"', page)                       # the popup links here
+        self.assertIn("full IP address", page)
+        self.assertIn("12 months", page)
+        self.assertIn('href="/privacy#white-paper"', self.c.get("/").get_data(as_text=True))
+        cookies = self.c.get("/cookies").get_data(as_text=True)
+        for key in ("adv_vid", "adv_prefs", "googtrans", "adv_wp_"):
+            self.assertIn(key, cookies)
+
+    def test_prefs_panel_and_translate_csp(self):
+        r = self.c.get("/")
+        body = r.get_data(as_text=True)
+        self.assertIn('id="prefs"', body)
+        self.assertIn("data-prefs-open", body)
+        self.assertIn('id="hero-stage" aria-hidden="true" translate="no"', body)
+        # prefs.js runs before paint (no defer) so saved settings don't flash
+        self.assertRegex(body, r'<script src="[^"]*js/prefs\.js\?v=[^"]*"></script>')
+        csp = r.headers["Content-Security-Policy"]
+        self.assertIn("https://translate.google.com", csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertNotIn("unsafe-eval", csp)
+        self.assertNotIn("script-src 'self' 'unsafe-inline'", csp)

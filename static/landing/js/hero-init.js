@@ -6,5 +6,5 @@
   var SCENES = ['tracing', 'processing', 'sorting', 'reclaiming', 'recovery', 'remediating', 'auditing', 'afr'];
   var stage = document.getElementById('hero-stage');
   if (!stage || !window.HeroScenes) return;          // no JS / GSAP: the static "Tracing." stays
-  window.HeroScenes.mount(stage, { scenes: SCENES, loop: true });
+  window.__hero = window.HeroScenes.mount(stage, { scenes: SCENES, loop: true });   // js/prefs.js replays it when motion settings change
 })();

@@ -7,6 +7,8 @@
 //   Visits   one row per page view, updated with engagement (time, scroll, sections, clicks).
 //   White paper  one row per white-paper action (popup shown / read / download / skip / close, and every
 //                open of the PDF), with the FULL IP address; an email for each open or download.
+//   WP downloads  live view of the White paper tab: every PDF download/open (newest first) and one row per
+//                 IP address (city, network, how many downloads and opens, first and last time).
 
 const CONFIG = {
   TOKEN: 'CHANGE-ME-long-random-string',                  // must equal LANDING_SCRIPT_TOKEN in app.yaml
@@ -23,8 +25,8 @@ const CONFIG = {
 };
 
 // ---------- nothing below this line needs editing ----------
-const BUILD = '2026-11-08-v4';
-const LEADS = 'Leads', VISITS = 'Visits', WHITEPAPER = 'White paper';
+const BUILD = '2026-11-08-v5';
+const LEADS = 'Leads', VISITS = 'Visits', WHITEPAPER = 'White paper', DOWNLOADS = 'WP downloads';
 const LEAD_COLS = [
   ['Received (IST)', 'received_at'], ['Name', 'name'], ['Email', 'email'], ['Looking for', 'interest'], ['Details', 'details'],
   ['Link (?r=)', 'ref'], ['Visitor ID', 'visitor_id'], ['City', 'city'], ['Region', 'region'], ['Country', 'country'],
@@ -176,6 +178,7 @@ function visit_(d) {
 function whitepaper_(d) {
   if (!d.action) return { ok: false, error: 'no action' };
   const sh = sheet_(WHITEPAPER, WP_COLS);
+  if (!SpreadsheetApp.getActive().getSheetByName(DOWNLOADS)) buildDownloads();   // first time after updating the script
   withLock_(() => {
     sh.appendRow(WP_COLS.map(c => {
       if (c[0] === 'Map') return d.latlng ? '=HYPERLINK("https://maps.google.com/?q=' + String(d.latlng).replace(/[^0-9.,-]/g, '') + '","map")' : '';
@@ -209,6 +212,7 @@ function setup() {
   if (CONFIG.DAILY_SUMMARY) ScriptApp.newTrigger('dailySummary').timeBased().everyDays(1).atHour(CONFIG.SUMMARY_HOUR).inTimezone(CONFIG.SUMMARY_TZ).create();
   sheet_(LEADS, LEAD_COLS); sheet_(VISITS, VISIT_COLS); sheet_(WHITEPAPER, WP_COLS);
   buildSummary();
+  buildDownloads();
 }
 
 // "Summary" tab: live formulas over Visits (datacenter traffic excluded) + a world map by country.
@@ -252,6 +256,37 @@ function buildSummary() {
   } catch (err) { console.warn('geo chart skipped: ' + err); }
 }
 
+// "WP downloads" tab: live formulas over the White paper tab (bots and datacenters excluded).
+// Left: every time the PDF was downloaded or opened, newest first. Right: one row per IP address.
+// Safe to re-run; it rebuilds the tab.
+function buildDownloads() {
+  const ss = SpreadsheetApp.getActive();
+  sheet_(WHITEPAPER, WP_COLS);
+  let sh = ss.getSheetByName(DOWNLOADS);
+  if (sh) ss.deleteSheet(sh);
+  sh = ss.insertSheet(DOWNLOADS, 1);
+  const c = name => colLetter_(WP_COLS.findIndex(x => x[0] === name) + 1);
+  const src = "'" + WHITEPAPER + "'!A2:" + colLetter_(WP_COLS.length);
+  const pdf = '(' + c('Action') + " = 'Downloaded PDF' or " + c('Action') + " = 'Opened PDF') and " + c('Datacenter?') + " <> 'yes'";
+  const list = ['Time (IST)', 'Action', 'IP address', 'City', 'Region', 'Country', 'Network', 'Came from (referrer)', 'Link (?r=)', 'Device'];
+  const blocks = [
+    ['A1', 'Every download and open (newest first)', '=IFERROR(QUERY(' + src + ', "select ' + list.map(c).join(', ') + ' where ' + pdf
+      + ' order by ' + c('Time (IST)') + ' desc label ' + list.map(n => c(n) + " '" + n + "'").join(', ') + '", 0), "No downloads yet")'],
+    ['L1', 'By IP address', '=IFERROR(QUERY(' + src + ', "select ' + [c('IP address'), c('City'), c('Country'), c('Network')].join(', ')
+      + ', count(' + c('Action') + '), min(' + c('Time (IST)') + '), max(' + c('Time (IST)') + ') where ' + pdf
+      + ' group by ' + [c('IP address'), c('City'), c('Country'), c('Network')].join(', ') + ' order by max(' + c('Time (IST)') + ') desc'
+      + " label " + c('IP address') + " 'IP address', count(" + c('Action') + ") 'Downloads + opens', min(" + c('Time (IST)')
+      + ") 'First (IST)', max(" + c('Time (IST)') + ") 'Last (IST)'\", 0), \"No downloads yet\")"],
+  ];
+  blocks.forEach(b => {
+    const cell = sh.getRange(b[0]);
+    cell.setValue(b[1]).setFontWeight('bold').setFontColor('#0F7A3E');
+    sh.getRange(cell.getRow() + 1, cell.getColumn()).setFormula(b[2]);
+  });
+  sh.setFrozenRows(2);
+  return sh;
+}
+
 function colLetter_(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; }
 
 function purgeOldVisits() {
@@ -277,6 +312,8 @@ function dailySummary() {
   const cutoff = Utilities.formatDate(since, CONFIG.TZ, 'yyyy-MM-dd HH:mm:ss');   // sheet times are IST text
   const visits = rows_(VISITS).filter(v => v['Started (IST)'] >= cutoff && v['Datacenter?'] !== 'yes');
   const leads = rows_(LEADS).filter(l => l['Received (IST)'] >= cutoff);
+  const pdfs = rows_(WHITEPAPER).filter(w => w['Time (IST)'] >= cutoff && w['Datacenter?'] !== 'yes'
+    && (w['Action'] === 'Downloaded PDF' || w['Action'] === 'Opened PDF'));
 
   const people = new Set(visits.map(v => v['Visitor ID'] || v['Visit ID'])).size;
   const returning = new Set(visits.filter(v => +v['Visit # (this browser)'] > 1).map(v => v['Visitor ID'])).size;
@@ -297,6 +334,10 @@ function dailySummary() {
     ['Devices', top(visits.map(v => v['Device'] + (v['OS'] ? ' ' + v['OS'] : '')), 4).join(' · ') || '—'],
     ['Sources', top(visits.map(source)).join(' · ') || '—'],
     ['Links opened', top(visits.map(v => v['Link (?r=)']), 10).join(' · ') || 'none'],
+    ['White paper', pdfs.length ? pdfs.filter(w => w['Action'] === 'Downloaded PDF').length + ' downloaded, '
+      + pdfs.filter(w => w['Action'] === 'Opened PDF').length + ' opened: '
+      + top(pdfs.map(w => [w['City'], w['Country']].filter(String).join(', ') + (w['Network'] ? ' (' + w['Network'] + ')' : ''))).join(' · ')
+      : 'none'],
     ['Leads', leads.length ? leads.map(l => l['Name'] + ' — ' + l['Looking for']).join(' · ') : 'none'],
   ];
   if (!CONFIG.DAILY_SUMMARY) return lines;

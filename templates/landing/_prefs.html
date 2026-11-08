@@ -1,0 +1,33 @@
+{#- Accessibility & language panel (js/prefs.js). Included by index.html and the legal pages. -#}
+<dialog class="prefs" id="prefs" aria-labelledby="prefs-title">
+  <form method="dialog" class="wp-x-form"><button class="wp-x" aria-label="Close settings">&times;</button></form>
+  <h2 id="prefs-title" class="prefs-title">Accessibility &amp; language</h2>
+  <p class="prefs-sub">Saved in this browser only. <a href="/accessibility">Accessibility statement</a></p>
+
+  <div class="prefs-group">
+    <label class="prefs-k" for="prefs-lang">Language</label>
+    <select id="prefs-lang" class="prefs-select notranslate" translate="no"></select>
+  </div>
+
+  <fieldset class="prefs-group">
+    <legend class="prefs-k">Text size</legend>
+    <div class="prefs-seg">
+      <label><input type="radio" name="prefs-text" value="0"><span>Default</span></label>
+      <label><input type="radio" name="prefs-text" value="1"><span>Large</span></label>
+      <label><input type="radio" name="prefs-text" value="2"><span>Larger</span></label>
+    </div>
+  </fieldset>
+
+  <div class="prefs-group prefs-toggles">
+    <label class="prefs-t"><input type="checkbox" data-pref="contrast"><span><strong>High contrast</strong><small>Darker text and stronger borders</small></span></label>
+    <label class="prefs-t"><input type="checkbox" data-pref="still"><span><strong>Stop animations</strong><small>Still headline, no moving graphics</small></span></label>
+    <label class="prefs-t"><input type="checkbox" data-pref="links"><span><strong>Underline links</strong><small>Make every link easy to spot</small></span></label>
+    <label class="prefs-t"><input type="checkbox" data-pref="spacing"><span><strong>Wider spacing</strong><small>More room between letters, words and lines</small></span></label>
+    <label class="prefs-t"><input type="checkbox" data-pref="font"><span><strong>Plain font</strong><small>A simple sans-serif typeface</small></span></label>
+  </div>
+
+  <div class="prefs-foot">
+    <button type="button" class="prefs-reset" data-prefs-reset>Reset display settings</button>
+  </div>
+  <p class="prefs-msg" data-prefs-msg role="status" aria-live="polite"></p>
+</dialog>

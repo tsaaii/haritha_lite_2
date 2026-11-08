@@ -10,3 +10,6 @@ venv/
 *.log
 # Local RDF report store (RDF_TRACKER_DIR default)
 rdf_tracker_data/
+
+# Deploy-time secrets (app.yaml includes it; template: secrets.example.yaml)
+secrets.yaml
