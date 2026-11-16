@@ -21,13 +21,14 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+import config
 from data import rdf_report
 
 PX = 0.75
 TOKENS = {
     "--green-700": "#0F7A3E", "--green-600": "#0FA14E", "--red-600": "#C2402F",
     "--ink-900": "#121A14", "--ink-700": "#33413A", "--ink-500": "#5C6B62", "--ink-300": "#9AA79F",
-    "--ink-200": "#CBD4CE", "--ink-100": "#E8EDEA", "--white": "#FFFFFF",
+    "--ink-200": "#CBD4CE", "--ink-100": "#E8EDEA", "--ink-050": "#F0F3F1", "--white": "#FFFFFF",
 }
 SERIF, SERIF_B = "Times-Roman", "Times-Bold"   # built-in; closest to Palatino without shipping font files
 
@@ -250,9 +251,9 @@ def _page_number(canvas, doc):
     canvas.restoreState()
 
 
-def filename(r: dict) -> str:
-    """Daily_RDF_tracker_DD-MM-YYYY.pdf, dated like the uploaded sheet (its title date)."""
-    return f"Daily_RDF_tracker_{r['sheet_date'].strftime('%d-%m-%Y')}.pdf"
+def filename(r: dict | None = None) -> str:
+    """Daily_RDF_tracker_DD-MM-YYYY.pdf, dated today (IST): the day the PDF is downloaded."""
+    return f"Daily_RDF_tracker_{config.today_ist().strftime('%d-%m-%Y')}.pdf"
 
 
 def build_pdf(r: dict) -> bytes:
