@@ -23,6 +23,7 @@ from werkzeug.security import generate_password_hash  # noqa: E402
 os.environ["RDF_REPORT_PIN_HASH"] = generate_password_hash("24680")   # test PIN, overrides the built-in one
 
 import captcha  # noqa: E402
+import config  # noqa: E402
 from data import rdf_report, rdf_tracker  # noqa: E402
 from main import app  # noqa: E402
 
@@ -134,7 +135,8 @@ class Upload(Base):
         self.assertEqual(j["results"][0]["date"], "2026-10-13")
         self.assertIn("13 Oct 2026", j["sheet_html"])
         self.assertIn("1,422.66", j["sheet_html"])
-        self.assertEqual(j["pdf_name"], "Daily_RDF_tracker_14-10-2026.pdf")
+        # named for the day it is downloaded (IST), not the sheet's date
+        self.assertEqual(j["pdf_name"], f"Daily_RDF_tracker_{config.today_ist():%d-%m-%Y}.pdf")
         self.assertIn("2. Tharuni sent RDF from Kadapa, Kakinada, Srikakulam and Vizianagaram sites.", j["gist"])
 
     def test_pdf_download(self):
@@ -143,7 +145,7 @@ class Upload(Base):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.mimetype, "application/pdf")
         self.assertTrue(r.data.startswith(b"%PDF-"))
-        self.assertIn('filename="Daily_RDF_tracker_14-10-2026.pdf"', r.headers["Content-Disposition"])
+        self.assertIn(f'filename="Daily_RDF_tracker_{config.today_ist():%d-%m-%Y}.pdf"', r.headers["Content-Disposition"])
 
     def test_not_a_tracker(self):
         bad = os.path.join(TMP, "store", "bad.csv")
@@ -340,3 +342,26 @@ class Dashboard(Base):
 
 def agency_short_ok(full: str, short: str) -> bool:
     return rdf_report.agency_short(full) == short
+
+
+class LogChartTests(unittest.TestCase):
+    """'Disposed so far': MT a day on a log left axis, MT left on a linear right axis."""
+
+    def test_axes(self):
+        from datetime import date
+        P = rdf_report.Point
+        pts = [P(date(2026, 10, 1), 800, 0, 238000), P(date(2026, 10, 2), 0, 0, 237200),
+               P(date(2026, 10, 3), 1500, 0, 246000)]
+        marks = rdf_report.chart_marks(pts, date(2026, 10, 15))   # ~20k/day needed, as in early Nov
+        texts = [m for m in marks if m[0] == "text"]
+        left = [m[3] for m in texts if m[5] == "end" and m[1] < 54]
+        right = [m[3] for m in texts if m[5] == "start" and m[1] > 580 and m[3] != "MT left"]
+        self.assertEqual(left, ["100", "1k", "10k", "100k"])
+        self.assertEqual(right, ["0", "100k", "200k", "300k"])
+        H, T, B = rdf_report.CHART_H, 22, 34
+        green = [yy for _, yy in [m for m in marks if m[0] == "path"][1][1]]
+        self.assertAlmostEqual(green[1], H - B)                        # a 0 day sits on the bottom line
+        y1k, y10k = (T + (1 - e / 3) * (H - T - B) for e in (1, 2))
+        self.assertTrue(y10k < green[2] < y1k)                         # 1,500 between the 1k and 10k lines
+        black = [yy for _, yy in [m for m in marks if m[0] == "path"][2][1]]
+        self.assertAlmostEqual(black[2], T + (1 - 246000 / 300000) * (H - T - B))   # linear right axis

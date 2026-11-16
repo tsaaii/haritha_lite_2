@@ -60,6 +60,15 @@ def fk(v: float) -> str:
     return str(_r(v))
 
 
+def decade(v: float) -> str:
+    """Axis label for a power of ten: 1, 10, 100, 1k, 10k, 100k, 1M."""
+    if v >= 1_000_000:
+        return f"{v / 1_000_000:g}M"
+    if v >= 1000:
+        return f"{v / 1000:g}k"
+    return f"{v:g}"
+
+
 def day(d: date) -> str:
     return f"{d.day} {d.strftime('%b')}"
 
@@ -120,6 +129,14 @@ def _nice(v: float) -> float:
     return math.ceil(v / p * 2) / 2 * p
 
 
+def _step(v: float) -> float:
+    """Smallest 1-2-2.5-5 x 10^n at or above v (axis tick spacing)."""
+    if v <= 0:
+        return 1
+    p = 10 ** math.floor(math.log10(v))
+    return next(m * p for m in (1, 2, 2.5, 5, 10) if m * p >= v)
+
+
 CHART_W, CHART_H = 640, 280
 
 
@@ -144,11 +161,18 @@ def chart_marks(pts: list[Point], dl: date) -> list[tuple]:
     def req(p):
         return p.bal / max(1, (dl - p.d).days)
 
-    m1 = _nice(max(max(max(p.today, req(p)) for p in pts), 1) * 1.1)
-    m2 = _nice(max(max(p.bal for p in pts), 1) * 1.05)
+    # Left axis (MT a day: disposed and needed) is logarithmic, so small daily figures stay readable;
+    # gridlines at powers of ten, and a 0 (a day with no dispatch) sits on the bottom line.
+    # Right axis (MT left) stays linear from 0, with its ticks on the same gridlines.
+    per_day = [v for p in pts for v in (p.today, req(p)) if v > 0] or [1.0]
+    lo_e = math.floor(math.log10(max(min(per_day), 1)))
+    hi_e = max(lo_e + 1, math.ceil(math.log10(max(per_day) * 1.1)))
+    span = hi_e - lo_e
+    m2 = _step(max(max(p.bal for p in pts), 1) * 1.05 / span) * span
 
     def y1(v):
-        return T + (1 - v / m1) * (H - T - B)
+        e = math.log10(v) if v > 0 else lo_e
+        return T + (1 - (min(max(e, lo_e), hi_e) - lo_e) / span) * (H - T - B)
 
     def y2(v):
         return T + (1 - v / m2) * (H - T - B)
@@ -164,12 +188,12 @@ def chart_marks(pts: list[Point], dl: date) -> list[tuple]:
     def dots(vals, fill, r, ring=True):
         out.extend(("dot", x(i), v, r, fill, ring) for i, v in enumerate(vals))
 
-    for fr in (0, 0.25, 0.5, 0.75, 1):
-        yy = T + (1 - fr) * (H - T - B)
+    for e in range(lo_e, hi_e + 1):
+        yy = y1(10 ** e)
         out.append(("line", L, yy, W - R, yy, "var(--ink-100)"))
-        txt(L - 6, yy + 4, fk(m1 * fr), GREEN, "end")
-        txt(W - R + 6, yy + 4, fk(m2 * fr), INK5, "start")
-    txt(2, T - 8, "MT disposed", GREEN, "start")
+        txt(L - 6, yy + 4, decade(10 ** e), GREEN, "end")
+        txt(W - R + 6, yy + 4, fk(m2 * (e - lo_e) / span), INK5, "start")
+    txt(2, T - 8, "MT disposed (log scale)", GREEN, "start")
     txt(W - R + 6, T - 8, "MT left", INK5, "start")
 
     step = max(1, math.ceil(n / 7))
@@ -182,12 +206,6 @@ def chart_marks(pts: list[Point], dl: date) -> list[tuple]:
     path(reqs, "var(--red-600)", 2, "6 4")
     dots(reqs, "var(--red-600)", 3, ring=False)
 
-    lp = pts[-1]
-    ry, by = y1(req(lp)) - 8, y2(lp.bal) - 10
-    clash = abs(ry - by) < 14
-    ly = (min(ry, by) - 8) if clash and ry <= by else (ry + 22 if clash else ry)
-    txt(x(n - 1), ly, fk(req(lp)) + " needed/day", "var(--red-600)", "end", bold=True)
-
     tv = [y1(p.today) for p in pts]
     path(tv, "var(--green-600)", 2.5)
     dots(tv, "var(--green-600)", 3.5)
@@ -195,9 +213,28 @@ def chart_marks(pts: list[Point], dl: date) -> list[tuple]:
     path(bv, INK7, 2.5)
     dots(bv, INK7, 3.5)
 
-    txt(x(n - 1), y1(lp.today) - 6, fk(lp.today), GREEN, bold=True)
-    txt(x(n - 1) - 8, y2(lp.bal) + 18 if clash and ry <= by else y2(lp.bal) - 10,
-        fk(lp.bal) + " left", INK9, "end", bold=True)
+    # End-of-line labels. Each sits just above its line, clear of the line's last ~110px; when the
+    # red and black lines end close together the lower one's label goes under its line instead,
+    # and the green figure moves under its line if it would sit on another label.
+    lp, top, bottom = pts[-1], T + 4, H - B - 3
+
+    def above(vals, width=110):
+        return min(v for i, v in enumerate(vals) if x(i) >= x(n - 1) - width) - 7
+
+    def below(vals, width=110):
+        return max(v for i, v in enumerate(vals) if x(i) >= x(n - 1) - width) + 15
+
+    ry, by = reqs[-1], bv[-1]
+    near = abs(ry - by) < 30
+    red_y = below(reqs) if near and ry >= by else above(reqs)
+    blk_y = below(bv) if near and ry < by else above(bv)
+    grn_y = above(tv, 24)
+    if any(abs(grn_y - o) < 13 for o in (red_y, blk_y)):
+        grn_y = below(tv, 24)
+    clamp = lambda v: min(max(v, top), bottom)   # noqa: E731
+    txt(x(n - 1), clamp(red_y), fk(req(lp)) + " needed/day", "var(--red-600)", "end", bold=True)
+    txt(x(n - 1) - 8, clamp(blk_y), fk(lp.bal) + " left", INK9, "end", bold=True)
+    txt(x(n - 1), clamp(grn_y), fk(lp.today), GREEN, bold=True)
     return out
 
 
