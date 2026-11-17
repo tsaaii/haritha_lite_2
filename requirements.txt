@@ -3,4 +3,5 @@ requests==2.32.3
 google-cloud-storage==2.18.2
 gunicorn==23.0.0
 reportlab==4.2.5
-tzdataPyYAML==6.0.2
+tzdata
+PyYAML==6.0.2
