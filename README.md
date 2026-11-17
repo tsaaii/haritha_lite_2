@@ -5,7 +5,8 @@ Flask + Jinja rebuild of the Swachh Andhra Pradesh dashboard, plus the Advitia L
 | URL | What |
 | --- | --- |
 | `/`, `/main` | Advitia Labs landing / pitch page ([docs/landing.md](docs/landing.md)) |
-| `/sac` | Swachha Andhra public dashboard (was `/`) |
+| `/sac` | Swachha Andhra dashboard: rotating public display, PIN popup, signed-in portal at `/sac/portal` with agency / phase / site drill-downs, sheet upload and live weighbridge tickets ([docs/sac.md](docs/sac.md)) |
+| `/sac-old` | The previous 12-card Swachha Andhra dashboard |
 | `POST /api/contact`, `/api/seen` | Landing contact form and visit tracker → Google Sheet (setup in [docs/landing.md](docs/landing.md)) |
 | `rdf.advitiaum.com/` | RDF disposal report (unchanged) |
 | `/TTD` | TTD legacy-waste dashboard: sign-in with captcha, progress vs 51,290 MT, reports, PDF, live cameras ([docs/ttd-dashboard.md](docs/ttd-dashboard.md)) |

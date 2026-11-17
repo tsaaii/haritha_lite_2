@@ -17,8 +17,9 @@ where Report is the daily printable sheet (and its PDF) for Swachha Andhra Corpo
 Also /RDF, and the old /rdf_report/ address redirects here. On the rdf.* host
 (rdf.advitiaum.com) the report is also served at "/".
 
-Sign-in: hardcoded PIN (as requested) + the math captcha and per-IP lockout
-from captcha.py (5 wrong tries -> 15 minutes). RDF_REPORT_PIN_HASH overrides the PIN.
+Sign-in: the shared PIN book (pins.py, also used by /sac and /reports) + the math captcha
+and per-IP lockout from captcha.py (5 wrong tries -> 15 minutes). Until pin.yaml exists the
+built-in PIN in pins.py is the one PIN.
 Data lives in RDF_TRACKER_DIR; see data/rdf_tracker.py and docs/rdf-report.md.
 """
 from __future__ import annotations
@@ -29,17 +30,15 @@ from datetime import date, timedelta
 from functools import wraps
 
 from flask import Blueprint, Response, jsonify, make_response, redirect, render_template, request, session, url_for
-from werkzeug.security import check_password_hash
 
 import captcha
+import pins
 from data import rdf_dashboard, rdf_report, rdf_report_pdf, rdf_tracker
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("rdf_report", __name__, template_folder="../templates")
 
 URL_PREFIX = "/rdf"
-# Hash of the hardcoded 5-digit report PIN (the PIN itself is not written in this public repo).
-_DEFAULT_PIN_HASH = "scrypt:32768:8:1$AVK4XUVlP4GM18Ep$b1821cf0f055e77e1eb4c46b73c8d203c073763f1c16c242bdc3e5e6c92bcc74ca6d7b7a4fb2b9a6d197156eb388427e4ef8e0d32f961d3fbc0762d69e242708"
 SESSION_KEY = "rdf_report_ok"
 HOST_PREFIX = "rdf."
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -90,10 +89,6 @@ def _rdf_host_root():
 @bp.route("/rdf_report/")
 def root():
     return redirect(url_for("rdf_report.report_view"), code=301)
-
-
-def _pin_hash() -> str:
-    return os.environ.get("RDF_REPORT_PIN_HASH", "").strip() or _DEFAULT_PIN_HASH
 
 
 def _load() -> tuple[list, str]:
@@ -159,12 +154,10 @@ def login():
     if not captcha.verify(request.form.get("captcha_answer", ""), nonce=request.form.get("captcha_nonce", "")):
         return _login_page("The security check answer was wrong. Try the new one.", 400)
 
-    pin = (request.form.get("pin") or "").strip()
-    try:
-        ok = bool(pin) and check_password_hash(_pin_hash(), pin)
-    except Exception:
-        ok = False
-    if not ok:
+    # One PIN for /sac, /reports and /rdf (pins.py); a good PIN signs in to all three.
+    from views import sac
+    p = pins.verify(request.form.get("pin") or "")
+    if p is None:
         count, just_blocked = captcha.register_failure(ip)
         logger.info("rdf_report wrong PIN ip=%s count=%d", ip, count)
         if just_blocked:
@@ -174,8 +167,7 @@ def login():
         return _login_page(msg, 401)
 
     captcha.clear_failures(ip)
-    session[SESSION_KEY] = True
-    session.permanent = True
+    sac.sign_in(p)
     # Back to wherever the PIN page was shown ("/" on rdf.*, else /rdf/).
     nxt = request.form.get("next") or ""
     return redirect(nxt if nxt in ("/", URL_PREFIX + "/") else url_for("rdf_report.report_view"))
@@ -183,7 +175,7 @@ def login():
 
 @bp.route(URL_PREFIX + "/logout")
 def logout():
-    session.pop(SESSION_KEY, None)
+    session.clear()     # one sign-in for /sac, /reports and /rdf, so one sign-out too
     return redirect("/" if request.host.lower().startswith(HOST_PREFIX) else url_for("rdf_report.report_view"))
 
 

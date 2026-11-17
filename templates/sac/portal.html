@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0B3D22">
+<title>SAC portal · Swachha Andhra Corporation</title>
+<link rel="icon" href="{{ url_for('static', filename='sac/img/sac-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sac/sac.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sac/portal.css') }}">
+</head>
+<body>
+<header class="top">
+  <div class="top__in">
+    <a class="brand" href="#" data-go="home">
+      <div class="brand__logo"><img src="{{ url_for('static', filename='sac/img/sac-logo.png') }}" alt="Swachha Andhra Corporation"></div>
+      <div class="brand__t"><div class="brand__name">Swachha Andhra Corporation</div><div class="brand__sub">Legacy Waste Remediation Project</div></div>
+    </a>
+    {% if is_admin %}
+    <button type="button" class="tbtn" data-go="upload" aria-label="Upload sheet" title="Upload sheet"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+    {% endif %}
+    <a class="tbtn" href="{{ url_for('sac.logout') }}" aria-label="Log out" title="Log out"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg></a>
+  </div>
+</header>
+
+<main class="main">
+  <div id="app"></div>
+  <div class="foot">
+    <div class="foot__u" id="updated">{{ updated }}</div>
+    <div class="built">Built by Advitia Labs</div>
+  </div>
+</main>
+
+<script id="sacRows" type="application/json">{{ rows_json | safe }}</script>
+<script id="sacPhases" type="application/json">{{ phases_json | safe }}</script>
+<script>window.SAC_CFG = {{ cfg_json | safe }}; window.SAC_ADMIN = {{ 'true' if is_admin else 'false' }}; window.SAC_RDF = {{ url_for('rdf_report.report_view') | tojson }};</script>
+<script src="{{ url_for('static', filename='sac/portal.js') }}"></script>
+</body>
+</html>
