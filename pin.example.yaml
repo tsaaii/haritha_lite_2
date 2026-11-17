@@ -1,0 +1,13 @@
+# PIN book for /sac, /reports and /rdf — copy to pin.yaml (git-ignored) or upload to
+# the PIN_FILE location in app.yaml (gs://advitia-weighbridge-data/dashboard_config/pin.yaml).
+# Hashes only. Make an entry with:   python pins.py add <name> <admin|viewer>
+# admin: may upload the phase sheet from the portal; viewer: read only.
+# Every PIN is the same length; the login popup shows that many boxes.
+pin_length: 4
+pins:
+  - name: md-office
+    role: admin
+    hash: "scrypt:32768:8:1$REPLACE_ME"
+  - name: field-team
+    role: viewer
+    hash: "scrypt:32768:8:1$REPLACE_ME"

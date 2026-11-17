@@ -13,3 +13,8 @@ rdf_tracker_data/
 
 # Deploy-time secrets (app.yaml includes it; template: secrets.example.yaml)
 secrets.yaml
+
+# PIN book for /sac, /reports and /rdf (hashes only; template: pin.example.yaml)
+pin.yaml
+# Local store for the published /sac phase sheet (PHASE_DATA_CSV default)
+phase_data_store/

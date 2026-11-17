@@ -88,6 +88,9 @@ AGENCY_DISPLAY_NAMES: dict[str, str] = {}
 
 ROTATION_INTERVAL_MS = int(os.environ.get("ROTATION_INTERVAL_MS", "12000"))
 
+# New /sac display: seconds per slide (all phases, then each phase).
+SAC_ROTATION_MS = int(os.environ.get("SAC_ROTATION_MS", "6000"))
+
 
 def project_deadline_date() -> date:
     try:

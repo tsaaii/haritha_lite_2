@@ -127,10 +127,8 @@ is already verified.
 
 ### Changing the PIN
 
-The PIN is hardcoded, as requested: its hash is `_DEFAULT_PIN_HASH` in `views/rdf_report.py`.
-To change it without editing code, set `RDF_REPORT_PIN_HASH` in app.yaml `env_variables` to the
-output of `python -c "from werkzeug.security import generate_password_hash as g; print(g('NEW-PIN'))"`,
-then redeploy.
+The RDF report now shares one PIN with `/sac` and `/reports`: see [sac.md](sac.md#pins).
+Signing in on any of the three signs you in to all of them, and logging out of one logs out of all.
 
 ## Run locally
 

@@ -4,7 +4,9 @@ haritha_lite Flask app.
 Routes:
     GET  / and /main -> Advitia Labs landing / pitch page (views/landing.py)
     POST /api/contact, /api/seen -> landing lead form + visit tracker (views/landing_api.py)
-    GET  /sac       -> Swachha Andhra public dashboard (12 cards, all from sites_master.csv)
+    GET  /sac       -> Swachha Andhra dashboard: rotating public display + PIN popup (views/sac.py)
+    GET  /sac/portal -> signed-in agency / phase / site drill-downs, sheet upload, live weighbridge tickets
+    GET  /sac-old   -> the previous 12-card dashboard (sites_master.csv)
     GET  /healthz   -> liveness probe (App Engine)
     POST /admin/refresh-cache -> manually invalidate the CSV cache (login-gated)
     GET  /login, POST /login, GET /logout -> auth (login blueprint)
@@ -44,6 +46,7 @@ from views.landing import bp as landing_bp
 from views.landing_api import bp as landing_api_bp
 from views.ttd import bp as ttd_bp
 from views.peshi import bp as peshi_bp
+from views import sac as sac_view
 
 logging.basicConfig(
     level=logging.INFO,
@@ -111,10 +114,14 @@ def create_app() -> Flask:
     # /peshi: meeting invite builder for the MD Peshi (views/peshi.py)
     app.register_blueprint(peshi_bp)
 
-    # Swachha Andhra dashboard. Endpoint name stays "overview" so every
-    # url_for("overview") back-link follows it to /sac.
-    @app.route("/sac", strict_slashes=False)
-    def overview():
+    # /sac: new dashboard + portal (views/sac.py). Endpoint name stays "overview"
+    # so every url_for("overview") back-link follows it to the new /sac.
+    app.register_blueprint(sac_view.bp)
+    app.add_url_rule("/sac", "overview", sac_view.dashboard_view, strict_slashes=False)
+
+    # The previous 12-card dashboard, kept as it was.
+    @app.route("/sac-old", strict_slashes=False)
+    def overview_old():
         sites = master.get_sites()
         today = config.today_ist()
 

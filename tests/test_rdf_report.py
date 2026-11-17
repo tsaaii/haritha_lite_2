@@ -20,9 +20,12 @@ os.environ.setdefault("SECRET_KEY", "test-secret")
 TMP = tempfile.mkdtemp(prefix="rdf-test-")
 os.environ["RDF_TRACKER_DIR"] = TMP
 from werkzeug.security import generate_password_hash  # noqa: E402
-os.environ["RDF_REPORT_PIN_HASH"] = generate_password_hash("24680")   # test PIN, overrides the built-in one
+os.environ["SAC_PIN_HASH"] = generate_password_hash("2468")   # test PIN, overrides the built-in one
+# No pin.yaml: the shared PIN book (pins.py) uses the built-in PIN (here the test one above).
+NO_PIN_FILE = os.path.join(TMP, "no-pin.yaml")
 
 import captcha  # noqa: E402
+import pins  # noqa: E402
 import config  # noqa: E402
 from data import rdf_report, rdf_tracker  # noqa: E402
 from main import app  # noqa: E402
@@ -49,7 +52,7 @@ def answer(client) -> str:
         return str(s[captcha._CAPTCHA_ANSWER_KEY])
 
 
-def sign_in(client, pin="24680", base="http://localhost", next_url="/rdf/"):
+def sign_in(client, pin="2468", base="http://localhost", next_url="/rdf/"):
     client.get("/rdf/", base_url=base)                    # renders the captcha
     with client.session_transaction(base_url=base) as s:
         a, n = str(s[captcha._CAPTCHA_ANSWER_KEY]), s[captcha._CAPTCHA_NONCE_KEY]
@@ -61,6 +64,8 @@ class Base(unittest.TestCase):
     def setUp(self):
         reset_store()
         captcha._failures.clear()
+        os.environ["PIN_FILE"] = NO_PIN_FILE
+        pins.invalidate()
         self.c = app.test_client()
 
 
@@ -88,23 +93,22 @@ class SignIn(Base):
         self.c.get("/rdf/")
         with self.c.session_transaction() as s:
             n = s[captcha._CAPTCHA_NONCE_KEY]
-        r = self.c.post("/rdf/login", data={"pin": "24680", "captcha_answer": "99999", "captcha_nonce": n})
+        r = self.c.post("/rdf/login", data={"pin": "2468", "captcha_answer": "99999", "captcha_nonce": n})
         self.assertEqual(r.status_code, 400)
         self.assertIn(b"security check", r.data)
         self.assertEqual(self.c.get("/rdf/api/trackers").status_code, 401)
 
     def test_wrong_pin_then_lockout(self):
-        r = sign_in(self.c, pin="11111")
+        r = sign_in(self.c, pin="1111")
         self.assertEqual(r.status_code, 401)
         self.assertIn(b"Incorrect PIN", r.data)
         for _ in range(captcha.MAX_FAILURES):
-            r = sign_in(self.c, pin="11111")
+            r = sign_in(self.c, pin="1111")
         self.assertEqual(r.status_code, 429)
         self.assertEqual(sign_in(self.c).status_code, 429)   # right PIN still blocked
 
-    def test_builtin_pin_is_a_5_digit_hash(self):
-        from views import rdf_report as v
-        self.assertTrue(v._DEFAULT_PIN_HASH.startswith("scrypt:"))
+    def test_builtin_pin_is_a_hash(self):
+        self.assertTrue(pins.BUILTIN_PIN_HASH.startswith("scrypt:"))
 
     def test_apis_need_sign_in(self):
         self.assertEqual(self.c.get("/rdf/api/gist").status_code, 401)

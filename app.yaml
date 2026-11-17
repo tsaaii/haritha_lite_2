@@ -27,6 +27,14 @@ env_variables:
   # RDF expected = pct × target (cards 2 & 6).
   RDF_EXPECTED_PCT: "0.15"
 
+  # New /sac dashboard + portal (views/sac.py, docs/sac.md).
+  # The phase sheet admins upload from the portal's gear icon, and the PIN book
+  # shared by /sac, /reports and /rdf. Until pin.yaml is uploaded there, the RDF
+  # report PIN is the one admin PIN.
+  PHASE_DATA_CSV: "gs://advitia-weighbridge-data/dashboard_config/phase_data.csv"
+  PIN_FILE: "gs://advitia-weighbridge-data/dashboard_config/pin.yaml"
+  SAC_ROTATION_MS: "6000"
+
   PROJECT_DEADLINE: "2026-05-31"
   ROTATION_INTERVAL_MS: "12000"
 

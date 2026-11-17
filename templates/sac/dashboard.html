@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0B3D22">
+<title>Swachha Andhra Corporation · Legacy Waste Remediation</title>
+<link rel="icon" href="{{ url_for('static', filename='sac/img/sac-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sac/sac.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sac/dashboard.css') }}">
+</head>
+<body>
+{% set emblem = url_for('static', filename='sac/img/ap-emblem.png') %}
+{% set logo = url_for('static', filename='sac/img/sac-logo.png') %}
+{% set login_href = url_for('sac.portal') if signed_in else url_for('overview', login=1) %}
+{% set login_text = 'Open portal' if signed_in else 'Log in' %}
+
+<div class="dsk" id="dsk">
+  <div class="stage" id="stage">
+    <header class="hdr">
+      <div class="hdr__logo"><img src="{{ emblem }}" alt="Government of Andhra Pradesh"></div>
+      <div class="hdr__t"><div class="hdr__name">Swachha Andhra Corporation</div><div class="hdr__sub">Legacy Waste Remediation Project</div></div>
+      <div class="hdr__logo"><img src="{{ logo }}" alt="Swachha Andhra Corporation"></div>
+    </header>
+    <div class="body">
+      <div>
+        <div class="sname" data-k="name"></div>
+        <div class="big"><span class="big__n" data-k="pct"></span><span class="big__p">%</span></div>
+        <div class="pbar"><div data-k="bar"></div></div>
+        <div class="stats">
+          <div><div class="stat__v"><span class="dot" style="background:var(--green-300)"></span><span data-k="weighed"></span></div><div class="stat__l"><span data-k="wUnit"></span> weighed in</div></div>
+          <div><div class="stat__v"><span class="dot" style="background:var(--red-600)"></span><span data-k="left"></span></div><div class="stat__l"><span data-k="lUnit"></span> left out</div></div>
+          <div><div class="stat__v"><span><span data-k="done"></span><span class="of"> / <span data-k="sites"></span></span></span></div><div class="stat__l">sites with no legacy intake left</div></div>
+        </div>
+        <div class="mats">
+          <div class="mats__h caps">Where it went · Lakh MT</div>
+          <div class="segs" data-k="segs"></div>
+          <div class="mlist" data-k="mlist"></div>
+        </div>
+      </div>
+      <div class="ag">
+        <div class="ag__top">
+          <div class="ag__h caps">Agencies</div>
+          <div class="legend">
+            <span><i style="background:var(--green-500)"></i>Weighed in</span>
+            <span><i style="background:var(--green-050);border:1.5px solid var(--green-900)"></i>Awarded</span>
+            <span><i style="background:var(--red-600)"></i>Left out</span>
+            <span>in Lakh MT</span>
+          </div>
+        </div>
+        <div class="ag__list" id="agList" data-agscroll></div>
+        <div class="ag__more" data-k="more"></div>
+      </div>
+    </div>
+    <footer class="ftr">
+      <div class="ftr__row">
+        <div class="pills"><span class="pills" data-k="pills"></span><button type="button" class="hold" data-k="hold"></button></div>
+        <div class="ftr__r">{% if updated %}<span>{{ updated }}</span>{% endif %}<a href="{{ login_href }}" data-login>{{ login_text }}</a></div>
+      </div>
+      <div class="built">Built by Advitia Labs</div>
+    </footer>
+  </div>
+</div>
+
+<div class="mob">
+  <header class="mhdr">
+    <div class="hdr__logo"><img src="{{ emblem }}" alt="Government of Andhra Pradesh"></div>
+    <div class="hdr__t"><div class="hdr__name">Swachha Andhra Corporation</div><div class="hdr__sub">Legacy Waste Remediation Project</div></div>
+    <div class="hdr__logo"><img src="{{ logo }}" alt="Swachha Andhra Corporation"></div>
+  </header>
+  <div class="mtabs" data-k="pills"></div>
+  <div class="msec">
+    <div class="mrow"><div class="sname" data-k="name"></div><button type="button" class="mhold" data-k="hold"></button></div>
+    <div class="big"><span class="big__n" data-k="pct"></span><span class="big__p">%</span></div>
+    <div class="pbar"><div data-k="bar"></div></div>
+    <div class="mstats">
+      <div><div class="stat__v"><span class="dot" style="background:var(--green-300)"></span><span data-k="weighed"></span></div><div class="stat__l"><span data-k="wUnit"></span> weighed in</div></div>
+      <div><div class="stat__v"><span><span data-k="done"></span><span class="of"> / <span data-k="sites"></span></span></span></div><div class="stat__l">sites with no legacy intake left</div></div>
+    </div>
+    <div class="mats__h caps">Where it went · Lakh MT</div>
+    <div class="segs" data-k="segs"></div>
+    <div class="mlist" data-k="mlist"></div>
+  </div>
+  <div class="mag">
+    <div class="mag__h caps"><span>Agencies</span><span style="white-space:nowrap">Weighed in / awarded</span></div>
+    <div class="mag__list" id="agListM" data-agscroll></div>
+    <div class="mag__more" data-k="moreM"></div>
+  </div>
+  <div class="mob__foot">{% if updated %}<span>{{ updated }}</span>{% else %}<span></span>{% endif %}<a href="{{ login_href }}" data-login>{{ login_text }}</a></div>
+  <div class="built">Built by Advitia Labs</div>
+</div>
+
+{% if not signed_in %}
+<div class="scrim" id="login" {% if not open_login %}hidden{% endif %}>
+  <form class="dlg" role="dialog" aria-modal="true" aria-labelledby="loginTitle" id="loginForm" autocomplete="off" novalidate>
+    <div class="dlg__x"><button type="button" class="ds-icon" aria-label="Close" title="Close" id="loginClose"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <img class="dlg__logo" src="{{ logo }}" alt="Swachha Andhra Corporation">
+    <h2 id="loginTitle">Log in.</h2>
+    <div class="alert" role="alert" id="loginErr" hidden></div>
+    <div class="dlg__lbl caps" id="pinLbl">Your {{ pin_length }}-digit PIN</div>
+    <div class="pin" id="pin" role="group" aria-labelledby="pinLbl">
+      {% for i in range(pin_length) %}<input type="password" inputmode="numeric" maxlength="1" aria-label="PIN digit {{ i + 1 }}" autocomplete="off">{% endfor %}
+    </div>
+    <div class="dlg__lbl caps">Are you human?</div>
+    <div class="cap">
+      <span class="cap__q"><span id="capQ">{{ captcha_question }}</span> =</span>
+      <input type="text" inputmode="numeric" maxlength="3" aria-label="Captcha answer" placeholder="?" id="capA">
+      <button type="button" class="ds-icon" aria-label="New question" title="New question" id="capNew"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 21v-5h5"></path></svg></button>
+    </div>
+    <input type="hidden" id="capN" value="{{ captcha_nonce }}">
+    <div class="dlg__go"><button type="submit" class="ds-btn ds-btn--lg" id="loginGo">Log in</button></div>
+    <div class="built">Built by Advitia Labs</div>
+  </form>
+</div>
+{% endif %}
+
+<script id="sacData" type="application/json">{{ data | tojson }}</script>
+<script>window.SAC_CFG = {{ {"rotationMs": rotation_ms, "next": next_url, "login": url_for('sac.login'), "captcha": url_for('sac.new_captcha'), "signedIn": signed_in} | tojson }};</script>
+<script src="{{ url_for('static', filename='sac/dashboard.js') }}"></script>
+</body>
+</html>

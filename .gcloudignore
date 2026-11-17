@@ -20,3 +20,5 @@ __pycache__/
 # Local RDF report store
 rdf_tracker_data/
 .venv/
+# Local /sac phase sheet store
+phase_data_store/
