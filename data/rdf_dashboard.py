@@ -277,7 +277,7 @@ def _date_label(d: date | None) -> str:
     return f"{day(d)} {d.year}" if d else "—"
 
 
-def build(hist: list[Tracker], extra_agencies: list[str] | None = None) -> dict | None:
+def build(hist: list[Tracker], extra_agencies: list[str] | None = None, others: dict | None = None) -> dict | None:
     """Dashboard tabs for a history (a phase view or the raw trackers). Sites that are not in the
     daily tracker (tracked=False) are listed with their final 'to date' figure and status
     'Not tracked'; they stay out of pace, balances, projections and the site lists."""
@@ -428,7 +428,8 @@ def build(hist: list[Tracker], extra_agencies: list[str] | None = None) -> dict 
         "first_label": _date_label(d0), "n_days": len(dates),
         "dates": [d.isoformat() for d in dates],
         "kpi": {
-            "today": fmt(tot_today), "need": fmt(tot_bal / days_left), "cum": fmt(tot_cum), "bal": fmt(tot_bal),
+            "today": fmt(tot_today), "need": fmt(tot_bal / days_left),
+            "cum": fmt(tot_cum + (others["cum"] if others and others.get("n") else 0)), "bal": fmt(tot_bal),
             "pct": f"{_r(_pct(tot_cum_t, tot_bal) * 100)}%" if trk else "—", "pace": fmt(pace_all),
             "finish": _date_label(fin_all) if fin_all else "no recent dispatch",
             "late": not fin_all or fin_all > dl,
@@ -440,6 +441,7 @@ def build(hist: list[Tracker], extra_agencies: list[str] | None = None) -> dict 
                    "unique": len({s["count_key"] for s in sites}),
                    "unique_left": len({s["count_key"] for s in trk if s["bal"] > 0}),
                    "agencies_on_track": on_track, "agencies": len(ag_trk)},
+        "others": {"n": others["n"], "cum": fmt(others["cum"])} if others and others.get("n") else None,
         "stack_chart": stacked_daily_chart(dates, ag_trk),
         "finish_chart": finish_chart([a for a in ag_trk if a["bal"] > 0], rep, dl),
         "heatmap": heatmap(dates, heat_rows),

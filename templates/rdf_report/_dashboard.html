@@ -13,17 +13,17 @@
     {% if c.tracked %}
     <span class="lede__line">{{ k.pct }} of RDF disposed at the {{ c.tracked }} tracked site{{ 's' if c.tracked != 1 }} · {{ k.bal }} MT left · {{ d.days_left }} days to {{ d.dl_label }}.
       At the last 7 days' pace ({{ k.pace }} MT a day) everything clears by
-      <b class="{{ 'bad' if k.late else 'good' }}">{{ k.finish }}</b>.{% if c.untracked %} {{ c.untracked }} more site{{ 's' if c.untracked != 1 }} from the phase sheet add {{ '' }}their final figures to the total.{% endif %}</span>
+      <b class="{{ 'bad' if k.late else 'good' }}">{{ k.finish }}</b>.{% if d.others %} Disposed to date also includes {{ d.others.cum }} MT from {{ d.others.n }} other site{{ 's' if d.others.n != 1 }} of this phase.{% endif %}</span>
     {% else %}
-    <span class="lede__line">None of these {{ c.unique }} sites is in the daily tracker: figures are the final ones from the phase sheet.</span>
+    <span class="lede__line">No site in this phase is in the daily upload.{% if d.others %} Disposed to date is the final figure from its {{ d.others.n }} site{{ 's' if d.others.n != 1 }}.{% endif %}</span>
     {% endif %}
   </div>
 
   <div class="tiles">
     <div class="tile tile--hero"><span class="tile__l">Disposed on {{ d.rep_label }}</span><span class="tile__v">{{ k.today }} <small>MT</small></span>
       <span class="tile__s">Needed every day to clear by {{ d.dl_label }}: <b>{{ k.need }} MT</b>{% if k.short_x != "—" %} · {{ k.short_x }} the current pace{% endif %}</span></div>
-    <div class="tile"><span class="tile__l">Disposed to date</span><span class="tile__v good">{{ k.cum }} <small>MT</small></span><span class="tile__s">{{ k.pct }} done at tracked sites · {{ c.unique }} site{{ 's' if c.unique != 1 }}</span></div>
-    <div class="tile"><span class="tile__l">Left at sites</span><span class="tile__v">{{ k.bal }} <small>MT</small></span><span class="tile__s">{{ c.unique_left }} site{{ 's' if c.unique_left != 1 }} in the daily tracker still have RDF</span></div>
+    <div class="tile"><span class="tile__l">Disposed to date</span><span class="tile__v good">{{ k.cum }} <small>MT</small></span><span class="tile__s">{{ k.pct }} done · {{ c.unique }} site{{ 's' if c.unique != 1 }}{% if d.others %} + {{ d.others.cum }} MT from {{ d.others.n }} other site{{ 's' if d.others.n != 1 }}{% endif %}</span></div>
+    <div class="tile"><span class="tile__l">Left at sites</span><span class="tile__v">{{ k.bal }} <small>MT</small></span><span class="tile__s">{{ c.unique_left }} of {{ c.unique }} site{{ 's' if c.unique != 1 }} still have RDF</span></div>
     <div class="tile"><span class="tile__l">Agencies on track</span><span class="tile__v {{ 'bad' if c.agencies_on_track < c.agencies else 'good' }}">{{ c.agencies_on_track }} <small>of {{ c.agencies }}</small></span><span class="tile__s">clear by {{ d.dl_label }} at their pace</span></div>
   </div>
 
@@ -116,10 +116,17 @@
         <td class="n b {{ 'good' if a.today != '0.00' else 'bad' }}">{{ a.today }}</td>
         <td class="n">{{ a.pace }}</td><td class="n">{{ a.need }}</td><td class="n good">{{ a.cum }}</td><td class="n">{{ a.bal }}</td>
         <td class="n">{{ a.pct }}</td><td class="n">{{ a.sites }}</td>
-        <td class="small">{% if a.has_sites and a.tracked %}<span class="good">{{ a.counts.Active }} active</span> · {{ a.counts.Slowing }} slowing · <span class="bad">{{ a.counts.Stalled }} stalled</span> · {{ a.counts.Cleared }} cleared{% if a.untracked %} · <span class="muted">{{ a.untracked }} not tracked</span>{% endif %}{% elif a.has_sites %}<span class="muted">{{ a.untracked }} site{{ 's' if a.untracked != 1 }}, not in the daily tracker</span>{% else %}<span class="muted">no sites in tracker yet</span>{% endif %}</td>
+        <td class="small">{% if a.has_sites %}<span class="good">{{ a.counts.Active }} active</span> · {{ a.counts.Slowing }} slowing · <span class="bad">{{ a.counts.Stalled }} stalled</span> · {{ a.counts.Cleared }} cleared{% else %}<span class="muted">no sites in tracker yet</span>{% endif %}</td>
         <td class="{{ 'bad' if a.late else 'good' }} small">{{ a.finish }}</td>
       </tr>
       {% endfor %}
+      {% if d.others %}
+      <tr class="muted">
+        <td>Other sites of this phase ({{ d.others.n }})</td><td class="n">0.00</td><td class="n">—</td><td class="n">—</td>
+        <td class="n">{{ d.others.cum }}</td><td class="n">—</td><td class="n">—</td><td class="n">{{ d.others.n }}</td>
+        <td class="small" colspan="2">earlier work: final figure, included in Disposed to date</td>
+      </tr>
+      {% endif %}
       </tbody>
     </table></div>
   </div>
@@ -135,7 +142,6 @@
       <button type="button" class="chip" data-filter="quick"><i class="dot dot--quick"></i>Quick wins <small>{{ c.quick }}</small></button>
       <button type="button" class="chip" data-filter="long"><i class="dot dot--long"></i>Long haul <small>{{ c.long }}</small></button>
       <button type="button" class="chip" data-filter="cleared"><i class="dot dot--done"></i>Cleared <small>{{ c.cleared }}</small></button>
-      {% if c.untracked %}<button type="button" class="chip" data-filter="not-tracked"><i class="dot dot--off"></i>Not tracked <small>{{ c.untracked }}</small></button>{% endif %}
       <span class="chips__sep" aria-hidden="true"></span>
       {% for a in d.agencies if a.has_sites %}<button type="button" class="chip" data-filter="ag-{{ a.slug }}"><i class="sq" style="background:{{ a.color }}"></i>{{ a.short }} <small>{{ a.sites }}</small></button>{% endfor %}
       <input type="search" class="search" id="site-search" placeholder="Search site" aria-label="Search site">

@@ -87,7 +87,7 @@
 
   <section class="sec">
     <h2 data-head style="margin-bottom:4px;">By site</h2>
-    <span data-head class="sub" style="margin:0 0 12px;">Every site{% if r.phase_label %} in {{ r.phase_label }}{% endif %}, grouped by agency. Today = RDF disposed on {{ r.rep_day }}, as reported in the daily tracker.{% if r.has_untracked %} Sites not in the daily tracker show their final figure from the phase sheet; their Left and Done are blank (—).{% endif %}</span>
+    <span data-head class="sub" style="margin:0 0 12px;">Every site{% if r.phase_label %} of {{ r.phase_label }}{% endif %} in the daily upload, grouped by agency. Today = RDF disposed on {{ r.rep_day }}, as reported in the daily tracker.{% if r.others %} The {{ r.others.n }} other site{{ 's' if r.others.n != 1 }} of this phase are not listed; their {{ r.others.cum }} MT is in Disposed to date and in By agency.{% endif %}</span>
     <div class="scroll-x"><div>
     {% for g in r.groups %}
       <div class="group">
@@ -117,7 +117,7 @@
   {% endif %}
 
   <footer class="foot">
-    <span>Source: daily RDF tracker{% if r %}, {{ r.rep_label }}{% if r.has_untracked %}, and the phase sheet{% endif %}{% endif %}. Quantities in metric tonnes (MT).</span>
+    <span>Source: daily RDF tracker{% if r %}, {{ r.rep_label }}{% if r.others %}, and the phase sheet{% endif %}{% endif %}. Quantities in metric tonnes (MT).</span>
     <span>Swachha Andhra Corporation</span>
   </footer>
 </div>

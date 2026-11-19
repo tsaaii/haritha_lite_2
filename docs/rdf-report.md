@@ -37,8 +37,11 @@ How they are joined:
   into Phase 1 + Phase 1 – 15% by award; Pedana → Avinash Agencies; Salur and Kadapa 34,999.74 → Phase 3;
   Nandyal 15% excluded; and so on).
 - **Coastline Projects before Phase 3 is Tharuni Associates.**
-- Phase-sheet rows the tracker doesn't list are **not tracked**: their *To date* is the sheet's final
-  figure, *Today* is 0 and *Left* / *Done* are blank (—). They add to *Disposed to date*, never to *Left*.
+- **Each phase lists only the sites in the daily upload.** Its other sites (in the phase sheet, or with a
+  blank Balance in the master-format upload) are not listed anywhere on the dashboard or in the PDF;
+  their final figure is added to *Disposed to date* and shown as one **Other sites (n)** line under
+  *By agency*, so the agency rows still add up. They never count toward *Left*, *Done* or *Sites*.
+  The phase pills count listed sites. *Download master CSV* still has every row.
 - **Sites** counts unique dumpsites: spelling variants merge (`SITE_ALIASES`), Gudur(N)/(K) and
   Atmakur(N)/(K) stay apart, every Donthali row is Nellore Donthali.
 - A tracker row that matches nothing goes to a **Needs a phase** pill and is listed in the gear panel;

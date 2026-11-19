@@ -475,7 +475,13 @@ class PhasesAndEdits(Base):
         self.assertIn("RDF disposal report · Phase 3", p3)
         self.assertIn('aria-current="page">Phase 3', p3)
         old = self.c.get("/rdf/?phase=old").data.decode()
-        self.assertIn("Not tracked", old)
+        # Only the sites in the daily upload are listed; the rest is one "Other sites" total.
+        self.assertNotIn("Not tracked", old)
+        self.assertNotIn("not tracked", old.lower())
+        self.assertIn("Other sites", old)
+        self.assertIn("4,80,137.30", old)                      # Old's to-date total still includes them
+        self.assertIn("Amalapuram", old)
+        self.assertNotIn(">Tanuku<", old)                       # a phase-sheet-only Old site: not listed
         r = self.c.get("/rdf/api/range?from=2026-10-01&to=2026-11-17&phase=p2")
         self.assertTrue(r.get_json()["ok"])
 

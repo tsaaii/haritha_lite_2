@@ -317,10 +317,10 @@ def build_pdf(r: dict) -> bytes:
 
     # By site
     story += [P("By site", "h2"), Spacer(1, 3),
-              P(f"Every site{' in ' + r['phase_label'] if r.get('phase_label') else ''}, grouped by agency. "
+              P(f"Every site{' of ' + r['phase_label'] if r.get('phase_label') else ''} in the daily upload, grouped by agency. "
                 f"Today = RDF disposed on {r['rep_day']}, as reported in the daily tracker."
-                + (" Sites not in the daily tracker show their final figure from the phase sheet; "
-                   "their Left and Done are blank (—)." if r.get("has_untracked") else ""), "sub"),
+                + (f" The {r['others']['n']} other site{'s' if r['others']['n'] != 1 else ''} of this phase are not listed; "
+                   f"their {r['others']['cum']} MT is in Disposed to date and in By agency." if r.get("others") else ""), "sub"),
               Spacer(1, 9)]
     for g in r["groups"]:
         story += [_group_table(g, W), Spacer(1, 7.5)]
@@ -328,7 +328,7 @@ def build_pdf(r: dict) -> bytes:
     # Footer
     story += _rule(W, INK2, before=gap - 7.5, after=9)
     ft = Table([[P(f"Source: daily RDF tracker, {r['rep_label']}"
-                   + (", and the phase sheet" if r.get("has_untracked") else "") + ". Quantities in metric tonnes (MT).", "foot"),
+                   + (", and the phase sheet" if r.get("others") else "") + ". Quantities in metric tonnes (MT).", "foot"),
                  Paragraph("SWACHHA ANDHRA CORPORATION", ParagraphStyle("fr", parent=S["foot"], alignment=2))]],
                colWidths=[W * 0.68, W * 0.32])
     ft.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),

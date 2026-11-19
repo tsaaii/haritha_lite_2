@@ -127,10 +127,10 @@ def _book(hist):
 def _phase_view(hist, phase: str, b=None):
     """(phase history, report, latest all-phases day for the WhatsApp summary)."""
     b = b or _book(hist)
-    v = rdf_master.view(hist, phase, b)
+    v, others = rdf_master.split_tracked(rdf_master.view(hist, phase, b))
     all_last = rdf_master.view(hist[-1:], "all", b)[0] if hist else None
-    r = rdf_report.build(v, rdf_master.PHASE_LABEL.get(phase, ""), _extras(phase), all_last) if v else None
-    return v, r, b
+    r = rdf_report.build(v, rdf_master.PHASE_LABEL.get(phase, ""), _extras(phase), all_last, others) if v else None
+    return v, r, b, others
 
 
 def _report(phase: str) -> tuple[dict | None, str]:
@@ -153,7 +153,7 @@ def _views(phase: str) -> dict:
     if not hist:
         return empty
     try:
-        v, r, b = _phase_view(hist, phase)
+        v, r, b, others = _phase_view(hist, phase)
         counts = rdf_master.phase_counts(hist, b)
     except Exception:
         logger.exception("rdf_report: could not build the %s view", phase)
@@ -164,7 +164,7 @@ def _views(phase: str) -> dict:
     phases = [{"code": k, "label": lbl, "count": counts.get(k, 0)} for k, lbl in rdf_master.PHASES]
     if counts.get("un"):
         phases.append({"code": "un", "label": rdf_master.PHASE_LABEL["un"], "count": counts["un"]})
-    return {"r": r, "d": rdf_dashboard.build(v, _extras(phase)), "g": rdf_dashboard.date_range(v, start, last),
+    return {"r": r, "d": rdf_dashboard.build(v, _extras(phase), others), "g": rdf_dashboard.date_range(v, start, last),
             "load_error": err, "range_min": first.isoformat(), "range_max": last.isoformat(),
             "range_from": start.isoformat(), "range_to": last.isoformat(), "phase": phase, "phases": phases,
             "unassigned": counts.get("un", 0), "phase_options": [p for p in phases if p["code"] not in ("all", "un")]}
@@ -267,7 +267,7 @@ def api_range():
         return jsonify(ok=False, error="Pick both dates."), 400
     hist, err = _load()
     if hist:
-        g = rdf_dashboard.date_range(rdf_master.view(hist, _phase(), _book(hist)), start, end)
+        g = rdf_dashboard.date_range(rdf_master.split_tracked(rdf_master.view(hist, _phase(), _book(hist)))[0], start, end)
     else:
         g = {"ok": False, "error": err or "No trackers on file."}
     return _no_cache(jsonify(ok=g["ok"], html=render_template("rdf_report/_range.html", g=g),

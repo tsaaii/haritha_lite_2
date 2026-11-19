@@ -547,6 +547,16 @@ def view(hist: list[Tracker], phase: str = "all", b: Book | None = None) -> list
             for t, rows in zip(hist, days)]
 
 
+def split_tracked(v: list[Tracker]) -> tuple[list[Tracker], dict]:
+    """(the view with only the sites in the daily upload, the rest of the latest day as one total).
+
+    Each phase lists only its daily-tracked sites; RDF already disposed at its other sites is kept
+    in the totals as "other sites" (user, 19 Nov 2026)."""
+    out = [Tracker(t.date, tuple(s for s in t.sites if s.tracked), t.sheet_date, t.kind) for t in v]
+    rest = [s for s in v[-1].sites if not s.tracked] if v else []
+    return out, {"n": len({(s.key or s.site).lower() for s in rest}), "cum": sum(s.cum for s in rest)}
+
+
 def phase_counts(hist: list[Tracker], b: Book | None = None) -> dict[str, int]:
     """Rows per phase on the latest day (for the phase switcher)."""
     if not hist:
@@ -554,7 +564,8 @@ def phase_counts(hist: list[Tracker], b: Book | None = None) -> dict[str, int]:
     b = b or book(hist)
     out: dict[str, int] = {}
     for s in rows_for_day(b, hist[-1]):
-        out[s.phase] = out.get(s.phase, 0) + 1
+        if s.tracked:                       # pills count the sites each phase lists
+            out[s.phase] = out.get(s.phase, 0) + 1
     out["all"] = sum(out.values())
     return out
 

@@ -335,12 +335,14 @@ def unique_sites(sites) -> int:
 
 
 def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] | None = None,
-          gist_tracker: Tracker | None = None) -> dict | None:
-    """Report for a history (any phase view from data/rdf_master.py, or the raw trackers).
+          gist_tracker: Tracker | None = None, others: dict | None = None) -> dict | None:
+    """Report for a history (a phase view from data/rdf_master.py, or the raw trackers).
 
-    Sites not in the daily tracker (tracked=False) add to "to date" but have no balance: they are
-    left out of Left, Done %, Needed and Closest to reclaim.
+    `others` = {"n": sites, "cum": MT}: RDF already disposed at the phase's sites that are not in the
+    daily upload. Those sites are not listed; their total is added to "Disposed to date" and shown
+    as one "Other sites" line under By agency, so the agency rows still add up.
     """
+    others = others if others and others.get("n") else None
     if not hist:
         return None
     dl = _deadline()
@@ -354,7 +356,7 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
     need = bal / days
     on_pace = today >= need
     if not T:
-        verdict, status_color = "None of these sites is in the daily tracker: figures are final.", INK5
+        verdict, status_color = "No site in this phase is in the daily upload; Disposed to date is its final figure.", INK5
     elif on_pace:
         verdict, status_color = f"On pace for {day(dl)}.", GREEN
     elif today > 0:
@@ -376,8 +378,6 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
     def status(a):
         if not a["sites"]:
             return "No sites yet", INK5
-        if not a["tracked"]:
-            return "Not in daily tracker", INK5
         if a["bal"] <= 0:
             return "Cleared", GREEN
         if a["today"] >= a["bal"] / days:
@@ -395,6 +395,11 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
             "need": fmt(a["bal"] / days) if a["tracked"] else "—",
             "cum": fmt(a["cum"]), "bal": fmt(a["bal"]) if a["tracked"] else "—", "pct": _pct_t(a["sites"]),
         })
+
+    if others:
+        ag_rows.append({"name": f"Other sites ({others['n']})", "status": "earlier work, final figure", "status_color": INK5,
+                        "today": fmt(0), "today_color": INK3, "need": "—", "cum": fmt(others["cum"]), "bal": "—", "pct": "—",
+                        "other": True})
 
     def site_row(s: SiteDay) -> dict:
         moved = s.today > 0
@@ -432,9 +437,10 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
         "deadline_label": f"{day(dl)} {dl.year}", "deadline_short": day(dl),
         "days_label": f"{days} days to go",
         "range_label": f"{day(series[0].d)} to {day(rep)}",
-        "k": {"today": fmt(today), "need": fmt(need), "cum": fmt(cum), "bal": fmt(bal),
+        "k": {"today": fmt(today), "need": fmt(need), "cum": fmt(cum + (others["cum"] if others else 0)), "bal": fmt(bal),
               "pct": _pct_t(S), "sites": unique_sites(S), "verdict": verdict, "status_color": status_color},
-        "phase_label": phase_label, "has_untracked": len(T) < len(S),
+        "phase_label": phase_label,
+        "others": {"n": others["n"], "cum": fmt(others["cum"])} if others else None,
         "chart": chart_svg(series, dl), "chart_marks": chart_marks(series, dl), "proj_text": proj_text,
         "rep_iso": rep.isoformat(), "sheet_date": rep_t.sheet_date, "gist": gist(gist_tracker or rep_t),
         "ag_rows": ag_rows, "least": least_rows, "groups": groups,
