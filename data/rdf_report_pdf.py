@@ -252,8 +252,11 @@ def _page_number(canvas, doc):
 
 
 def filename(r: dict | None = None) -> str:
-    """Daily_RDF_tracker_DD-MM-YYYY.pdf, dated today (IST): the day the PDF is downloaded."""
-    return f"Daily_RDF_tracker_{config.today_ist().strftime('%d-%m-%Y')}.pdf"
+    """Daily_RDF_tracker_<phase>_DD-MM-YYYY.pdf, dated today (IST): the day the PDF is downloaded.
+    e.g. Daily_RDF_tracker_Phase-3_19-11-2026.pdf, Daily_RDF_tracker_All-phases_19-11-2026.pdf."""
+    import re
+    ph = re.sub(r"[^A-Za-z0-9]+", "-", (r or {}).get("phase_label") or "").strip("-")
+    return f"Daily_RDF_tracker_{ph + '_' if ph else ''}{config.today_ist().strftime('%d-%m-%Y')}.pdf"
 
 
 def build_pdf(r: dict) -> bytes:
@@ -261,7 +264,7 @@ def build_pdf(r: dict) -> bytes:
     fp = 6   # SimpleDocTemplate's frame padding; margins below are net of it (12mm / 14mm like @page)
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=12 * mm - fp, rightMargin=12 * mm - fp,
                             topMargin=14 * mm - fp, bottomMargin=14 * mm - fp,
-                            title=f"RDF disposal report · {r['rep_label']}",
+                            title=f"RDF disposal report{' · ' + r['phase_label'] if r.get('phase_label') else ''} · {r['rep_label']}",
                             author="Swachha Andhra Corporation", subject="Daily RDF disposal")
     W = doc.width - 2 * fp
     gap = 18 * PX
@@ -269,7 +272,8 @@ def build_pdf(r: dict) -> bytes:
     story = []
 
     # Header
-    left = [P("SWACHHA ANDHRA CORPORATION", "org"), P("RDF disposal report", "title")]
+    left = [P("SWACHHA ANDHRA CORPORATION", "org"),
+            P("RDF disposal report" + (f" · {r['phase_label']}" if r.get("phase_label") else ""), "title")]
     right = [P(r["rep_label"], "date"), P(f"Target: clear by {r['deadline_label']}", "meta"), P(r["days_label"], "meta")]
     hdr = Table([[left, right]], colWidths=[W * 0.55, W * 0.45])
     hdr.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -313,15 +317,18 @@ def build_pdf(r: dict) -> bytes:
 
     # By site
     story += [P("By site", "h2"), Spacer(1, 3),
-              P(f"Every site in the {r['rep_day']} tracker, grouped by agency. "
-                f"Today = RDF disposed on {r['rep_day']}, as reported in the tracker.", "sub"),
+              P(f"Every site{' in ' + r['phase_label'] if r.get('phase_label') else ''}, grouped by agency. "
+                f"Today = RDF disposed on {r['rep_day']}, as reported in the daily tracker."
+                + (" Sites not in the daily tracker show their final figure from the phase sheet; "
+                   "their Left and Done are blank (—)." if r.get("has_untracked") else ""), "sub"),
               Spacer(1, 9)]
     for g in r["groups"]:
         story += [_group_table(g, W), Spacer(1, 7.5)]
 
     # Footer
     story += _rule(W, INK2, before=gap - 7.5, after=9)
-    ft = Table([[P(f"Source: daily RDF tracker, {r['rep_label']}. Quantities in metric tonnes (MT).", "foot"),
+    ft = Table([[P(f"Source: daily RDF tracker, {r['rep_label']}"
+                   + (", and the phase sheet" if r.get("has_untracked") else "") + ". Quantities in metric tonnes (MT).", "foot"),
                  Paragraph("SWACHHA ANDHRA CORPORATION", ParagraphStyle("fr", parent=S["foot"], alignment=2))]],
                colWidths=[W * 0.68, W * 0.32])
     ft.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),

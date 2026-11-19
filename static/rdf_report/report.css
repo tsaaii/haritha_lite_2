@@ -303,3 +303,28 @@ dialog.panel::backdrop { background: rgba(18, 26, 20, 0.35); }
   [data-keep] { break-inside: avoid; }
   [data-head] { break-after: avoid; }
 }
+
+/* ---------------- Phases, quick edit, master sheet ---------------- */
+.phases { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.phase { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--ink-200); border-radius: 999px;
+  color: var(--ink-700); text-decoration: none; font-size: 14px; background: var(--white); }
+.phase small { color: var(--ink-500); font-size: 12px; }
+.phase:hover { border-color: var(--green-600); color: var(--green-700); }
+.phase[aria-current="page"] { background: var(--green-700); border-color: var(--green-700); color: var(--white); }
+.phase[aria-current="page"] small { color: var(--white); opacity: .85; }
+.phase--warn { border-color: var(--red-600); color: var(--red-600); }
+.tag--off { background: var(--ink-050); color: var(--ink-500); }
+.dot--off { background: var(--ink-300); }
+.pencil { border: 0; background: none; cursor: pointer; color: var(--ink-500); font-size: 15px; padding: 2px 6px; border-radius: 6px; }
+.pencil:hover, .pencil:focus-visible { color: var(--green-700); background: var(--ink-050); }
+.panel--edit { width: min(440px, calc(100vw - 24px)); }
+.edit-grid { display: grid; gap: 10px; }
+.edit-grid label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-500); }
+.edit-grid label[hidden] { display: none; }
+.edit-grid input, .edit-grid select { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--ink-200); border-radius: 8px; color: var(--ink-900); background: var(--white); }
+.edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.master-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.master-actions label { cursor: pointer; }
+.day.is-undone { opacity: .55; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media print { .phases, .pencil { display: none !important; } }

@@ -17,6 +17,45 @@ once that subdomain is mapped (step 4 below).
 | **Date range** | Pick From/To (or Last 7 / 14 days / Everything) to see each agency's MT disposed, MT/day, days with dispatch, sites that moved, and the balance at the start and end |
 | **Report** | The printable sheet: exactly what the PDF contains. Ctrl/Cmd+P prints this tab from anywhere |
 
+## Phases and the master sheet
+
+The dashboard covers every phase: **All phases · Phase 3 · Phase 2 · Phase 1 – 15% · Phase 1 · Old**
+(the pills above the tabs; `?phase=all|p3|p2|p1x|p1|old`). Each phase has the same tabs, charts and
+PDF. Sites are never added together across phases; *All phases* lists every row and sums the totals.
+
+It is built on one **master sheet** (the "true copy"), made by `data/rdf_master.py` from:
+
+1. **The daily tracker** (gear icon, as before). Its figures always win.
+2. **The phase sheet**, `data/rdf_master/phase_sheet.csv`: every site of every phase with its target and
+   RDF disposed. A newer copy can be uploaded from the gear panel (*Replace phase sheet*); it is kept at
+   `RDF_TRACKER_DIR/master/phase_sheet.csv` and wins over the shipped one.
+
+How they are joined:
+- A tracker row is matched to its phase-sheet row by **awarded quantity** (= `target_mt`, within 1 MT),
+  then agency, then site name. The rows the data can't settle were decided with you and are written in
+  `OVERRIDES` / `EXCLUDE` in `data/rdf_master.py` (Gudivada 40,000 → Phase 2; Machilipatnam 69,077 split
+  into Phase 1 + Phase 1 – 15% by award; Pedana → Avinash Agencies; Salur and Kadapa 34,999.74 → Phase 3;
+  Nandyal 15% excluded; and so on).
+- **Coastline Projects before Phase 3 is Tharuni Associates.**
+- Phase-sheet rows the tracker doesn't list are **not tracked**: their *To date* is the sheet's final
+  figure, *Today* is 0 and *Left* / *Done* are blank (—). They add to *Disposed to date*, never to *Left*.
+- **Sites** counts unique dumpsites: spelling variants merge (`SITE_ALIASES`), Gudur(N)/(K) and
+  Atmakur(N)/(K) stay apart, every Donthali row is Nellore Donthali.
+- A tracker row that matches nothing goes to a **Needs a phase** pill and is listed in the gear panel;
+  pick its phase with the pencil.
+
+**Download master CSV** (gear panel) gives the master sheet for the latest day: Phase, Agency, Site,
+Awarded, Disposed today, Cumulative, Balance. A copy is also saved to `RDF_TRACKER_DIR/master/master.csv`
+after every upload or edit.
+
+**Quick edit:** the pencil on a row in the Sites tab. *Today*, *To date* and *Left* change the latest
+report day only, and uploading that day's sheet again replaces them; *Site name*, *Agency* and *Phase*
+apply to every day. Every edit is logged in `RDF_TRACKER_DIR/master/edits.json` and listed under
+*Recent edits* in the gear panel with an **Undo** button.
+
+PDF names include the phase: `Daily_RDF_tracker_Phase-3_DD-MM-YYYY.pdf`, `Daily_RDF_tracker_All-phases_….pdf`.
+The WhatsApp summary always covers all phases.
+
 **Site groups** (set in `data/rdf_dashboard.py`, adjustable with environment variables):
 - **Active**: sent RDF in the last 3 calendar days (`RDF_ACTIVE_DAYS`).
 - **Stalled**: RDF left, but nothing sent for 7 or more days, or never (`RDF_STALLED_DAYS`).
@@ -45,6 +84,7 @@ If a file isn't a tracker, the panel stays open and says why, and nothing change
 | CSV parsing + storage (local or GCS) + CLI | `data/rdf_tracker.py` |
 | Report sheet figures, chart (SVG + shared marks), WhatsApp gist | `data/rdf_report.py` |
 | Dashboard tabs: site groups, agency progress, projections, heatmap, date range | `data/rdf_dashboard.py` |
+| Master sheet: phases, matching rules, views, quick edits | `data/rdf_master.py`, `data/rdf_master/phase_sheet.csv` |
 | Export-ready A4 PDF (ReportLab, vector) | `data/rdf_report_pdf.py` |
 | Page / sheet partial / PIN page / styles / gear panel | `templates/rdf_report/`, `static/rdf_report/` |
 | **Hardcoded history** (one sheet per day, deployed with the code) | `data/rdf_history/` |

@@ -272,7 +272,7 @@ def chart_svg(pts: list[Point], dl: date) -> str:
 AGENCY_SHORT = {
     "tharuni associates": "Tharuni", "saurashtra enviro": "Saurashtra", "zigma global": "Zigma",
     "coastline projects": "Coastline", "iway associates": "Iway", "card box company": "Card Box",
-    "raghu ram hume pipes": "Raghu Ram", "pr constructions": "PR Constructions",
+    "raghu ram hume pipes": "Raghu Ram", "pr constructions": "PR Constructions", "avinash agencies": "Avinash",
 }
 _SUFFIX = re.compile(r"\s+(associates|enviro|global|projects|company|constructions|pvt\.?|ltd\.?|"
                      r"private|limited|hume pipes|infra|enterprises)\b.*$", re.I)
@@ -305,7 +305,7 @@ def gist(t: Tracker) -> str:
     for s in t.sites:
         if s.today > 0:
             sites = sent.setdefault(agency_short(s.agency), {})
-            town = site_short(s.site)
+            town = site_short(s.src or s.site)
             sites.setdefault(town.lower(), town)
     if not sent:
         return f"No agency sent RDF on {day(t.date)}."
@@ -320,18 +320,42 @@ def gist(t: Tracker) -> str:
 # Report
 # ---------------------------------------------------------------------------
 
-def build(hist: list[Tracker]) -> dict | None:
+def _tracked(sites):
+    return [s for s in sites if s.tracked]
+
+
+def _pct_t(sites) -> str:
+    """Done % over the sites the daily tracker reports (others have no balance)."""
+    t = _tracked(sites)
+    return _pct_s(_sum(t, "cum"), _sum(t, "bal")) if t else "—"
+
+
+def unique_sites(sites) -> int:
+    return len({(s.key or s.site).lower() for s in sites})
+
+
+def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] | None = None,
+          gist_tracker: Tracker | None = None) -> dict | None:
+    """Report for a history (any phase view from data/rdf_master.py, or the raw trackers).
+
+    Sites not in the daily tracker (tracked=False) add to "to date" but have no balance: they are
+    left out of Left, Done %, Needed and Closest to reclaim.
+    """
     if not hist:
         return None
     dl = _deadline()
     rep_t = hist[-1]
     rep, S = rep_t.date, list(rep_t.sites)
     days = max(1, (dl - rep).days)
+    extras = EXTRA_AGENCIES if extra_agencies is None else extra_agencies
 
-    today, cum, bal = _sum(S, "today"), _sum(S, "cum"), _sum(S, "bal")
+    T = _tracked(S)
+    today, cum, bal = _sum(S, "today"), _sum(S, "cum"), _sum(T, "bal")
     need = bal / days
     on_pace = today >= need
-    if on_pace:
+    if not T:
+        verdict, status_color = "None of these sites is in the daily tracker: figures are final.", INK5
+    elif on_pace:
         verdict, status_color = f"On pace for {day(dl)}.", GREEN
     elif today > 0:
         verdict, status_color = f"About {_r(need / today)}× short of the daily need.", INK9
@@ -340,18 +364,20 @@ def build(hist: list[Tracker]) -> dict | None:
 
     ag: dict[str, list[SiteDay]] = {}
     lower = {s.agency.lower() for s in S}
-    for name in EXTRA_AGENCIES:
+    for name in extras:
         if name.lower() not in lower:
             ag[name] = []
     for s in S:
         ag.setdefault(s.agency, []).append(s)
-    ag_list = [{"name": k, "sites": v, "today": _sum(v, "today"), "cum": _sum(v, "cum"), "bal": _sum(v, "bal")}
-               for k, v in ag.items()]
+    ag_list = [{"name": k, "sites": v, "today": _sum(v, "today"), "cum": _sum(v, "cum"), "bal": _sum(_tracked(v), "bal"),
+                "tracked": bool(_tracked(v))} for k, v in ag.items()]
     ag_list.sort(key=lambda a: (-(len(a["sites"]) > 0), -a["today"], -a["bal"]))
 
     def status(a):
         if not a["sites"]:
             return "No sites yet", INK5
+        if not a["tracked"]:
+            return "Not in daily tracker", INK5
         if a["bal"] <= 0:
             return "Cleared", GREEN
         if a["today"] >= a["bal"] / days:
@@ -366,17 +392,18 @@ def build(hist: list[Tracker]) -> dict | None:
         ag_rows.append({
             "name": a["name"], "status": st, "status_color": col,
             "today": fmt(a["today"]), "today_color": GREEN if a["today"] > 0 else RED,
-            "need": fmt(a["bal"] / days) if a["sites"] else "—",
-            "cum": fmt(a["cum"]), "bal": fmt(a["bal"]), "pct": _pct_s(a["cum"], a["bal"]),
+            "need": fmt(a["bal"] / days) if a["tracked"] else "—",
+            "cum": fmt(a["cum"]), "bal": fmt(a["bal"]) if a["tracked"] else "—", "pct": _pct_t(a["sites"]),
         })
 
     def site_row(s: SiteDay) -> dict:
         moved = s.today > 0
         return {"site": s.site, "agency": s.agency, "today": fmt(s.today),
                 "today_color": GREEN if moved else INK3, "today_weight": 700 if moved else 400,
-                "cum": fmt(s.cum), "bal": fmt(s.bal), "pct": _pct_s(s.cum, s.bal)}
+                "cum": fmt(s.cum), "bal": fmt(s.bal) if s.tracked else "—",
+                "pct": _pct_s(s.cum, s.bal) if s.tracked else "—"}
 
-    least = sorted((s for s in S if s.bal > 0), key=lambda s: s.bal)[:RECLAIM_COUNT]
+    least = sorted((s for s in T if s.bal > 0), key=lambda s: s.bal)[:RECLAIM_COUNT]
     least_rows = [dict(site_row(s), rank=i + 1) for i, s in enumerate(least)]
 
     groups = []
@@ -387,11 +414,11 @@ def build(hist: list[Tracker]) -> dict | None:
         groups.append({
             "name": a["name"], "count": f"{cnt} site{'' if cnt == 1 else 's'}",
             "today": fmt(a["today"]), "today_color": GREEN if a["today"] > 0 else RED,
-            "cum": fmt(a["cum"]), "bal": fmt(a["bal"]), "pct": _pct_s(a["cum"], a["bal"]),
+            "cum": fmt(a["cum"]), "bal": fmt(a["bal"]) if a["tracked"] else "—", "pct": _pct_t(a["sites"]),
             "sites": [site_row(s) for s in sorted(a["sites"], key=lambda s: (-s.today, -s.cum))],
         })
 
-    series = [Point(t.date, _sum(t.sites, "today"), _sum(t.sites, "cum"), _sum(t.sites, "bal")) for t in hist]
+    series = [Point(t.date, _sum(t.sites, "today"), _sum(t.sites, "cum"), _sum(_tracked(t.sites), "bal")) for t in hist]
     P = _proj(series, dl, PACE_DAYS)
     if P["pace"] <= 0:
         proj_text = f"Nothing disposed recently; at this pace nothing clears by {day(dl)}."
@@ -406,8 +433,9 @@ def build(hist: list[Tracker]) -> dict | None:
         "days_label": f"{days} days to go",
         "range_label": f"{day(series[0].d)} to {day(rep)}",
         "k": {"today": fmt(today), "need": fmt(need), "cum": fmt(cum), "bal": fmt(bal),
-              "pct": _pct_s(cum, bal), "sites": len(S), "verdict": verdict, "status_color": status_color},
+              "pct": _pct_t(S), "sites": unique_sites(S), "verdict": verdict, "status_color": status_color},
+        "phase_label": phase_label, "has_untracked": len(T) < len(S),
         "chart": chart_svg(series, dl), "chart_marks": chart_marks(series, dl), "proj_text": proj_text,
-        "rep_iso": rep.isoformat(), "sheet_date": rep_t.sheet_date, "gist": gist(rep_t),
+        "rep_iso": rep.isoformat(), "sheet_date": rep_t.sheet_date, "gist": gist(gist_tracker or rep_t),
         "ag_rows": ag_rows, "least": least_rows, "groups": groups,
     }

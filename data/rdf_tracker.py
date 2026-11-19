@@ -55,6 +55,14 @@ class SiteDay:
     today: float       # "RDF disposed as on Dt" column
     cum: float         # "Cumulative RDF disposed as on Dt" column
     bal: float         # "Balance RDF to be disposed from site" column
+    awarded: float = 0.0   # "Total Qty awarded to ULB" column: how a row is matched to the phase sheet
+    # Set by data/rdf_master.py when a row is placed in a phase view:
+    sid: str = ""          # stable master-row id (edits and per-site series key on it)
+    phase: str = ""        # phase code: p3, p2, p1x, p1, old, un
+    tracked: bool = True   # False = phase-sheet-only row: fixed cumulative, no balance
+    src: str = ""          # site name as written in the tracker (WhatsApp summary uses it)
+    key: str = ""          # unique-site key for the Sites count
+    base: str = ""         # site name without the view's suffixes (" · P3", " (2)"): what the edit form shows
 
 
 @dataclass(frozen=True)
@@ -142,7 +150,7 @@ def parse(raw: bytes, filename: str = "") -> Tracker:
     for r in body:
         site, sl = _clean(r[2]), _clean(r[1])
         name = f"{site} #{sl}" if seen[site.lower()] > 1 and sl else site
-        sites.append(SiteDay(_clean(r[0]), name, _num(r[6]), _num(r[7]), _num(r[9])))
+        sites.append(SiteDay(_clean(r[0]), name, _num(r[6]), _num(r[7]), _num(r[9]), awarded=_num(r[3])))
     return Tracker(d, tuple(sites), sheet)
 
 
@@ -193,6 +201,15 @@ def _delete(rel: str) -> None:
     path = os.path.join(TRACKER_DIR, rel)
     if os.path.exists(path):
         os.remove(path)
+
+
+def read_file(rel: str) -> bytes | None:
+    """Read RDF_TRACKER_DIR/<rel> (None if missing). Used for master/ files (edits, phase sheet)."""
+    return _read(rel)
+
+
+def write_file(rel: str, data: bytes, content_type: str = "text/csv") -> None:
+    _write(rel, data, content_type)
 
 
 def _list_trackers() -> list[tuple[str, str, datetime | None]]:
@@ -315,6 +332,17 @@ def store(raw: bytes, filename: str) -> tuple[Tracker, bool]:
     _write(f"{_UPLOADS}/{stamp}_{safe}", raw)
     _write(f"{_TRACKERS}/{name}", raw)
     return t, replaced
+
+
+def uploaded_at() -> dict[date, datetime]:
+    """When each uploaded day's sheet was last written (built-in days are absent)."""
+    out = {}
+    for name, _, upd in _list_trackers():
+        try:
+            out[date.fromisoformat(name[:-4])] = upd
+        except ValueError:
+            continue
+    return out
 
 
 def history_dates() -> set[date]:

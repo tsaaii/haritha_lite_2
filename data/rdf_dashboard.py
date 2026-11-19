@@ -59,6 +59,9 @@ class SiteSeries:
     key: str
     agency: str
     site: str
+    tracked: bool = True
+    phase: str = ""
+    base: str = ""
     days: dict[date, tuple[float, float, float]] = field(default_factory=dict)   # d -> (today, cum, bal)
 
     def at(self, d: date):
@@ -76,12 +79,19 @@ class SiteSeries:
         return max(moved) if moved else None
 
 
+def _k(s) -> str:
+    """Series key: the master row id when there is one (phase views), else agency + site."""
+    return s.sid or (s.agency + "|" + s.site)
+
+
 def _series(hist: list[Tracker]) -> dict[str, SiteSeries]:
     out: dict[str, SiteSeries] = {}
     for t in hist:
         for s in t.sites:
-            k = s.agency + "|" + s.site
-            ss = out.get(k) or out.setdefault(k, SiteSeries(k, s.agency, s.site))
+            k = _k(s)
+            ss = out.get(k) or out.setdefault(k, SiteSeries(k, s.agency, s.site, s.tracked))
+            ss.agency, ss.site, ss.tracked = s.agency, s.site, s.tracked     # latest day's naming wins
+            ss.phase, ss.base = s.phase, s.base or s.site
             ss.days[t.date] = (s.today, s.cum, s.bal)
     return out
 
@@ -148,6 +158,8 @@ def stacked_daily_chart(dates: list[date], agencies: list[dict]) -> str:
     slot = (W - L - R) / n
     bw = max(3.0, min(28.0, slot * 0.7))
     totals = [sum(a["daily"].get(d, 0) for a in agencies) for d in dates]
+    if max(totals + [0]) <= 0:
+        return '<p class="muted small">No RDF was sent on any day on file in this view.</p>'
     top = _nice(max(totals + [1]) * 1.08)
 
     def y(v):
@@ -265,7 +277,10 @@ def _date_label(d: date | None) -> str:
     return f"{day(d)} {d.year}" if d else "—"
 
 
-def build(hist: list[Tracker]) -> dict | None:
+def build(hist: list[Tracker], extra_agencies: list[str] | None = None) -> dict | None:
+    """Dashboard tabs for a history (a phase view or the raw trackers). Sites that are not in the
+    daily tracker (tracked=False) are listed with their final 'to date' figure and status
+    'Not tracked'; they stay out of pace, balances, projections and the site lists."""
     if not hist:
         return None
     dl = _deadline()
@@ -273,12 +288,21 @@ def build(hist: list[Tracker]) -> dict | None:
     rep, d0 = dates[-1], dates[0]
     days_left = max(1, (dl - rep).days)
     series = _series(hist)
-    current = [series[s.agency + "|" + s.site] for s in hist[-1].sites]
+    current = [series[_k(s)] for s in hist[-1].sites]
+    keys = {_k(s): (s.key or s.site).lower() for s in hist[-1].sites}
 
     # ---- sites ----
     sites = []
     for ss in current:
         today, cum, bal = ss.at(rep)
+        if not ss.tracked:
+            sites.append({
+                "key": ss.key, "agency": ss.agency, "short": agency_short(ss.agency), "site": ss.site,
+                "today": today, "cum": cum, "bal": 0.0, "pct": None, "pace": 0.0, "last": None, "idle": None,
+                "status": "Not tracked", "tags": [], "finish": None, "leftover": 0.0, "need": 0.0, "tracked": False,
+                "sid": ss.key, "count_key": keys.get(ss.key, ss.site.lower()), "phase": ss.phase, "base": ss.base,
+            })
+            continue
         pace = _pace(ss.days, rep, PACE_WINDOW)
         last = ss.last_dispatch()
         idle = (rep - last).days if last else None
@@ -301,22 +325,25 @@ def build(hist: list[Tracker]) -> dict | None:
             "key": ss.key, "agency": ss.agency, "short": agency_short(ss.agency), "site": ss.site,
             "today": today, "cum": cum, "bal": bal, "pct": _pct(cum, bal), "pace": pace,
             "last": last, "idle": idle, "status": status, "tags": tags, "finish": fin,
-            "leftover": leftover, "need": bal / days_left if bal > 0 else 0.0,
+            "leftover": leftover, "need": bal / days_left if bal > 0 else 0.0, "tracked": True,
+            "sid": ss.key, "count_key": keys.get(ss.key, ss.site.lower()), "phase": ss.phase, "base": ss.base,
         })
 
     # ---- agencies (fixed order: most RDF handled first; colour by fixed slot) ----
     names = sorted({s["agency"] for s in sites}, key=lambda a: -sum(x["cum"] + x["bal"] for x in sites if x["agency"] == a))
     from data.rdf_report import EXTRA_AGENCIES
-    for extra in EXTRA_AGENCIES:
+    for extra in (EXTRA_AGENCIES if extra_agencies is None else extra_agencies):
         if extra.lower() not in {n.lower() for n in names}:
             names.append(extra)
     agencies = []
     for name in names:
         mine = [s for s in sites if s["agency"] == name]
-        pts = _agency_points([series[s["key"]] for s in mine])
+        mt = [s for s in mine if s["tracked"]]
+        pts = _agency_points([series[s["key"]] for s in mt])
         today = sum(s["today"] for s in mine)
         cum = sum(s["cum"] for s in mine)
-        bal = sum(s["bal"] for s in mine)
+        cum_t = sum(s["cum"] for s in mt)
+        bal = sum(s["bal"] for s in mt)
         pace = _pace(pts, rep, PACE_WINDOW) if pts else 0.0
         # Straight line from the first day on file to 100% on the deadline.
         if pts and d0 in pts:
@@ -325,13 +352,14 @@ def build(hist: list[Tracker]) -> dict | None:
             expected = p0 + (1 - p0) * min(1.0, (rep - d0).days / max(1, (dl - d0).days))
         else:
             expected = None
-        fin = _finish(bal, pace, rep) if mine else None
-        counts = {k: sum(1 for s in mine if s["status"] == k) for k in ("Active", "Slowing", "Stalled", "Cleared")}
+        fin = _finish(bal, pace, rep) if mt else None
+        counts = {k: sum(1 for s in mine if s["status"] == k) for k in ("Active", "Slowing", "Stalled", "Cleared", "Not tracked")}
         agencies.append({
             "name": name, "short": agency_short(name), "color": agency_color(name, names),
-            "sites": len(mine), "today": today, "cum": cum, "bal": bal, "pct": _pct(cum, bal),
+            "sites": len(mine), "today": today, "cum": cum, "bal": bal, "pct": _pct(cum_t, bal),
             "expected": expected, "pace": pace, "need": bal / days_left if bal > 0 else 0.0,
-            "finish": fin if bal > 0 else None, "has_sites": bool(mine), "counts": counts,
+            "finish": fin if bal > 0 else None, "has_sites": bool(mine), "tracked": bool(mt), "counts": counts,
+            "untracked": len(mine) - len(mt),
             "quick": sum(1 for s in mine if "quick" in s["tags"]),
             "daily": {d: v[0] for d, v in pts.items()},
             "finish_label": _date_label(fin) if fin else "", "late_days": (fin - dl).days if fin and fin > dl else 0,
@@ -341,10 +369,12 @@ def build(hist: list[Tracker]) -> dict | None:
         s["color"] = color[s["agency"]]
 
     # ---- headline ----
+    trk = [s for s in sites if s["tracked"]]
     tot_today = sum(s["today"] for s in sites)
     tot_cum = sum(s["cum"] for s in sites)
-    tot_bal = sum(s["bal"] for s in sites)
-    proj_pts = _agency_points(current)
+    tot_cum_t = sum(s["cum"] for s in trk)
+    tot_bal = sum(s["bal"] for s in trk)
+    proj_pts = _agency_points([ss for ss in current if ss.tracked])
     pace_all = _pace(proj_pts, rep, PACE_WINDOW)
     fin_all = _finish(tot_bal, pace_all, rep)
     lists = {
@@ -353,65 +383,80 @@ def build(hist: list[Tracker]) -> dict | None:
         "quick": sorted([s for s in sites if "quick" in s["tags"]], key=lambda s: s["bal"]),
         "long": sorted([s for s in sites if "long" in s["tags"]], key=lambda s: -s["leftover"]),
         "Cleared": [s for s in sites if s["status"] == "Cleared"],
+        "Not tracked": [s for s in sites if not s["tracked"]],
     }
 
     # ---- view rows (formatted) ----
     def site_row(s):
         tags = [{"Active": ("Active", "ok"), "Slowing": ("Slowing", "warn"), "Stalled": ("Stalled", "bad"),
-                 "Cleared": ("Cleared", "done")}[s["status"]]]
+                 "Cleared": ("Cleared", "done"), "Not tracked": ("Not tracked", "off")}[s["status"]]]
         if "quick" in s["tags"]:
             tags.append(("Quick win", "quick"))
         if "long" in s["tags"]:
             tags.append(("Long haul", "long"))
-        filters = [s["status"].lower()] + s["tags"] + ["ag-" + _slug(s["agency"])]
+        filters = [_slug(s["status"])] + s["tags"] + ["ag-" + _slug(s["agency"])]
+        t = s["tracked"]
         return {
+            "sid": s["sid"], "tracked": t, "today_raw": f"{s['today']:.2f}", "cum_raw": f"{s['cum']:.2f}",
+            "bal_raw": f"{s['bal']:.2f}", "agency_full": s["agency"], "site_name": s["base"], "phase": s["phase"],
             "site": s["site"], "agency": s["short"], "color": s["color"], "tags": tags, "filters": " ".join(filters),
-            "today": fmt(s["today"]), "today_v": s["today"], "pace": fmt(s["pace"]), "pace_v": s["pace"],
-            "cum": fmt(s["cum"]), "cum_v": s["cum"], "bal": fmt(s["bal"]), "bal_v": s["bal"],
-            "pct": f"{_r(s['pct'] * 100)}%", "pct_v": s["pct"],
-            "last": day(s["last"]) if s["last"] else "never", "last_v": -(s["idle"] if s["idle"] is not None else 9999),
-            "finish": ("cleared" if s["bal"] <= 0 else _date_label(s["finish"]) if s["finish"] else "no pace"),
-            "finish_v": (s["finish"] - rep).days if s["finish"] else 99999,
-            "late": bool(s["finish"] and s["finish"] > dl) or (s["bal"] > 0 and not s["finish"]),
+            "today": fmt(s["today"]), "today_v": s["today"], "pace_v": s["pace"],
+            "cum": fmt(s["cum"]), "cum_v": s["cum"], "bal": fmt(s["bal"]) if t else "—", "bal_v": s["bal"] if t else -1,
+            "pct": f"{_r(s['pct'] * 100)}%" if t else "—", "pct_v": s["pct"] if t else -1,
+            "pace": fmt(s["pace"]) if t else "—",
+            "last": (day(s["last"]) if s["last"] else "never") if t else "—",
+            "last_v": -(s["idle"] if s["idle"] is not None else 9999) if t else -99999,
+            "finish": ("not in tracker" if not t else "cleared" if s["bal"] <= 0
+                       else _date_label(s["finish"]) if s["finish"] else "no pace"),
+            "finish_v": (s["finish"] - rep).days if s["finish"] and t else 99999 if t else 199999,
+            "late": t and (bool(s["finish"] and s["finish"] > dl) or (s["bal"] > 0 and not s["finish"])),
             "need": fmt(s["need"]),
         }
 
     heat_rows = []
     for a in agencies:
-        for s in sorted([x for x in sites if x["agency"] == a["name"]], key=lambda x: -x["bal"]):
+        for s in sorted([x for x in sites if x["agency"] == a["name"] and x["tracked"]], key=lambda x: -x["bal"]):
             ss = series[s["key"]]
             heat_rows.append({"agency": s["agency"], "site": s["site"], "color": s["color"],
                               "cells": [ss.at(d)[0] if ss.at(d) else None for d in dates]})
 
     ag_with = [a for a in agencies if a["has_sites"]]
-    on_track = sum(1 for a in ag_with if a["bal"] > 0 and a["finish"] and a["finish"] <= dl)
+    ag_trk = [a for a in ag_with if a["tracked"]]
+    on_track = sum(1 for a in ag_trk if a["bal"] > 0 and a["finish"] and a["finish"] <= dl)
     return {
         "rep": rep, "rep_label": _date_label(rep), "dl_label": _date_label(dl), "days_left": days_left,
         "first_label": _date_label(d0), "n_days": len(dates),
         "dates": [d.isoformat() for d in dates],
         "kpi": {
             "today": fmt(tot_today), "need": fmt(tot_bal / days_left), "cum": fmt(tot_cum), "bal": fmt(tot_bal),
-            "pct": f"{_r(_pct(tot_cum, tot_bal) * 100)}%", "pace": fmt(pace_all),
+            "pct": f"{_r(_pct(tot_cum_t, tot_bal) * 100)}%" if trk else "—", "pace": fmt(pace_all),
             "finish": _date_label(fin_all) if fin_all else "no recent dispatch",
             "late": not fin_all or fin_all > dl,
             "short_x": (f"{_r((tot_bal / days_left) / pace_all)}×" if pace_all > 0 else "—"),
         },
         "counts": {"active": len(lists["Active"]), "stalled": len(lists["Stalled"]), "quick": len(lists["quick"]),
                    "long": len(lists["long"]), "cleared": len(lists["Cleared"]), "sites": len(sites),
-                   "agencies_on_track": on_track, "agencies": len(ag_with)},
-        "stack_chart": stacked_daily_chart(dates, ag_with),
-        "finish_chart": finish_chart([a for a in ag_with if a["bal"] > 0], rep, dl),
+                   "untracked": len(lists["Not tracked"]), "tracked": len(trk),
+                   "unique": len({s["count_key"] for s in sites}),
+                   "unique_left": len({s["count_key"] for s in trk if s["bal"] > 0}),
+                   "agencies_on_track": on_track, "agencies": len(ag_trk)},
+        "stack_chart": stacked_daily_chart(dates, ag_trk),
+        "finish_chart": finish_chart([a for a in ag_trk if a["bal"] > 0], rep, dl),
         "heatmap": heatmap(dates, heat_rows),
         "agencies": [{
             "name": a["name"], "short": a["short"], "color": a["color"], "slug": _slug(a["name"]),
-            "sites": a["sites"], "has_sites": a["has_sites"], "today": fmt(a["today"]), "cum": fmt(a["cum"]),
-            "bal": fmt(a["bal"]), "pct": f"{_r(a['pct'] * 100)}%", "pct_w": f"{a['pct'] * 100:.1f}%",
+            "sites": a["sites"], "has_sites": a["has_sites"], "tracked": a["tracked"], "untracked": a["untracked"],
+            "today": fmt(a["today"]), "cum": fmt(a["cum"]),
+            "bal": fmt(a["bal"]) if a["tracked"] else "—", "pct": f"{_r(a['pct'] * 100)}%" if a["tracked"] else "—",
+            "pct_w": f"{a['pct'] * 100:.1f}%",
             "exp_w": f"{a['expected'] * 100:.1f}%" if a["expected"] is not None else "",
             "exp": f"{_r(a['expected'] * 100)}%" if a["expected"] is not None else "—",
             "behind": a["expected"] is not None and a["pct"] + 1e-9 < a["expected"],
-            "pace": fmt(a["pace"]), "need": fmt(a["need"]),
-            "finish": ("cleared" if a["has_sites"] and a["bal"] <= 0 else a["finish_label"] or ("no recent dispatch" if a["has_sites"] else "—")),
-            "late": a["has_sites"] and a["bal"] > 0 and (not a["finish"] or a["finish"] > dl),
+            "pace": fmt(a["pace"]) if a["tracked"] else "—", "need": fmt(a["need"]) if a["tracked"] else "—",
+            "finish": ("not in tracker" if a["has_sites"] and not a["tracked"]
+                       else "cleared" if a["has_sites"] and a["bal"] <= 0
+                       else a["finish_label"] or ("no recent dispatch" if a["has_sites"] else "—")),
+            "late": a["tracked"] and a["bal"] > 0 and (not a["finish"] or a["finish"] > dl),
             "counts": a["counts"], "quick": a["quick"],
         } for a in agencies],
         "sites": [site_row(s) for s in sorted(sites, key=lambda s: (names.index(s["agency"]), -s["today"], -s["bal"]))],
@@ -449,7 +494,7 @@ def date_range(hist: list[Tracker], start: date, end: date) -> dict:
     first, last = in_range[0], in_range[-1]
     before = [d for d in dates if d < first]
     series = _series(hist)
-    end_sites = [series[s.agency + "|" + s.site] for s in hist[dates.index(last)].sites]
+    end_sites = [series[_k(s)] for s in hist[dates.index(last)].sites if s.tracked]
 
     def base_of(ss: SiteSeries):
         if before:

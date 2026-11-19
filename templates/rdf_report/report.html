@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0B3D22">
-<title>RDF disposal dashboard{% if r %} · {{ r.rep_label }}{% endif %}</title>
+<title>RDF disposal dashboard{% if r %} · {{ r.phase_label }} · {{ r.rep_label }}{% endif %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='rdf_report/report.css') }}">
 <script id="rdf-report-config" type="application/json">{{ cfg | tojson }}</script>
 </head>
@@ -24,6 +24,14 @@
   </div>
 
   {% if load_error %}<div class="alert" data-noprint>{{ load_error }}</div>{% endif %}
+
+  {% if phases %}
+  <nav class="phases" aria-label="Phase" data-noprint>
+    {% for p in phases %}
+    <a class="phase{{ ' phase--warn' if p.code == 'un' else '' }}" href="?phase={{ p.code }}" data-phase="{{ p.code }}"{% if p.code == phase %} aria-current="page"{% endif %}>{{ p.label }} <small>{{ p.count }}</small></a>
+    {% endfor %}
+  </nav>
+  {% endif %}
 
   <nav class="tabs" role="tablist" aria-label="Dashboard" data-noprint>
     <button type="button" role="tab" class="tab" data-tab="overview" aria-selected="true">Overview</button>
@@ -70,7 +78,41 @@
       <h3>Days on file</h3>
       <div id="days"><small class="c5">Loading…</small></div>
     </div>
+    <div class="days">
+      <h3>Master sheet</h3>
+      <p class="small c5">One row per site per phase: the daily tracker's sites with today's figures, every other site with its final figure from the phase sheet (<span id="sheet-src">built-in</span> copy).</p>
+      <div class="master-actions">
+        <a class="btn btn--secondary" id="master-dl" href="{{ cfg.api.master }}">Download master CSV</a>
+        <label class="btn btn--ghost">Replace phase sheet<input type="file" id="sheet-file" accept=".csv,text/csv" hidden></label>
+      </div>
+      <div id="unassigned"></div>
+    </div>
+    <div class="days">
+      <h3>Recent edits</h3>
+      <div id="edits"><small class="c5">Loading…</small></div>
+    </div>
   </div>
+</dialog>
+
+<dialog class="panel panel--edit" id="edit" aria-labelledby="edit-title">
+  <form method="dialog" id="edit-form">
+    <div class="panel__head">
+      <h2 id="edit-title">Edit site</h2>
+      <button type="button" class="icon-btn" id="edit-close" aria-label="Close">✕</button>
+    </div>
+    <div class="panel__body edit-grid">
+      <p class="small c5" id="edit-note"></p>
+      <label>Site name <input name="site" required maxlength="80"></label>
+      <label>Agency <input name="agency" required maxlength="80" list="agency-list"></label>
+      <label>Phase <select name="phase">{% for p in phase_options or [] %}<option value="{{ p.code }}">{{ p.label }}</option>{% endfor %}</select></label>
+      <label data-tracked>Today (MT) <input name="today" inputmode="decimal" pattern="[0-9.,]*"></label>
+      <label>To date (MT) <input name="cum" inputmode="decimal" pattern="[0-9.,]*"></label>
+      <label data-tracked>Left (MT) <input name="bal" inputmode="decimal" pattern="[0-9.,]*"></label>
+      <datalist id="agency-list">{% if d %}{% for a in d.agencies %}<option value="{{ a.name }}">{% endfor %}{% endif %}</datalist>
+      <div class="msgs" id="edit-msg" aria-live="polite"></div>
+      <div class="edit-actions"><button type="button" class="btn btn--ghost" id="edit-cancel">Cancel</button><button type="submit" class="btn btn--primary">Save</button></div>
+    </div>
+  </form>
 </dialog>
 
 <script src="{{ url_for('static', filename='rdf_report/report.js') }}" defer></script>

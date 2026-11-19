@@ -3,7 +3,7 @@
   <header class="rh">
     <div class="rh__left">
       <span class="rh__org">Swachha Andhra Corporation</span>
-      <span class="rh__title">RDF disposal report</span>
+      <span class="rh__title">RDF disposal report{% if r and r.phase_label %} · {{ r.phase_label }}{% endif %}</span>
     </div>
     {% if r %}
     <div class="rh__right">
@@ -87,7 +87,7 @@
 
   <section class="sec">
     <h2 data-head style="margin-bottom:4px;">By site</h2>
-    <span data-head class="sub" style="margin:0 0 12px;">Every site in the {{ r.rep_day }} tracker, grouped by agency. Today = RDF disposed on {{ r.rep_day }}, as reported in the tracker.</span>
+    <span data-head class="sub" style="margin:0 0 12px;">Every site{% if r.phase_label %} in {{ r.phase_label }}{% endif %}, grouped by agency. Today = RDF disposed on {{ r.rep_day }}, as reported in the daily tracker.{% if r.has_untracked %} Sites not in the daily tracker show their final figure from the phase sheet; their Left and Done are blank (—).{% endif %}</span>
     <div class="scroll-x"><div>
     {% for g in r.groups %}
       <div class="group">
@@ -117,7 +117,7 @@
   {% endif %}
 
   <footer class="foot">
-    <span>Source: daily RDF tracker{% if r %}, {{ r.rep_label }}{% endif %}. Quantities in metric tonnes (MT).</span>
+    <span>Source: daily RDF tracker{% if r %}, {{ r.rep_label }}{% if r.has_untracked %}, and the phase sheet{% endif %}{% endif %}. Quantities in metric tonnes (MT).</span>
     <span>Swachha Andhra Corporation</span>
   </footer>
 </div>

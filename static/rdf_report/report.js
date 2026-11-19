@@ -12,6 +12,8 @@
   var sheetSlot = $("sheet-slot"), dashSlot = $("dash-slot"), pdfBtn = $("pdf"), toast = $("toast");
   var busy = false, toastTimer = null;
   var state = { tab: "overview", filter: "all", sort: null, dir: -1, q: "" };
+  var phase = cfg.phase || "all";
+  var editDlg = $("edit"), editForm = $("edit-form"), editing = null;
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -96,7 +98,7 @@
     var f = $("range-from").value, t = $("range-to").value, out = $("range-out");
     if (!f || !t) return;
     out.classList.add("is-busy");
-    api(cfg.api.range + "?from=" + encodeURIComponent(f) + "&to=" + encodeURIComponent(t)).then(function (j) {
+    api(cfg.api.range + "?from=" + encodeURIComponent(f) + "&to=" + encodeURIComponent(t) + "&phase=" + phase).then(function (j) {
       out.classList.remove("is-busy");
       if (j.html != null) out.innerHTML = j.html;
       else out.innerHTML = "", out.appendChild(el("div", "card empty", j.error || "Could not load."));
@@ -129,8 +131,106 @@
       $("range-to").dataset.lastMax = j.range.max;
       runRange();
     }
+    (j.phases || []).forEach(function (p) {
+      var a = document.querySelector('.phase[data-phase="' + p.code + '"] small');
+      if (a) a.textContent = p.count;
+    });
     showTab(state.tab, false);
     applySites();
+  }
+  function postJSON(url, body) {
+    body.phase = phase;
+    return api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  }
+
+  // ---------------------------------------------------------------- quick edit
+  var NUM = ["today", "cum", "bal"], FIELDS = ["site", "agency", "phase"].concat(NUM);
+  function openEdit(b) {
+    editing = { sid: b.dataset.edit, tracked: !!b.dataset.eTracked, orig: {} };
+    FIELDS.forEach(function (f) {
+      var v = b.dataset["e" + f[0].toUpperCase() + f.slice(1)] || "";
+      editing.orig[f] = v;
+      editForm.elements[f].value = v;
+    });
+    editForm.querySelectorAll("[data-tracked]").forEach(function (l) { l.hidden = !editing.tracked; });
+    $("edit-title").textContent = "Edit " + editing.orig.site;
+    $("edit-note").textContent = editing.tracked
+      ? "Figures change the latest report day only; uploading that day's sheet again replaces them. Name, agency and phase apply to every day."
+      : "This site isn't in the daily tracker: its 'To date' is the final figure from the phase sheet.";
+    $("edit-msg").textContent = "";
+    if (editDlg.showModal) editDlg.showModal(); else editDlg.setAttribute("open", "");
+    editForm.elements.site.focus();
+  }
+  function closeEdit() { if (editDlg.close) { if (editDlg.open) editDlg.close(); } else editDlg.removeAttribute("open"); editing = null; }
+  function saveEdit(e) {
+    e.preventDefault();
+    if (!editing) return;
+    var changes = {}, n = 0;
+    FIELDS.forEach(function (f) {
+      if (!editing.tracked && (f === "today" || f === "bal")) return;
+      var v = editForm.elements[f].value.trim();
+      var same = NUM.indexOf(f) >= 0 ? Math.abs(parseFloat(v.replace(/,/g, "")) - parseFloat(editing.orig[f])) < 0.005 : v === editing.orig[f];
+      if (!same) { changes[f] = v; n++; }
+    });
+    if (!n) { closeEdit(); return; }
+    var msg = $("edit-msg");
+    msg.textContent = "Saving…";
+    postJSON(cfg.api.edit, { sid: editing.sid, changes: changes }).then(function (j) {
+      if (!j.ok) { msg.textContent = ""; msg.appendChild(el("div", "msg msg--err", j.error || "Could not save.")); return; }
+      closeEdit();
+      applyAll(j);
+      notify("Saved. Undo it from the gear panel if needed.", true);
+    });
+  }
+
+  // ---------------------------------------------------------------- master sheet (gear panel)
+  function loadEdits() {
+    var box = $("edits"), un = $("unassigned");
+    api(cfg.api.edits).then(function (j) {
+      box.textContent = ""; un.textContent = "";
+      if (!j.ok) { box.appendChild(el("small", "c5", j.error || "Could not load.")); return; }
+      $("sheet-src").textContent = j.sheet;
+      if (j.unassigned && j.unassigned.length) {
+        var w = el("div", "msg msg--err");
+        w.appendChild(el("b", null, j.unassigned.length + " tracker row" + (j.unassigned.length > 1 ? "s" : "") + " could not be matched to a phase: "));
+        w.appendChild(document.createTextNode(j.unassigned.map(function (u) { return u.site + " (" + u.agency + ", " + u.awarded + " MT awarded)"; }).join("; ") +
+          ". Open the 'Needs a phase' tab and use the pencil to pick one."));
+        un.appendChild(w);
+      }
+      if (!j.edits.length) { box.appendChild(el("small", "c5", "No edits yet.")); return; }
+      j.edits.forEach(function (e) {
+        var row = el("div", "day" + (e.undone ? " is-undone" : "")), left = el("span");
+        left.appendChild(el("span", "c9", e.site + " "));
+        left.appendChild(el("small", null, "· " + e.field + ": " + e.old + " → " + e.new + (e.day ? " (" + e.day + ")" : "") + " · " + e.at));
+        row.appendChild(left);
+        row.appendChild(el("span"));
+        if (e.undone) { row.appendChild(el("small", "c5", "undone")); box.appendChild(row); return; }
+        var b = el("button", null, "Undo");
+        b.type = "button";
+        b.addEventListener("click", function () {
+          postJSON(cfg.api.undo, { id: e.id }).then(function (r) {
+            if (!r.ok) { say(r.error || "Could not undo.", false); return; }
+            applyAll(r); loadEdits(); notify("Edit undone.", true);
+          });
+        });
+        row.appendChild(b);
+        box.appendChild(row);
+      });
+    });
+  }
+  function uploadSheet(file) {
+    if (!file) return;
+    var fd = new FormData();
+    fd.append("file", file, file.name);
+    fd.append("phase", phase);
+    msgs.textContent = "";
+    say("Reading the phase sheet…", true);
+    api(cfg.api.sheet, { method: "POST", body: fd }).then(function (j) {
+      msgs.textContent = "";
+      if (!j.ok) { say(j.error || "Could not use that file.", false); return; }
+      say("Phase sheet replaced: " + j.rows + " rows.", true);
+      applyAll(j); loadEdits();
+    });
   }
 
   function copyText(text) {
@@ -175,7 +275,7 @@
         if (!confirm(d.overrides_builtin
           ? "Remove your " + d.label + " upload? The built-in sheet for that day will be used again."
           : "Remove the " + d.label + " tracker from the report? The graphs will drop this day.")) return;
-        api(cfg.api["delete"], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: d.date }) })
+        postJSON(cfg.api["delete"], { date: d.date })
           .then(function (r) {
             if (!r.ok) { say(r.error || "Could not remove.", false); return; }
             applyAll(r);
@@ -197,6 +297,7 @@
     if (!files || !files.length || busy) return;
     var total = 0, fd = new FormData();
     Array.prototype.forEach.call(files, function (f) { total += f.size; fd.append("files", f, f.name); });
+    fd.append("phase", phase);
     input.value = "";
     msgs.textContent = "";
     if (total > cfg.maxBytes) { say("Files are too large (8 MB max per upload).", false); return; }
@@ -238,8 +339,10 @@
 
   // ---------------------------------------------------------------- events (delegated)
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-tab], [data-goto], [data-filter], th[data-sort], #gist-copy, [data-days]");
+    var t = e.target.closest("[data-tab], [data-goto], [data-filter], th[data-sort], #gist-copy, [data-days], [data-edit], a[data-phase]");
     if (!t) return;
+    if (t.dataset.edit) return openEdit(t);
+    if (t.dataset.phase) { e.preventDefault(); location.href = "?phase=" + t.dataset.phase + "#" + state.tab; return; }
     if (t.dataset.tab) return showTab(t.dataset.tab);
     if (t.dataset.goto) return gotoSites(t.dataset.goto);
     if (t.dataset.filter) { state.filter = t.dataset.filter; return applySites(); }
@@ -268,7 +371,11 @@
   });
   window.addEventListener("hashchange", function () { showTab(location.hash.slice(1), false); });
 
-  $("gear").addEventListener("click", function () { if (!busy) msgs.textContent = ""; loadDays(); openPanel(); });
+  $("gear").addEventListener("click", function () { if (!busy) msgs.textContent = ""; loadDays(); loadEdits(); openPanel(); });
+  $("sheet-file").addEventListener("change", function () { uploadSheet(this.files[0]); this.value = ""; });
+  editForm.addEventListener("submit", saveEdit);
+  $("edit-close").addEventListener("click", closeEdit);
+  $("edit-cancel").addEventListener("click", closeEdit);
   $("panel-close").addEventListener("click", closePanel);
   input.addEventListener("change", function () { upload(input.files); });
   ["dragenter", "dragover"].forEach(function (ev) {

@@ -13,6 +13,14 @@ where Report is the daily printable sheet (and its PDF) for Swachha Andhra Corpo
                                   replies with the re-rendered report sheet, gist + PDF link
                                   so one upload updates the page and downloads the PDF
     POST /rdf/api/delete       -> {date: "YYYY-MM-DD"}
+    POST /rdf/api/edit         -> {sid, changes: {today|cum|bal|agency|phase|site: value}}: quick edit
+    POST /rdf/api/undo         -> {id}: undo one quick edit
+    GET  /rdf/api/edits        -> recent quick edits + rows that still need a phase (gear panel)
+    GET  /rdf/api/master.csv   -> the master sheet ("true copy"): every site of every phase, latest day
+    POST /rdf/api/phase-sheet  -> multipart "file": replace the phase sheet (data/rdf_master.py)
+
+Every page and API takes ?phase=all|p3|p2|p1x|p1|old (default all): the same tabs, charts and
+PDF for one phase, or for all phases together. See data/rdf_master.py for how phases are built.
 
 Also /RDF, and the old /rdf_report/ address redirects here. On the rdf.* host
 (rdf.advitiaum.com) the report is also served at "/".
@@ -33,7 +41,7 @@ from flask import Blueprint, Response, jsonify, make_response, redirect, render_
 
 import captcha
 import pins
-from data import rdf_dashboard, rdf_report, rdf_report_pdf, rdf_tracker
+from data import rdf_dashboard, rdf_master, rdf_report, rdf_report_pdf, rdf_tracker
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("rdf_report", __name__, template_folder="../templates")
@@ -99,39 +107,85 @@ def _load() -> tuple[list, str]:
         return [], "Could not read the uploaded trackers. Try again in a minute."
 
 
-def _report() -> tuple[dict | None, str]:
+PHASE_CODES = [k for k, _ in rdf_master.PHASES]
+
+
+def _phase(value: str | None = None) -> str:
+    p = (value if value is not None else request.args.get("phase") or "").strip().lower()
+    return p if p in PHASE_CODES or p == "un" else "all"
+
+
+def _extras(phase: str) -> list[str] | None:
+    """Agencies listed before they reach the tracker belong to the current phase only."""
+    return None if phase in ("all", "p3") else []
+
+
+def _book(hist):
+    return rdf_master.book(hist)
+
+
+def _phase_view(hist, phase: str, b=None):
+    """(phase history, report, latest all-phases day for the WhatsApp summary)."""
+    b = b or _book(hist)
+    v = rdf_master.view(hist, phase, b)
+    all_last = rdf_master.view(hist[-1:], "all", b)[0] if hist else None
+    r = rdf_report.build(v, rdf_master.PHASE_LABEL.get(phase, ""), _extras(phase), all_last) if v else None
+    return v, r, b
+
+
+def _report(phase: str) -> tuple[dict | None, str]:
     """(report view model or None if no days on file, error message)."""
     hist, err = _load()
-    return (rdf_report.build(hist) if hist else None), err
+    if not hist:
+        return None, err
+    try:
+        return _phase_view(hist, phase)[1], err
+    except Exception:
+        logger.exception("rdf_report: could not build the %s view", phase)
+        return None, "Could not build the report. Try again in a minute."
 
 
-def _views() -> dict:
+def _views(phase: str) -> dict:
     """Everything the page needs: report sheet (r), dashboard tabs (d), default date range (g)."""
     hist, err = _load()
+    empty = {"r": None, "d": None, "g": None, "load_error": err, "range_min": "", "range_max": "",
+             "range_from": "", "range_to": "", "phase": phase, "phases": [], "unassigned": 0}
     if not hist:
-        return {"r": None, "d": None, "g": None, "load_error": err, "range_min": "", "range_max": "",
-                "range_from": "", "range_to": ""}
-    first, last = hist[0].date, hist[-1].date
+        return empty
+    try:
+        v, r, b = _phase_view(hist, phase)
+        counts = rdf_master.phase_counts(hist, b)
+    except Exception:
+        logger.exception("rdf_report: could not build the %s view", phase)
+        return dict(empty, load_error="Could not build the dashboard (phase sheet or edits unreadable). "
+                                      "Try again, or check the gear panel.")
+    first, last = v[0].date, v[-1].date
     start = max(first, last - timedelta(days=6))
-    return {"r": rdf_report.build(hist), "d": rdf_dashboard.build(hist), "g": rdf_dashboard.date_range(hist, start, last),
+    phases = [{"code": k, "label": lbl, "count": counts.get(k, 0)} for k, lbl in rdf_master.PHASES]
+    if counts.get("un"):
+        phases.append({"code": "un", "label": rdf_master.PHASE_LABEL["un"], "count": counts["un"]})
+    return {"r": r, "d": rdf_dashboard.build(v, _extras(phase)), "g": rdf_dashboard.date_range(v, start, last),
             "load_error": err, "range_min": first.isoformat(), "range_max": last.isoformat(),
-            "range_from": start.isoformat(), "range_to": last.isoformat()}
+            "range_from": start.isoformat(), "range_to": last.isoformat(), "phase": phase, "phases": phases,
+            "unassigned": counts.get("un", 0), "phase_options": [p for p in phases if p["code"] not in ("all", "un")]}
 
 
-def _pdf_url(r: dict) -> str:
+def _pdf_url(r: dict, phase: str) -> str:
     # ?d= makes each day's PDF a distinct URL so nothing serves a stale cached copy.
-    return url_for("rdf_report.report_pdf", d=r["rep_iso"])
+    return url_for("rdf_report.report_pdf", d=r["rep_iso"], phase=phase)
 
 
 @bp.route(URL_PREFIX + "/")
 def report_view():
     if not _signed_in():
         return _login_page()
-    v = _views()
+    phase = _phase()
+    v = _views(phase)
     return _no_cache(render_template(
-        "rdf_report/report.html", **v, pdf_url=_pdf_url(v["r"]) if v["r"] else "",
-        cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in ("trackers", "upload", "delete", "gist", "range")},
-             "maxBytes": MAX_UPLOAD_BYTES},
+        "rdf_report/report.html", **v, pdf_url=_pdf_url(v["r"], phase) if v["r"] else "",
+        cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in
+                     ("trackers", "upload", "delete", "gist", "range", "edit", "undo", "edits", "master", "sheet")},
+             "maxBytes": MAX_UPLOAD_BYTES, "phase": phase},
     ))
 
 
@@ -183,7 +237,7 @@ def logout():
 def report_pdf():
     if not _signed_in():
         return redirect(url_for("rdf_report.report_view"))
-    r, err = _report()
+    r, err = _report(_phase())
     if not r:
         return (err or "No daily trackers uploaded yet."), 404
     resp = Response(rdf_report_pdf.build_pdf(r), mimetype="application/pdf")
@@ -198,7 +252,7 @@ def report_pdf():
 @bp.route(URL_PREFIX + "/api/gist")
 @_api
 def api_gist():
-    r, err = _report()
+    r, err = _report("all")
     return _no_cache(jsonify(ok=bool(r), text=r["gist"] if r else "", error=err))
 
 
@@ -212,7 +266,10 @@ def api_range():
     except ValueError:
         return jsonify(ok=False, error="Pick both dates."), 400
     hist, err = _load()
-    g = rdf_dashboard.date_range(hist, start, end) if hist else {"ok": False, "error": err or "No trackers on file."}
+    if hist:
+        g = rdf_dashboard.date_range(rdf_master.view(hist, _phase(), _book(hist)), start, end)
+    else:
+        g = {"ok": False, "error": err or "No trackers on file."}
     return _no_cache(jsonify(ok=g["ok"], html=render_template("rdf_report/_range.html", g=g),
                              **{k: g.get(k) for k in ("from_iso", "to_iso")}))
 
@@ -249,28 +306,150 @@ def api_upload():
     ok = any(x["ok"] for x in results)
     out = {"ok": ok, "results": results}
     if ok:
-        out.update(_sheet_payload())
+        out.update(_sheet_payload(_phase(request.form.get("phase"))))
+        _snapshot()
     return jsonify(out)
 
 
-def _sheet_payload() -> dict:
+def _snapshot():
+    hist, _ = _load()
+    if hist:
+        rdf_master.save_snapshot(hist)
+
+
+def _sheet_payload(phase: str) -> dict:
     """Fresh report sheet + dashboard tabs HTML + where to fetch the PDF, for in-place page updates."""
-    v = _views()
+    v = _views(phase)
     r = v["r"]
     return {"sheet_html": render_template("rdf_report/_sheet.html", r=r),
-            "dash_html": render_template("rdf_report/_dashboard.html", r=r, d=v["d"]),
+            "dash_html": render_template("rdf_report/_dashboard.html", **v),
             "range": {"min": v["range_min"], "max": v["range_max"]},
-            "rep_label": r["rep_label"] if r else "", "pdf_url": _pdf_url(r) if r else "",
+            "rep_label": r["rep_label"] if r else "", "pdf_url": _pdf_url(r, phase) if r else "",
             "gist": r["gist"] if r else "", "gist_day": r["rep_day"] if r else "",
-            "pdf_name": rdf_report_pdf.filename(r) if r else ""}
+            "pdf_name": rdf_report_pdf.filename(r) if r else "", "unassigned": v["unassigned"],
+            "phases": v["phases"]}
 
 
 @bp.route(URL_PREFIX + "/api/delete", methods=["POST"])
 @_api
 def api_delete():
-    d = str((request.get_json(silent=True) or {}).get("date") or "")
+    body = request.get_json(silent=True) or {}
+    d = str(body.get("date") or "")
     try:
         rdf_tracker.remove(d)
     except rdf_tracker.TrackerError as exc:
         return jsonify(ok=False, error=str(exc)), 400
-    return jsonify(ok=True, **_sheet_payload())
+    _snapshot()
+    return jsonify(ok=True, **_sheet_payload(_phase(str(body.get("phase") or ""))))
+
+
+# ---------------------------------------------------------------------------
+# Master sheet: quick edits, phase sheet, download
+# ---------------------------------------------------------------------------
+
+def _row(hist, sid: str):
+    """The master row `sid` on the latest day, as currently shown (edits applied)."""
+    b = _book(hist)
+    for s in rdf_master.rows_for_day(b, hist[-1]):
+        if s.sid == sid:
+            return s
+    return None
+
+
+@bp.route(URL_PREFIX + "/api/edit", methods=["POST"])
+@_api
+def api_edit():
+    body = request.get_json(silent=True) or {}
+    sid, changes = str(body.get("sid") or ""), body.get("changes") or {}
+    if not isinstance(changes, dict) or not changes:
+        return jsonify(ok=False, error="Nothing to change."), 400
+    hist, err = _load()
+    if not hist:
+        return jsonify(ok=False, error=err or "No trackers on file."), 400
+    s = _row(hist, sid)
+    if s is None:
+        return jsonify(ok=False, error="That site is not on the latest day any more. Reload the page."), 404
+    current = {"today": f"{s.today:.2f}", "cum": f"{s.cum:.2f}", "bal": f"{s.bal:.2f}", "agency": s.agency,
+               "phase": s.phase, "site": s.site, "tracked": s.tracked}
+    for f in ("today", "cum", "bal"):
+        if f in changes:
+            try:
+                if abs(float(str(changes[f]).replace(",", "")) - float(current[f])) < 0.005:
+                    changes.pop(f)
+            except ValueError:
+                pass
+    try:
+        made = rdf_master.add_edits(sid, changes, hist[-1].date, captcha.client_ip(), current)
+    except rdf_master.EditError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    except Exception:
+        logger.exception("rdf_report: could not save edit")
+        return jsonify(ok=False, error="Could not save the change. Try again."), 500
+    _snapshot()
+    return jsonify(ok=True, made=len(made), **_sheet_payload(_phase(str(body.get("phase") or ""))))
+
+
+@bp.route(URL_PREFIX + "/api/undo", methods=["POST"])
+@_api
+def api_undo():
+    body = request.get_json(silent=True) or {}
+    try:
+        rdf_master.undo_edit(str(body.get("id") or ""))
+    except rdf_master.EditError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    _snapshot()
+    return jsonify(ok=True, **_sheet_payload(_phase(str(body.get("phase") or ""))))
+
+
+_FIELD = {"today": "Today", "cum": "To date", "bal": "Left", "agency": "Agency", "phase": "Phase", "site": "Site name"}
+
+
+@bp.route(URL_PREFIX + "/api/edits")
+@_api
+def api_edits():
+    hist, _ = _load()
+    names = {}
+    if hist:
+        for s in rdf_master.rows_for_day(_book(hist), hist[-1]):
+            names[s.sid] = f"{s.site} · {s.agency} · {rdf_master.PHASE_LABEL.get(s.phase, s.phase)}"
+    items = []
+    for e in reversed(rdf_master.edits()[-60:]):
+        fmt_v = (lambda v: rdf_master.PHASE_LABEL.get(v, v)) if e["field"] == "phase" else (lambda v: v)
+        items.append({"id": e["id"], "undone": e.get("undone", False), "field": _FIELD.get(e["field"], e["field"]),
+                      "site": names.get(e["sid"], e["sid"]), "old": fmt_v(e.get("old", "")), "new": fmt_v(e.get("new", "")),
+                      "day": e.get("day") or "", "at": e.get("at", "")[:16].replace("T", " ") + " UTC"})
+    un = [{"sid": s.sid, "site": s.src, "agency": s.agency, "awarded": rdf_report.fmt(s.awarded)}
+          for s in (rdf_master.unassigned(hist) if hist else [])]
+    _, where = rdf_master.sheet_raw()
+    return _no_cache(jsonify(ok=True, edits=items, unassigned=un, sheet=where))
+
+
+@bp.route(URL_PREFIX + "/api/master.csv")
+@_api
+def api_master():
+    hist, err = _load()
+    body = rdf_master.master_csv(hist)
+    stamp = hist[-1].date.strftime("%d-%m-%Y") if hist else "empty"
+    resp = Response(body, mimetype="text/csv")
+    resp.headers["Content-Disposition"] = f'attachment; filename="RDF_master_{stamp}.csv"'
+    return _no_cache(resp)
+
+
+@bp.route(URL_PREFIX + "/api/phase-sheet", methods=["POST"])
+@_api
+def api_sheet():
+    f = request.files.get("file")
+    if not f:
+        return jsonify(ok=False, error="Choose the phase sheet CSV."), 400
+    raw = f.read(MAX_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_BYTES:
+        return jsonify(ok=False, error="File is too large (8 MB max)."), 413
+    try:
+        n = rdf_master.store_sheet(raw)
+    except rdf_master.SheetError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    except Exception:
+        logger.exception("rdf_report: could not save the phase sheet")
+        return jsonify(ok=False, error="Could not save the file. Try again."), 500
+    _snapshot()
+    return jsonify(ok=True, rows=n, **_sheet_payload(_phase(request.form.get("phase"))))
