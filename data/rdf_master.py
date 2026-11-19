@@ -410,6 +410,10 @@ class Book:
     ident: dict
     vals: dict
     uploads: dict
+    # Master-format days: (phase, agency, site) -> [(sid, awarded, key)] from the last daily-tracker day,
+    # so a site keeps its id (and its line on the charts) when the upload format changes.
+    catalog: dict | None = None
+    links: dict | None = None
 
 
 def book(hist: list[Tracker], uploads: dict | None = None, items: list[dict] | None = None) -> Book:
@@ -417,6 +421,8 @@ def book(hist: list[Tracker], uploads: dict | None = None, items: list[dict] | N
     places: dict[tuple[str, str, float], list[Place]] = {}
     tracked: set[str] = set()
     for t in hist:
+        if t.kind == "master":
+            continue
         for s in t.sites:
             k = (s.agency, s.site, s.awarded)
             if k not in places:
@@ -429,7 +435,15 @@ def book(hist: list[Tracker], uploads: dict | None = None, items: list[dict] | N
         except Exception:
             logger.exception("rdf_master: could not list upload times")
             uploads = {}
-    return Book(rows, places, tracked, ident, vals, uploads)
+    b = Book(rows, places, tracked, ident, vals, uploads)
+    last = next((t for t in reversed(hist) if t.kind != "master"), None)
+    if any(t.kind == "master" for t in hist):
+        b.catalog = {}
+        if last is not None:
+            for s in _tracker_rows(b, last):
+                b.catalog.setdefault((s.phase, s.agency.lower(), s.site.lower()), []).append((s.sid, s.awarded, s.key))
+        b.links = {}
+    return b
 
 
 def _value_edit(b: Book, sid: str, d: date | None, tracked: bool) -> dict:
@@ -442,8 +456,54 @@ def _value_edit(b: Book, sid: str, d: date | None, tracked: bool) -> dict:
     return {f: v for f, (v, at) in e.items() if up is None or _parse_at(at) >= up}
 
 
+_SUFFIX_N = re.compile(r"\s*\(\d+\)$")
+
+
+def _link(b: Book, s: SiteDay, used: set[str]) -> tuple[str, str]:
+    """(sid, count key) for a master-format row: the same site's id from the daily-tracker days when it
+    can be found (phase + agency + site name, closest awarded), else an id from the row itself."""
+    k = (s.phase, s.agency, s.site, s.awarded)
+    if k in b.links and b.links[k][0] not in used:
+        return b.links[k]
+    base = _SUFFIX_N.sub("", s.site)
+    cands = []
+    for nm in {base.lower(), site_name(base).lower()}:
+        cands += b.catalog.get((s.phase, s.agency.lower(), nm), [])
+    cands = [c for c in cands if c[0] not in used]
+    if cands:
+        sid, _, key = min(cands, key=lambda c: abs(c[1] - s.awarded))
+    else:
+        sid = f"{s.phase}:m:{_slug(s.agency)}-{_slug(s.site)}"
+        n = 2
+        while sid in used:
+            sid, n = f"{s.phase}:m:{_slug(s.agency)}-{_slug(s.site)}-{n}", n + 1
+        key = "Yemmiganur" if base.lower() == "yemmiganur 15%" else site_name(base)
+    b.links[k] = (sid, key)
+    return sid, key
+
+
+def _master_rows(b: Book, t: Tracker) -> list[SiteDay]:
+    """A master-format day: the file is the true copy (phase, agency, figures); only ids and edits are added."""
+    out, used = [], set()
+    for s in t.sites:
+        sid, key = _link(b, s, used)
+        used.add(sid)
+        ph, ag, nm, key = _apply_identity(sid, s.phase, s.agency, _SUFFIX_N.sub("", s.site), key, b.ident)
+        v = _value_edit(b, sid, t.date, s.tracked)
+        out.append(replace(s, agency=ag, site=nm, phase=ph, sid=sid, key=key,
+                           today=v.get("today", s.today), cum=v.get("cum", s.cum), bal=v.get("bal", s.bal)))
+    return out
+
+
 def rows_for_day(b: Book, t: Tracker) -> list[SiteDay]:
     """Every master row on one report day (all phases)."""
+    if t.kind == "master":
+        return _master_rows(b, t)
+    return _tracker_rows(b, t)
+
+
+def _tracker_rows(b: Book, t: Tracker) -> list[SiteDay]:
+    """A daily-tracker day: tracker rows placed in phases + every phase-sheet row the tracker lacks."""
     out: list[SiteDay] = []
     for s in t.sites:
         for p in b.places.get((s.agency, s.site, s.awarded), []):
@@ -522,7 +582,7 @@ def master_csv(hist: list[Tracker], b: Book | None = None) -> bytes:
     rows = rows_for_day(b, t)
     names = _names([rows], "p")
     rows.sort(key=lambda s: (PHASE_ORDER.index(s.phase) if s.phase in PHASE_ORDER else 9, s.agency, s.site))
-    w.writerow(["Phase", "Agency", "Site", "Awarded (MT)", f"Disposed on {t.date.day} {t.date:%b} (MT)",
+    w.writerow(["Phase", "Agency", "Site", "Awarded (MT)", f"Disposed on {t.date.day} {t.date:%b %Y} (MT)",
                 "Cumulative disposed (MT)", "Balance (MT)"])
     for s in rows:
         w.writerow([PHASE_LABEL.get(s.phase, s.phase), s.agency, names[s.sid], f"{s.awarded:.2f}", f"{s.today:.2f}",

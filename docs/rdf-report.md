@@ -44,6 +44,24 @@ How they are joined:
 - A tracker row that matches nothing goes to a **Needs a phase** pill and is listed in the gear panel;
   pick its phase with the pencil.
 
+**Daily upload in the master-sheet format (from 19 Nov 2026).** The gear icon accepts this CSV as well
+as the old daily tracker:
+
+```
+Phase,Agency,Site,Awarded (MT),Disposed on 18 Nov (MT),Cumulative disposed (MT),Balance (MT)
+Phase 3,Avinash Agencies,Pedana,46410.41,0.00,98.88,1350.00
+Phase 3,Geron Engineering,Dhone,20812.42,0.00,0.00,
+```
+
+- The **day** is read from the `Disposed on <day> <Mon> [<year>]` header (year = this year if left out).
+  **Change it every day**: a file with an old date replaces that day. The upload message says which day
+  each file was filed under.
+- **Phase**: Phase 3, Phase 2, Phase 1 – 15%, Phase 1 or Old. **Blank Balance** = not in the daily tracker.
+- The file is taken as it is (no matching, no Coastline rule). Each row keeps its site's id from the
+  earlier days by phase + agency + site name (closest awarded when a name repeats), so the charts carry on.
+  Renaming a site in the file starts a new line for it; use the pencil to rename instead.
+- Easiest routine: **Download master CSV**, update the day's figures and the `Disposed on` date, upload.
+
 **Download master CSV** (gear panel) gives the master sheet for the latest day: Phase, Agency, Site,
 Awarded, Disposed today, Cumulative, Balance. A copy is also saved to `RDF_TRACKER_DIR/master/master.csv`
 after every upload or edit.

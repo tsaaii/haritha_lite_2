@@ -7,6 +7,7 @@ Runs against temp folders (built-in history from data/rdf_history + an empty upl
 from __future__ import annotations
 
 import csv
+from datetime import date, timedelta
 import glob
 import io
 import os
@@ -522,3 +523,60 @@ class PhasesAndEdits(Base):
                         content_type="multipart/form-data")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(self.c.post("/rdf/api/edit", json={}).status_code, 400)       # no X-Requested-With
+
+
+class MasterFormatUpload(Base):
+    """From 19 Nov 2026 the daily upload is the master sheet (same columns as Download master CSV)."""
+
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+        with open(NOV, "rb") as f:
+            self.post(f.read(), os.path.basename(NOV))
+
+    def post(self, raw, name):
+        return self.c.post("/rdf/api/upload", headers=XRW, data={"files": (io.BytesIO(raw), name)},
+                           content_type="multipart/form-data").get_json()
+
+    def master(self, day="18 Nov"):
+        txt = self.c.get("/rdf/api/master.csv").data.decode()
+        return txt.replace("Disposed on 17 Nov 2026", "Disposed on " + day)
+
+    def test_master_day_continues_every_site(self):
+        txt = self.master()
+        rows = list(csv.reader(io.StringIO(txt)))
+        i = next(n for n, r in enumerate(rows) if r[2] == "Kurnool Joharapuram")
+        rows[i][4], rows[i][5] = "100.00", f"{float(rows[i][5]) + 100:.2f}"           # sent 100 MT on 18 Nov
+        buf = io.StringIO()
+        csv.writer(buf).writerows(rows)
+        j = self.post(buf.getvalue().encode(), "RDF_master_18-11-2026.csv")
+        self.assertTrue(j["ok"], j)
+        self.assertEqual((j["results"][0]["date"], j["results"][0]["kind"]), ("2026-11-18", "master sheet"))
+        hist = rdf_tracker.history()
+        b = rdf_master.book(hist)
+        d17 = {s.sid: s for s in rdf_master.rows_for_day(b, hist[-2])}
+        d18 = {s.sid: s for s in rdf_master.rows_for_day(b, hist[-1])}
+        self.assertEqual(set(d17), set(d18))                                     # same 293 sites, same ids
+        joh = next(s for s in d18.values() if s.site == "Kurnool Joharapuram")
+        self.assertEqual(joh.today, 100.0)
+        self.assertAlmostEqual(joh.cum - d17[joh.sid].cum, 100.0, places=2)
+        self.assertIn("Kurnool Joharapuram", j["gist"])
+        page = self.c.get("/rdf/?phase=p3").data.decode()
+        self.assertIn("18 Nov 2026", page)
+
+    def test_errors_are_clear(self):
+        j = self.post(b"Phase,Agency,Site,Awarded (MT),Disposed on 18 Nov (MT),Cumulative disposed (MT),Balance (MT)\n"
+                      b"Phase 9,X,Y,1,0,0,0\n", "x.csv")
+        self.assertFalse(j["ok"])
+        self.assertIn("Unknown phase", j["results"][0]["error"])
+        j = self.post(b"Phase,Agency,Site,Awarded (MT),Disposed (MT),Cumulative disposed (MT),Balance (MT)\n"
+                      b"Phase 3,X,Y,1,0,0,0\n", "x.csv")
+        self.assertFalse(j["ok"])
+        self.assertIn("missing", j["results"][0]["error"])
+
+    def test_old_tracker_still_accepted_and_year_is_inferred(self):
+        t = rdf_tracker.parse(self.master("30 Dec").encode(), "x.csv")
+        today = config.today_ist()
+        self.assertEqual(t.date.year, today.year if date(today.year, 12, 30) <= today + timedelta(days=7) else today.year - 1)
+        with open(SEED[-1], "rb") as f:
+            self.assertTrue(self.post(f.read(), "Daily_RDF_tracker-14-10-2026.csv")["ok"])

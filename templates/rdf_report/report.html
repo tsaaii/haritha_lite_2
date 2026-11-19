@@ -70,8 +70,10 @@
   <div class="panel__body">
     <label class="drop" id="drop">
       <input type="file" id="files" accept=".csv,text/csv" multiple hidden>
-      <span>Upload the daily RDF tracker CSV</span>
-      <small>Picking a file updates the report and downloads its PDF straight away. Each sheet is filed under its "as on" date; uploading the same date again replaces it.</small>
+      <span>Upload the day's CSV</span>
+      <small>The master sheet (Phase, Agency, Site, Awarded, Disposed on &lt;day&gt;, Cumulative, Balance), or the old daily RDF tracker.
+        Picking a file updates the report and downloads its PDF straight away. Each file is filed under its day (the "Disposed on" column, or the tracker's "as on" date); the same day again replaces it.
+        A blank Balance means the site isn't tracked daily.</small>
     </label>
     <div class="msgs" id="msgs" aria-live="polite"></div>
     <div class="days">

@@ -302,7 +302,8 @@ def api_upload():
             continue
         results.append({"file": name, "ok": True, "date": t.date.isoformat(),
                         "label": rdf_report.day(t.date) + f" {t.date.year}",
-                        "sites": len(t.sites), "replaced": replaced})
+                        "sites": len(t.sites), "replaced": replaced,
+                        "kind": "master sheet" if t.kind == "master" else "daily tracker"})
     ok = any(x["ok"] for x in results)
     out = {"ok": ok, "results": results}
     if ok:

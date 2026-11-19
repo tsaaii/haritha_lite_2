@@ -319,7 +319,8 @@
       applyAll(j);
       loadDays();
       (j.results || []).forEach(function (r) {
-        say(r.ok ? r.file + ": " + r.label + ", " + r.sites + " sites" + (r.replaced ? " (replaced that day)." : " added.")
+        say(r.ok ? r.file + " (" + r.kind + "): filed under " + r.label + ", " + r.sites + " rows" +
+                   (r.replaced ? ". It REPLACED the " + r.label + " already on file; if that's the wrong day, check the date in the 'Disposed on' column." : ", added.")
                  : r.file + ": " + r.error, r.ok);
       });
       if (!failed.length) closePanel();          // all good: show the updated dashboard
