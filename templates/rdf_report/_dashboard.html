@@ -64,7 +64,7 @@
       <div class="card__head"><h2>{{ title }}</h2><button type="button" class="link" data-goto="{{ key }}">See all</button></div>
       <p class="muted small">{{ note }}</p>
       <table class="tbl tbl--mini"><thead><tr><th>Site</th><th class="n">{{ colname }}</th></tr></thead><tbody>
-      {% for s in rows %}<tr><td><i class="sq" style="background:{{ s.color }}" title="{{ s.agency }}"></i>{{ s.site }} <span class="muted small">· {{ s.agency }}</span></td><td class="n b">{{ s[col] }}</td></tr>
+      {% for s in rows %}<tr><td><i class="sq" style="background:{{ s.color }}" title="{{ s.agency }}"></i><button type="button" class="link link--name" data-detail="site" data-key="{{ s.site_key }}">{{ s.site }}</button> <span class="muted small">· {{ s.agency }}</span></td><td class="n b">{{ s[col] }}</td></tr>
       {% else %}<tr><td colspan="2" class="muted">None.</td></tr>{% endfor %}
       </tbody></table>
     </div>
@@ -112,7 +112,7 @@
       <tbody>
       {% for a in d.agencies %}
       <tr {% if a.has_sites %}data-goto="ag-{{ a.slug }}" tabindex="0"{% endif %}>
-        <td><i class="sq" style="background:{{ a.color }}"></i>{{ a.name }}</td>
+        <td><i class="sq" style="background:{{ a.color }}"></i><button type="button" class="link link--name" data-detail="agency" data-key="{{ a.name }}" title="{{ a.name }} in every phase">{{ a.name }}</button></td>
         <td class="n b {{ 'good' if a.today != '0.00' else 'bad' }}">{{ a.today }}</td>
         <td class="n">{{ a.pace }}</td><td class="n">{{ a.need }}</td><td class="n good">{{ a.cum }}</td><td class="n">{{ a.bal }}</td>
         <td class="n">{{ a.pct }}</td><td class="n">{{ a.sites }}</td>
@@ -160,8 +160,8 @@
       <tr data-f="{{ s.filters }}" data-site="{{ s.site | lower }}" data-v-site="{{ s.site | lower }}" data-v-agency="{{ s.agency | lower }}"
           data-v-today="{{ s.today_v }}" data-v-pace="{{ s.pace_v }}" data-v-cum="{{ s.cum_v }}" data-v-bal="{{ s.bal_v }}"
           data-v-pct="{{ s.pct_v }}" data-v-last="{{ s.last_v }}" data-v-finish="{{ s.finish_v }}">
-        <td class="c9">{{ s.site }}</td>
-        <td><i class="sq" style="background:{{ s.color }}"></i>{{ s.agency }}</td>
+        <td class="c9"><button type="button" class="link link--name" data-detail="site" data-key="{{ s.site_key }}" title="{{ s.site }} in every phase">{{ s.site }}</button></td>
+        <td><i class="sq" style="background:{{ s.color }}"></i><button type="button" class="link link--name" data-detail="agency" data-key="{{ s.agency_full }}" title="{{ s.agency_full }} in every phase">{{ s.agency }}</button></td>
         <td>{% for label, kind in s.tags %}<span class="tag tag--{{ kind }}">{{ label }}</span>{% endfor %}</td>
         <td class="n {{ 'good b' if s.today_v > 0 else 'muted' }}">{{ s.today }}</td>
         <td class="n">{{ s.pace }}</td><td class="n good">{{ s.cum }}</td><td class="n b">{{ s.bal }}</td><td class="n">{{ s.pct }}</td>

@@ -143,6 +143,23 @@
     return api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   }
 
+  // ---------------------------------------------------------------- details (site / agency / phase, all phases)
+  var detailDlg = $("detail"), detailStack = [];
+  function openDetail(kind, key, back) {
+    var body = $("detail-body");
+    if (!back) detailStack.push([kind, key]);
+    $("detail-back").hidden = detailStack.length < 2;
+    body.classList.add("is-busy");
+    if (!detailDlg.open) { if (detailDlg.showModal) detailDlg.showModal(); else detailDlg.setAttribute("open", ""); }
+    api(cfg.api.detail + "?kind=" + encodeURIComponent(kind) + "&key=" + encodeURIComponent(key)).then(function (j) {
+      body.classList.remove("is-busy");
+      $("detail-title").textContent = j.ok ? ({ site: "Site", agency: "Agency", phase: "Phase" }[kind] + ": " + j.title) : "Details";
+      if (j.ok) body.innerHTML = j.html;
+      else { body.textContent = ""; body.appendChild(el("div", "msg msg--err", j.error || "Could not load.")); }
+    });
+  }
+  function closeDetail() { detailStack = []; if (detailDlg.close) { if (detailDlg.open) detailDlg.close(); } else detailDlg.removeAttribute("open"); }
+
   // ---------------------------------------------------------------- quick edit
   var NUM = ["today", "cum", "bal"], FIELDS = ["site", "agency", "phase"].concat(NUM);
   function openEdit(b) {
@@ -340,8 +357,9 @@
 
   // ---------------------------------------------------------------- events (delegated)
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-tab], [data-goto], [data-filter], th[data-sort], #gist-copy, [data-days], [data-edit], a[data-phase]");
+    var t = e.target.closest("[data-detail], [data-tab], [data-goto], [data-filter], th[data-sort], #gist-copy, [data-days], [data-edit], a[data-phase]");
     if (!t) return;
+    if (t.dataset.detail) { e.preventDefault(); e.stopPropagation(); return openDetail(t.dataset.detail, t.dataset.key); }
     if (t.dataset.edit) return openEdit(t);
     if (t.dataset.phase) { e.preventDefault(); location.href = "?phase=" + t.dataset.phase + "#" + state.tab; return; }
     if (t.dataset.tab) return showTab(t.dataset.tab);
@@ -375,6 +393,14 @@
   $("gear").addEventListener("click", function () { if (!busy) msgs.textContent = ""; loadDays(); loadEdits(); openPanel(); });
   $("sheet-file").addEventListener("change", function () { uploadSheet(this.files[0]); this.value = ""; });
   editForm.addEventListener("submit", saveEdit);
+  $("detail-close").addEventListener("click", closeDetail);
+  $("detail-back").addEventListener("click", function () {
+    detailStack.pop();
+    var prev = detailStack[detailStack.length - 1];
+    if (prev) openDetail(prev[0], prev[1], true);
+  });
+  detailDlg.addEventListener("close", function () { detailStack = []; });
+  detailDlg.addEventListener("click", function (e) { if (e.target === detailDlg) closeDetail(); });
   $("edit-close").addEventListener("click", closeEdit);
   $("edit-cancel").addEventListener("click", closeEdit);
   $("panel-close").addEventListener("click", closePanel);

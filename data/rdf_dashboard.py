@@ -399,6 +399,7 @@ def build(hist: list[Tracker], extra_agencies: list[str] | None = None, others: 
         return {
             "sid": s["sid"], "tracked": t, "today_raw": f"{s['today']:.2f}", "cum_raw": f"{s['cum']:.2f}",
             "bal_raw": f"{s['bal']:.2f}", "agency_full": s["agency"], "site_name": s["base"], "phase": s["phase"],
+            "site_key": s["count_key"],
             "site": s["site"], "agency": s["short"], "color": s["color"], "tags": tags, "filters": " ".join(filters),
             "today": fmt(s["today"]), "today_v": s["today"], "pace_v": s["pace"],
             "cum": fmt(s["cum"]), "cum_v": s["cum"], "bal": fmt(s["bal"]) if t else "—", "bal_v": s["bal"] if t else -1,

@@ -601,6 +601,60 @@ def master_csv(hist: list[Tracker], b: Book | None = None) -> bytes:
     return buf.getvalue().encode("utf-8")
 
 
+def detail(hist: list[Tracker], kind: str, value: str, b: Book | None = None) -> dict | None:
+    """Everything on file for one site, agency or phase, across all phases (latest day, every row,
+    including a phase's earlier work). % = cumulative RDF disposed x 100 / awarded MT.
+
+      site   -> one row per phase x agency, sorted by phase (newest first)
+      agency -> grouped by phase, subtotal per phase
+      phase  -> grouped by agency, subtotal per agency ('all' -> grouped by phase)
+    """
+    if not hist or kind not in ("site", "agency", "phase"):
+        return None
+    b = b or book(hist)
+    rows = rows_for_day(b, hist[-1])
+    v = (value or "").strip().lower()
+    if kind == "site":
+        mine = [s for s in rows if (s.key or s.site).lower() == v]
+        title = next((s.key or s.site for s in mine), value)
+        group = None
+    elif kind == "agency":
+        mine = [s for s in rows if s.agency.lower() == v]
+        title = next((s.agency for s in mine), value)
+        group = "phase"
+    else:
+        mine = rows if v == "all" else [s for s in rows if s.phase == v]
+        title = PHASE_LABEL.get(v, value)
+        group = "phase" if v == "all" else "agency"
+    if not mine:
+        return None
+    pord = {p: i for i, p in enumerate(PHASE_ORDER)}
+    mine.sort(key=lambda s: (pord.get(s.phase, 9), s.agency.lower(), s.site.lower(), -s.awarded))
+
+    def tot(rs):
+        aw, cum = sum(s.awarded for s in rs), sum(s.cum for s in rs)
+        return {"awarded": aw, "cum": cum, "today": sum(s.today for s in rs), "pct": (cum * 100 / aw) if aw > 0 else None,
+                "n": len({(s.key or s.site).lower() for s in rs})}
+
+    def row(s):
+        return {"phase": PHASE_LABEL.get(s.phase, s.phase), "agency": s.agency, "site": s.site,
+                "awarded": s.awarded, "cum": s.cum, "today": s.today, "daily": s.tracked,
+                "pct": (s.cum * 100 / s.awarded) if s.awarded > 0 else None, "key": s.key or s.site}
+    groups = []
+    if group:
+        order: dict[str, list[SiteDay]] = {}
+        for s in mine:
+            order.setdefault(PHASE_LABEL.get(s.phase, s.phase) if group == "phase" else s.agency, []).append(s)
+        for label, rs in order.items():
+            groups.append({"label": label, "rows": [row(s) for s in rs], "sub": tot(rs)})
+    else:
+        groups.append({"label": "", "rows": [row(s) for s in mine], "sub": None})
+    # Columns before the figures; the grouping column is shown as group headings instead.
+    cols = {"site": ["phase", "agency"], "agency": ["site"], "phase": ["agency", "site"] if v == "all" else ["site"]}[kind]
+    return {"kind": kind, "title": title, "groups": groups, "total": tot(mine), "day": hist[-1].date, "cols": cols, "group_by": group,
+            "phases": len({s.phase for s in mine}), "agencies": len({s.agency for s in mine})}
+
+
 def save_snapshot(hist: list[Tracker]) -> None:
     """Keep the current true copy in the bucket too (best effort)."""
     try:

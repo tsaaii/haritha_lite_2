@@ -30,6 +30,7 @@
     {% for p in phases %}
     <a class="phase{{ ' phase--warn' if p.code == 'un' else '' }}" href="?phase={{ p.code }}" data-phase="{{ p.code }}"{% if p.code == phase %} aria-current="page"{% endif %}>{{ p.label }} <small>{{ p.count }}</small></a>
     {% endfor %}
+    {% if phase != 'un' %}<button type="button" class="phase phase--info" data-detail="phase" data-key="{{ phase }}" title="Every site of {{ 'every phase' if phase == 'all' else 'this phase' }}: awarded, RDF disposed, %">{{ 'Totals by phase' if phase == 'all' else 'All sites of this phase' }}</button>{% endif %}
   </nav>
   {% endif %}
 
@@ -94,6 +95,15 @@
       <div id="edits"><small class="c5">Loading…</small></div>
     </div>
   </div>
+</dialog>
+
+<dialog class="panel panel--detail" id="detail" aria-labelledby="detail-title">
+  <div class="panel__head">
+    <button type="button" class="icon-btn" id="detail-back" aria-label="Back" hidden>←</button>
+    <h2 id="detail-title">Details</h2>
+    <button type="button" class="icon-btn" id="detail-close" aria-label="Close">✕</button>
+  </div>
+  <div class="panel__body" id="detail-body"></div>
 </dialog>
 
 <dialog class="panel panel--edit" id="edit" aria-labelledby="edit-title">

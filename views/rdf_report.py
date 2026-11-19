@@ -184,7 +184,7 @@ def report_view():
     return _no_cache(render_template(
         "rdf_report/report.html", **v, pdf_url=_pdf_url(v["r"], phase) if v["r"] else "",
         cfg={"api": {k: url_for(f"rdf_report.api_{k}") for k in
-                     ("trackers", "upload", "delete", "gist", "range", "edit", "undo", "edits", "master", "sheet")},
+                     ("trackers", "upload", "delete", "gist", "range", "edit", "undo", "edits", "master", "sheet", "detail")},
              "maxBytes": MAX_UPLOAD_BYTES, "phase": phase},
     ))
 
@@ -423,6 +423,17 @@ def api_edits():
           for s in (rdf_master.unassigned(hist) if hist else [])]
     _, where = rdf_master.sheet_raw()
     return _no_cache(jsonify(ok=True, edits=items, unassigned=un, sheet=where))
+
+
+@bp.route(URL_PREFIX + "/api/detail")
+@_api
+def api_detail():
+    """?kind=site|agency|phase&key=... -> HTML fragment: that site/agency/phase across every phase."""
+    hist, err = _load()
+    det = rdf_master.detail(hist, request.args.get("kind", ""), request.args.get("key", "")) if hist else None
+    if not det:
+        return jsonify(ok=False, error=err or "Nothing on file for that."), 404
+    return _no_cache(jsonify(ok=True, title=det["title"], html=render_template("rdf_report/_detail.html", x=det, fmt=rdf_report.fmt)))
 
 
 @bp.route(URL_PREFIX + "/api/master.csv")

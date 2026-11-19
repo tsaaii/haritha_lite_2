@@ -74,6 +74,14 @@ report day only, and uploading that day's sheet again replaces them; *Site name*
 apply to every day. Every edit is logged in `RDF_TRACKER_DIR/master/edits.json` and listed under
 *Recent edits* in the gear panel with an **Undo** button.
 
+**Details window:** click a **site** name (Sites tab, Overview lists) to see it in every phase, every
+agency one below the other (e.g. Nellore Donthali: Zigma, Raghu Ram and PR Constructions in Phase 3, plus
+Zigma's Phase 2, Phase 1 – 15% and Phase 1 work), with Awarded, RDF disposed and **% of awarded**
+(= RDF disposed × 100 ÷ awarded), and a total. Click an **agency** name for all its sites grouped by phase,
+or the button after the phase pills for the whole phase grouped by agency (*Totals by phase* on All phases).
+A summary by group sits on top; names inside the window open their own details (← goes back). It uses the
+full master sheet for the latest day, so it includes sites that the phase lists don't show.
+
 PDF names include the phase: `Daily_RDF_tracker_Phase-3_DD-MM-YYYY.pdf`, `Daily_RDF_tracker_All-phases_….pdf`.
 The WhatsApp summary always covers all phases.
 

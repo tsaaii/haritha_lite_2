@@ -586,3 +586,52 @@ class MasterFormatUpload(Base):
         self.assertEqual(t.date.year, today.year if date(today.year, 12, 30) <= today + timedelta(days=7) else today.year - 1)
         with open(SEED[-1], "rb") as f:
             self.assertTrue(self.post(f.read(), "Daily_RDF_tracker-14-10-2026.csv")["ok"])
+
+
+class Details(Base):
+    """Click a site / agency / phase: every phase, every agency, with totals and % of awarded."""
+
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+        with open(NOV, "rb") as f:
+            self.c.post("/rdf/api/upload", headers=XRW, data={"files": (io.BytesIO(f.read()), os.path.basename(NOV))},
+                        content_type="multipart/form-data")
+
+    def get(self, kind, key):
+        return self.c.get("/rdf/api/detail", query_string={"kind": kind, "key": key})
+
+    def test_site_across_phases_and_agencies(self):
+        hist = rdf_tracker.history()
+        x = rdf_master.detail(hist, "site", "nellore donthali")
+        rows = x["groups"][0]["rows"]
+        self.assertEqual({r["phase"] for r in rows}, {"Phase 3", "Phase 2", "Phase 1", "Phase 1 – 15%"})
+        self.assertEqual({r["agency"] for r in rows if r["phase"] == "Phase 3"},
+                         {"Zigma Global", "Raghu Ram Hume Pipes", "PR Constructions"})
+        self.assertAlmostEqual(x["total"]["awarded"], sum(r["awarded"] for r in rows), places=2)
+        self.assertAlmostEqual(x["total"]["cum"], sum(r["cum"] for r in rows), places=2)
+        self.assertAlmostEqual(x["total"]["pct"], x["total"]["cum"] * 100 / x["total"]["awarded"], places=6)
+        j = self.get("site", "Nellore Donthali").get_json()
+        self.assertTrue(j["ok"])
+        self.assertIn("% of awarded", j["html"])
+        self.assertIn("PR Constructions", j["html"])
+
+    def test_agency_grouped_by_phase_and_phase_by_agency(self):
+        hist = rdf_tracker.history()
+        a = rdf_master.detail(hist, "agency", "Avinash Agencies")
+        self.assertEqual([g["label"] for g in a["groups"]], ["Phase 3", "Old"])
+        self.assertAlmostEqual(a["total"]["cum"], sum(g["sub"]["cum"] for g in a["groups"]), places=2)
+        p = rdf_master.detail(hist, "phase", "p2")
+        self.assertTrue(all(r["phase"] == "Phase 2" for g in p["groups"] for r in g["rows"]))
+        self.assertAlmostEqual(p["total"]["cum"], 106207.54, places=1)
+        allp = rdf_master.detail(hist, "phase", "all")
+        self.assertEqual([g["label"] for g in allp["groups"]], ["Phase 3", "Phase 2", "Phase 1 – 15%", "Phase 1", "Old"])
+        self.assertAlmostEqual(allp["total"]["cum"], 1080606.95, places=1)
+        self.assertEqual(self.get("agency", "Nobody").status_code, 404)
+        self.assertEqual(self.get("phase", "p3").status_code, 200)
+
+    def test_names_are_clickable(self):
+        page = self.c.get("/rdf/?phase=p3").data.decode()
+        self.assertIn('data-detail="site" data-key="nellore donthali"', page)
+        self.assertIn('data-detail="agency" data-key="Zigma Global"', page)
+        self.assertIn('data-detail="phase" data-key="p3"', page)
