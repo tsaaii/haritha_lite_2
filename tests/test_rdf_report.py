@@ -6,6 +6,8 @@ Runs against temp folders (built-in history from data/rdf_history + an empty upl
 """
 from __future__ import annotations
 
+import csv
+from datetime import date, timedelta
 import glob
 import io
 import os
@@ -27,7 +29,7 @@ NO_PIN_FILE = os.path.join(TMP, "no-pin.yaml")
 import captcha  # noqa: E402
 import pins  # noqa: E402
 import config  # noqa: E402
-from data import rdf_report, rdf_tracker  # noqa: E402
+from data import rdf_master, rdf_report, rdf_tracker  # noqa: E402
 from main import app  # noqa: E402
 
 HIST = os.path.join(TMP, "_history")
@@ -140,8 +142,9 @@ class Upload(Base):
         self.assertIn("13 Oct 2026", j["sheet_html"])
         self.assertIn("1,422.66", j["sheet_html"])
         # named for the day it is downloaded (IST), not the sheet's date
-        self.assertEqual(j["pdf_name"], f"Daily_RDF_tracker_{config.today_ist():%d-%m-%Y}.pdf")
-        self.assertIn("2. Tharuni sent RDF from Kadapa, Kakinada, Srikakulam and Vizianagaram sites.", j["gist"])
+        self.assertEqual(j["pdf_name"], f"Daily_RDF_tracker_All-phases_{config.today_ist():%d-%m-%Y}.pdf")
+        # Coastline's work before Phase 3 (Eluru, Machilipatnam) is Tharuni's (user rule, 19 Nov 2026).
+        self.assertIn("2. Tharuni sent RDF from Eluru, Kadapa, Kakinada, Machilipatnam, Srikakulam and Vizianagaram sites.", j["gist"])
 
     def test_pdf_download(self):
         self.upload(SEED[-1])
@@ -149,7 +152,9 @@ class Upload(Base):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.mimetype, "application/pdf")
         self.assertTrue(r.data.startswith(b"%PDF-"))
-        self.assertIn(f'filename="Daily_RDF_tracker_{config.today_ist():%d-%m-%Y}.pdf"', r.headers["Content-Disposition"])
+        self.assertIn(f'filename="Daily_RDF_tracker_All-phases_{config.today_ist():%d-%m-%Y}.pdf"', r.headers["Content-Disposition"])
+        r = self.c.get("/rdf/report.pdf?phase=p3")
+        self.assertIn(f'filename="Daily_RDF_tracker_Phase-3_{config.today_ist():%d-%m-%Y}.pdf"', r.headers["Content-Disposition"])
 
     def test_not_a_tracker(self):
         bad = os.path.join(TMP, "store", "bad.csv")
@@ -369,3 +374,264 @@ class LogChartTests(unittest.TestCase):
         self.assertTrue(y10k < green[2] < y1k)                         # 1,500 between the 1k and 10k lines
         black = [yy for _, yy in [m for m in marks if m[0] == "path"][2][1]]
         self.assertAlmostEqual(black[2], T + (1 - 246000 / 300000) * (H - T - B))   # linear right axis
+
+
+NOV = os.path.join(ROOT, "tests", "fixtures", "Daily_RDF_tracker-18-11-2026.csv")
+
+
+class Master(unittest.TestCase):
+    """The true copy: 17 Nov tracker + phase sheet, as approved by the user (RDF_master.csv, 19 Nov)."""
+
+    @classmethod
+    def setUpClass(cls):
+        reset_store()
+        with open(NOV, "rb") as f:
+            cls.t = rdf_tracker.parse(f.read(), os.path.basename(NOV))
+        cls.hist = []
+        for p in SEED:
+            with open(p, "rb") as f:
+                cls.hist.append(rdf_tracker.parse(f.read(), os.path.basename(p)))
+        cls.hist.append(cls.t)
+        cls.b = rdf_master.book(cls.hist, items=[])
+        cls.rows = rdf_master.rows_for_day(cls.b, cls.t)
+
+    def by(self, **kw):
+        return [s for s in self.rows if all(getattr(s, k) == v for k, v in kw.items())]
+
+    def test_counts_and_totals_per_phase(self):
+        want = {  # phase: (rows, tracked, unique sites, cumulative, balance)
+            "p3": (55, 46, 51, 144658.80, 150715.16), "p2": (24, 5, 24, 106207.54, 52730.43),
+            "p1x": (48, 3, 48, 19945.02, 2184.71), "p1": (95, 9, 94, 329658.29, 22493.89),
+            "old": (71, 1, 70, 480137.30, 807.10)}
+        for ph, (n, tr, uq, cum, bal) in want.items():
+            rs = self.by(phase=ph)
+            self.assertEqual(len(rs), n, ph)
+            self.assertEqual(sum(s.tracked for s in rs), tr, ph)
+            self.assertEqual(rdf_report.unique_sites(rs), uq, ph)
+            self.assertAlmostEqual(sum(s.cum for s in rs), cum, places=1, msg=ph)
+            self.assertAlmostEqual(sum(s.bal for s in rs if s.tracked), bal, places=1, msg=ph)
+        self.assertEqual(len(self.rows), 293)
+        self.assertEqual(rdf_report.unique_sites(self.rows), 132)
+        self.assertFalse(self.by(phase="un"))
+
+    def test_user_decisions(self):
+        self.assertFalse([s for s in self.rows if "nandyal 15" in s.src.lower()])           # excluded
+        machi = [s for s in self.rows if s.tracked and s.site == "Machilipatnam" and s.phase in ("p1", "p1x")]
+        self.assertEqual(sorted(round(s.awarded) for s in machi), [27216, 41861])            # split by award
+        self.assertTrue(all(s.agency == "Tharuni Associates" for s in machi))
+        self.assertFalse([s for s in self.rows if s.agency == "Coastline Projects" and s.phase != "p3"])
+        self.assertTrue(self.by(phase="p3", agency="Coastline Projects"))
+        self.assertEqual(self.by(site="Pedana", phase="p3")[0].agency, "Avinash Agencies")
+        self.assertEqual({s.phase for s in self.rows if s.src in ("Salur", "Kadapa") and s.tracked}, {"p3"})
+        self.assertEqual(self.by(site="Yemmiganur 15%")[0].key, "Yemmiganur")
+        self.assertEqual(len(self.by(site="Nellore Donthali", phase="p3")), 3)           # one site, 3 agencies
+        self.assertEqual({s.site for s in self.rows if s.site.startswith("Gudur")}, {"Gudur(N)", "Gudur(K)"})
+        amal = [s for s in self.rows if s.site == "Amalapuram" and s.tracked]
+        self.assertEqual([s.phase for s in amal], ["old"])
+        old = self.by(phase="old", tracked=False)[0]
+        self.assertEqual((old.today, old.bal), (0.0, 0.0))
+
+    def test_history_days_match_the_same_way(self):
+        # Every built-in October sheet places all its rows (none needs a phase).
+        for t in self.hist[:-1]:
+            self.assertFalse([s for s in rdf_master.rows_for_day(self.b, t) if s.phase == "un"], t.date)
+
+    def test_views_keep_phases_apart(self):
+        p3 = rdf_master.view(self.hist, "p3", self.b)
+        self.assertEqual({s.phase for t in p3 for s in t.sites}, {"p3"})
+        allv = rdf_master.view(self.hist, "all", self.b)
+        self.assertTrue(all(" · " in s.site for s in allv[-1].sites))       # All view names say the phase
+        r = rdf_report.build(rdf_master.view(self.hist, "old", self.b), "Old", [])
+        self.assertEqual(r["k"]["sites"], 70)
+        self.assertEqual(r["phase_label"], "Old")
+
+    def test_master_csv(self):
+        rows = list(csv.reader(io.StringIO(rdf_master.master_csv(self.hist, self.b).decode())))
+        self.assertEqual(rows[0][:3], ["Phase", "Agency", "Site"])
+        self.assertEqual(len(rows) - 1, 293)
+        self.assertEqual(rows[1][0], "Phase 3")                               # phases newest first
+        self.assertEqual(rows[-1][0], "Old")
+
+
+class PhasesAndEdits(Base):
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+        with open(NOV, "rb") as f:
+            self.c.post("/rdf/api/upload", headers=XRW, data={"files": (io.BytesIO(f.read()), os.path.basename(NOV))},
+                        content_type="multipart/form-data")
+
+    def sid(self, site, phase):
+        hist = rdf_tracker.history()
+        return next(s for s in rdf_master.rows_for_day(rdf_master.book(hist), hist[-1])
+                    if s.site == site and s.phase == phase)
+
+    def test_phase_switcher_and_views(self):
+        page = self.c.get("/rdf/").data.decode()
+        for label in ("All phases", "Phase 3", "Phase 2", "Phase 1 – 15%", "Phase 1", "Old"):
+            self.assertIn(label, page)
+        self.assertIn("RDF disposal report · All phases", page)
+        p3 = self.c.get("/rdf/?phase=p3").data.decode()
+        self.assertIn("RDF disposal report · Phase 3", p3)
+        self.assertIn('aria-current="page">Phase 3', p3)
+        old = self.c.get("/rdf/?phase=old").data.decode()
+        # Only the sites in the daily upload are listed; the rest is one "Other sites" total.
+        self.assertNotIn("Not tracked", old)
+        self.assertNotIn("not tracked", old.lower())
+        self.assertIn("Other sites", old)
+        self.assertIn("4,80,137.30", old)                      # Old's to-date total still includes them
+        self.assertIn("Amalapuram", old)
+        self.assertNotIn(">Tanuku<", old)                       # a phase-sheet-only Old site: not listed
+        r = self.c.get("/rdf/api/range?from=2026-10-01&to=2026-11-17&phase=p2")
+        self.assertTrue(r.get_json()["ok"])
+
+    def test_edit_undo_and_later_upload_wins(self):
+        s = self.sid("Kurnool Joharapuram", "p3")
+        r = self.c.post("/rdf/api/edit", headers=XRW, json={"sid": s.sid, "changes": {"cum": "5000"}, "phase": "p3"})
+        self.assertTrue(r.get_json()["ok"], r.get_json())
+        self.assertEqual(self.sid("Kurnool Joharapuram", "p3").cum, 5000.0)
+        edits = self.c.get("/rdf/api/edits").get_json()["edits"]
+        self.assertEqual(edits[0]["field"], "To date")
+        r = self.c.post("/rdf/api/undo", headers=XRW, json={"id": edits[0]["id"]})
+        self.assertTrue(r.get_json()["ok"])
+        self.assertEqual(self.sid("Kurnool Joharapuram", "p3").cum, s.cum)
+        # edit again, then upload the same day's sheet: the sheet wins
+        self.c.post("/rdf/api/edit", headers=XRW, json={"sid": s.sid, "changes": {"cum": "5000"}})
+        import time
+        time.sleep(1.1)
+        with open(NOV, "rb") as f:
+            self.c.post("/rdf/api/upload", headers=XRW, data={"files": (io.BytesIO(f.read()), "again.csv")},
+                        content_type="multipart/form-data")
+        self.assertEqual(self.sid("Kurnool Joharapuram", "p3").cum, s.cum)
+
+    def test_identity_edit_moves_phase_on_every_day(self):
+        s = self.sid("Salur", "p3")
+        r = self.c.post("/rdf/api/edit", headers=XRW, json={"sid": s.sid, "changes": {"phase": "p2", "site": "Salur Old dump"}})
+        self.assertTrue(r.get_json()["ok"])
+        hist = rdf_tracker.history()
+        v = rdf_master.view(hist, "p2")
+        self.assertTrue(all(any(x.sid == s.sid and x.site.startswith("Salur Old dump") for x in t.sites)
+                            for t in v if any(y.sid == s.sid for y in t.sites)))
+
+    def test_untracked_rows_only_edit_to_date(self):
+        s = next(x for x in rdf_master.rows_for_day(rdf_master.book(rdf_tracker.history()), rdf_tracker.history()[-1])
+                 if not x.tracked)
+        r = self.c.post("/rdf/api/edit", headers=XRW, json={"sid": s.sid, "changes": {"today": "10"}})
+        self.assertEqual(r.status_code, 400)
+        r = self.c.post("/rdf/api/edit", headers=XRW, json={"sid": s.sid, "changes": {"cum": "123.45"}})
+        self.assertTrue(r.get_json()["ok"])
+
+    def test_master_download_and_bad_phase_sheet(self):
+        r = self.c.get("/rdf/api/master.csv")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data.decode().strip().splitlines()), 294)
+        r = self.c.post("/rdf/api/phase-sheet", headers=XRW, data={"file": (io.BytesIO(b"a,b\n1,2\n"), "x.csv")},
+                        content_type="multipart/form-data")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.c.post("/rdf/api/edit", json={}).status_code, 400)       # no X-Requested-With
+
+
+class MasterFormatUpload(Base):
+    """From 19 Nov 2026 the daily upload is the master sheet (same columns as Download master CSV)."""
+
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+        with open(NOV, "rb") as f:
+            self.post(f.read(), os.path.basename(NOV))
+
+    def post(self, raw, name):
+        return self.c.post("/rdf/api/upload", headers=XRW, data={"files": (io.BytesIO(raw), name)},
+                           content_type="multipart/form-data").get_json()
+
+    def master(self, day="18 Nov"):
+        txt = self.c.get("/rdf/api/master.csv").data.decode()
+        return txt.replace("Disposed on 17 Nov 2026", "Disposed on " + day)
+
+    def test_master_day_continues_every_site(self):
+        txt = self.master()
+        rows = list(csv.reader(io.StringIO(txt)))
+        i = next(n for n, r in enumerate(rows) if r[2] == "Kurnool Joharapuram")
+        rows[i][4], rows[i][5] = "100.00", f"{float(rows[i][5]) + 100:.2f}"           # sent 100 MT on 18 Nov
+        buf = io.StringIO()
+        csv.writer(buf).writerows(rows)
+        j = self.post(buf.getvalue().encode(), "RDF_master_18-11-2026.csv")
+        self.assertTrue(j["ok"], j)
+        self.assertEqual((j["results"][0]["date"], j["results"][0]["kind"]), ("2026-11-18", "master sheet"))
+        hist = rdf_tracker.history()
+        b = rdf_master.book(hist)
+        d17 = {s.sid: s for s in rdf_master.rows_for_day(b, hist[-2])}
+        d18 = {s.sid: s for s in rdf_master.rows_for_day(b, hist[-1])}
+        self.assertEqual(set(d17), set(d18))                                     # same 293 sites, same ids
+        joh = next(s for s in d18.values() if s.site == "Kurnool Joharapuram")
+        self.assertEqual(joh.today, 100.0)
+        self.assertAlmostEqual(joh.cum - d17[joh.sid].cum, 100.0, places=2)
+        self.assertIn("Kurnool Joharapuram", j["gist"])
+        page = self.c.get("/rdf/?phase=p3").data.decode()
+        self.assertIn("18 Nov 2026", page)
+
+    def test_errors_are_clear(self):
+        j = self.post(b"Phase,Agency,Site,Awarded (MT),Disposed on 18 Nov (MT),Cumulative disposed (MT),Balance (MT)\n"
+                      b"Phase 9,X,Y,1,0,0,0\n", "x.csv")
+        self.assertFalse(j["ok"])
+        self.assertIn("Unknown phase", j["results"][0]["error"])
+        j = self.post(b"Phase,Agency,Site,Awarded (MT),Disposed (MT),Cumulative disposed (MT),Balance (MT)\n"
+                      b"Phase 3,X,Y,1,0,0,0\n", "x.csv")
+        self.assertFalse(j["ok"])
+        self.assertIn("missing", j["results"][0]["error"])
+
+    def test_old_tracker_still_accepted_and_year_is_inferred(self):
+        t = rdf_tracker.parse(self.master("30 Dec").encode(), "x.csv")
+        today = config.today_ist()
+        self.assertEqual(t.date.year, today.year if date(today.year, 12, 30) <= today + timedelta(days=7) else today.year - 1)
+        with open(SEED[-1], "rb") as f:
+            self.assertTrue(self.post(f.read(), "Daily_RDF_tracker-14-10-2026.csv")["ok"])
+
+
+class Details(Base):
+    """Click a site / agency / phase: every phase, every agency, with totals and % of awarded."""
+
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+        with open(NOV, "rb") as f:
+            self.c.post("/rdf/api/upload", headers=XRW, data={"files": (io.BytesIO(f.read()), os.path.basename(NOV))},
+                        content_type="multipart/form-data")
+
+    def get(self, kind, key):
+        return self.c.get("/rdf/api/detail", query_string={"kind": kind, "key": key})
+
+    def test_site_across_phases_and_agencies(self):
+        hist = rdf_tracker.history()
+        x = rdf_master.detail(hist, "site", "nellore donthali")
+        rows = x["groups"][0]["rows"]
+        self.assertEqual({r["phase"] for r in rows}, {"Phase 3", "Phase 2", "Phase 1", "Phase 1 – 15%"})
+        self.assertEqual({r["agency"] for r in rows if r["phase"] == "Phase 3"},
+                         {"Zigma Global", "Raghu Ram Hume Pipes", "PR Constructions"})
+        self.assertAlmostEqual(x["total"]["awarded"], sum(r["awarded"] for r in rows), places=2)
+        self.assertAlmostEqual(x["total"]["cum"], sum(r["cum"] for r in rows), places=2)
+        self.assertAlmostEqual(x["total"]["pct"], x["total"]["cum"] * 100 / x["total"]["awarded"], places=6)
+        j = self.get("site", "Nellore Donthali").get_json()
+        self.assertTrue(j["ok"])
+        self.assertIn("% of awarded", j["html"])
+        self.assertIn("PR Constructions", j["html"])
+
+    def test_agency_grouped_by_phase_and_phase_by_agency(self):
+        hist = rdf_tracker.history()
+        a = rdf_master.detail(hist, "agency", "Avinash Agencies")
+        self.assertEqual([g["label"] for g in a["groups"]], ["Phase 3", "Old"])
+        self.assertAlmostEqual(a["total"]["cum"], sum(g["sub"]["cum"] for g in a["groups"]), places=2)
+        p = rdf_master.detail(hist, "phase", "p2")
+        self.assertTrue(all(r["phase"] == "Phase 2" for g in p["groups"] for r in g["rows"]))
+        self.assertAlmostEqual(p["total"]["cum"], 106207.54, places=1)
+        allp = rdf_master.detail(hist, "phase", "all")
+        self.assertEqual([g["label"] for g in allp["groups"]], ["Phase 3", "Phase 2", "Phase 1 – 15%", "Phase 1", "Old"])
+        self.assertAlmostEqual(allp["total"]["cum"], 1080606.95, places=1)
+        self.assertEqual(self.get("agency", "Nobody").status_code, 404)
+        self.assertEqual(self.get("phase", "p3").status_code, 200)
+
+    def test_names_are_clickable(self):
+        page = self.c.get("/rdf/?phase=p3").data.decode()
+        self.assertIn('data-detail="site" data-key="nellore donthali"', page)
+        self.assertIn('data-detail="agency" data-key="Zigma Global"', page)
+        self.assertIn('data-detail="phase" data-key="p3"', page)

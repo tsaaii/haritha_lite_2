@@ -9,17 +9,21 @@
 {# ---------------- Overview ---------------- #}
 <section class="tabpanel" data-panel="overview" aria-label="Overview">
   <div class="lede">
-    <span class="lede__date">Report of {{ d.rep_label }}</span>
-    <span class="lede__line">{{ k.pct }} of RDF disposed · {{ k.bal }} MT left · {{ d.days_left }} days to {{ d.dl_label }}.
+    <span class="lede__date">{{ r.phase_label if r else '' }} · report of {{ d.rep_label }}</span>
+    {% if c.tracked %}
+    <span class="lede__line">{{ k.pct }} of RDF disposed at the {{ c.tracked }} tracked site{{ 's' if c.tracked != 1 }} · {{ k.bal }} MT left · {{ d.days_left }} days to {{ d.dl_label }}.
       At the last 7 days' pace ({{ k.pace }} MT a day) everything clears by
-      <b class="{{ 'bad' if k.late else 'good' }}">{{ k.finish }}</b>.</span>
+      <b class="{{ 'bad' if k.late else 'good' }}">{{ k.finish }}</b>.{% if d.others %} Disposed to date also includes {{ d.others.cum }} MT from {{ d.others.n }} other site{{ 's' if d.others.n != 1 }} of this phase.{% endif %}</span>
+    {% else %}
+    <span class="lede__line">No site in this phase is in the daily upload.{% if d.others %} Disposed to date is the final figure from its {{ d.others.n }} site{{ 's' if d.others.n != 1 }}.{% endif %}</span>
+    {% endif %}
   </div>
 
   <div class="tiles">
     <div class="tile tile--hero"><span class="tile__l">Disposed on {{ d.rep_label }}</span><span class="tile__v">{{ k.today }} <small>MT</small></span>
       <span class="tile__s">Needed every day to clear by {{ d.dl_label }}: <b>{{ k.need }} MT</b>{% if k.short_x != "—" %} · {{ k.short_x }} the current pace{% endif %}</span></div>
-    <div class="tile"><span class="tile__l">Disposed to date</span><span class="tile__v good">{{ k.cum }} <small>MT</small></span><span class="tile__s">{{ k.pct }} done</span></div>
-    <div class="tile"><span class="tile__l">Left at sites</span><span class="tile__v">{{ k.bal }} <small>MT</small></span><span class="tile__s">{{ c.sites - c.cleared }} of {{ c.sites }} sites still have RDF</span></div>
+    <div class="tile"><span class="tile__l">Disposed to date</span><span class="tile__v good">{{ k.cum }} <small>MT</small></span><span class="tile__s">{{ k.pct }} done · {{ c.unique }} site{{ 's' if c.unique != 1 }}{% if d.others %} + {{ d.others.cum }} MT from {{ d.others.n }} other site{{ 's' if d.others.n != 1 }}{% endif %}</span></div>
+    <div class="tile"><span class="tile__l">Left at sites</span><span class="tile__v">{{ k.bal }} <small>MT</small></span><span class="tile__s">{{ c.unique_left }} of {{ c.unique }} site{{ 's' if c.unique != 1 }} still have RDF</span></div>
     <div class="tile"><span class="tile__l">Agencies on track</span><span class="tile__v {{ 'bad' if c.agencies_on_track < c.agencies else 'good' }}">{{ c.agencies_on_track }} <small>of {{ c.agencies }}</small></span><span class="tile__s">clear by {{ d.dl_label }} at their pace</span></div>
   </div>
 
@@ -34,12 +38,12 @@
   <div class="grid2">
     <div class="card">
       <div class="card__head"><h2>Daily disposal by agency</h2><span class="muted">{{ d.first_label }} to {{ d.rep_label }} · hover a bar for figures</span></div>
-      <div class="legend legend--wrap">{% for a in d.agencies if a.has_sites %}<span><i class="sq" style="background:{{ a.color }}"></i>{{ a.short }}</span>{% endfor %}</div>
+      <div class="legend legend--wrap">{% for a in d.agencies if a.has_sites and a.tracked %}<span><i class="sq" style="background:{{ a.color }}"></i>{{ a.short }}</span>{% endfor %}</div>
       {{ d.stack_chart | safe }}
     </div>
     {% if r %}
     <div class="card">
-      <div class="card__head"><h2>Disposed so far · all agencies</h2><span class="muted">{{ r.range_label }}</span></div>
+      <div class="card__head"><h2>Disposed so far · {{ r.phase_label | lower if r.phase_label != 'All phases' else 'all phases' }}</h2><span class="muted">{{ r.range_label }}</span></div>
       <div class="legend legend--wrap">
         <span><i class="sw sw--g"></i>MT disposed each day (left)</span>
         <span><i class="sw sw--r"></i>MT a day needed by {{ r.deadline_short }} (left)</span>
@@ -60,7 +64,7 @@
       <div class="card__head"><h2>{{ title }}</h2><button type="button" class="link" data-goto="{{ key }}">See all</button></div>
       <p class="muted small">{{ note }}</p>
       <table class="tbl tbl--mini"><thead><tr><th>Site</th><th class="n">{{ colname }}</th></tr></thead><tbody>
-      {% for s in rows %}<tr><td><i class="sq" style="background:{{ s.color }}" title="{{ s.agency }}"></i>{{ s.site }} <span class="muted small">· {{ s.agency }}</span></td><td class="n b">{{ s[col] }}</td></tr>
+      {% for s in rows %}<tr><td><i class="sq" style="background:{{ s.color }}" title="{{ s.agency }}"></i><button type="button" class="link link--name" data-detail="site" data-key="{{ s.site_key }}">{{ s.site }}</button> <span class="muted small">· {{ s.agency }}</span></td><td class="n b">{{ s[col] }}</td></tr>
       {% else %}<tr><td colspan="2" class="muted">None.</td></tr>{% endfor %}
       </tbody></table>
     </div>
@@ -86,7 +90,7 @@
   <div class="card">
     <div class="card__head"><h2>Agency progress</h2><span class="muted">% of RDF disposed · <i class="tick-key"></i> where it should be today on a straight line from {{ d.first_label }} to 100% on {{ d.dl_label }}</span></div>
     <div class="prog">
-      {% for a in d.agencies if a.has_sites %}
+      {% for a in d.agencies if a.has_sites and a.tracked %}
       <button type="button" class="prog__row" data-goto="ag-{{ a.slug }}" title="Show {{ a.short }}'s sites">
         <span class="prog__name"><i class="sq" style="background:{{ a.color }}"></i>{{ a.short }}</span>
         <span class="prog__bar"><span class="prog__fill" style="width:{{ a.pct_w }}"></span>{% if a.exp_w %}<span class="prog__tick" style="left:{{ a.exp_w }}"></span>{% endif %}</span>
@@ -108,7 +112,7 @@
       <tbody>
       {% for a in d.agencies %}
       <tr {% if a.has_sites %}data-goto="ag-{{ a.slug }}" tabindex="0"{% endif %}>
-        <td><i class="sq" style="background:{{ a.color }}"></i>{{ a.name }}</td>
+        <td><i class="sq" style="background:{{ a.color }}"></i><button type="button" class="link link--name" data-detail="agency" data-key="{{ a.name }}" title="{{ a.name }} in every phase">{{ a.name }}</button></td>
         <td class="n b {{ 'good' if a.today != '0.00' else 'bad' }}">{{ a.today }}</td>
         <td class="n">{{ a.pace }}</td><td class="n">{{ a.need }}</td><td class="n good">{{ a.cum }}</td><td class="n">{{ a.bal }}</td>
         <td class="n">{{ a.pct }}</td><td class="n">{{ a.sites }}</td>
@@ -116,6 +120,13 @@
         <td class="{{ 'bad' if a.late else 'good' }} small">{{ a.finish }}</td>
       </tr>
       {% endfor %}
+      {% if d.others %}
+      <tr class="muted">
+        <td>Other sites of this phase ({{ d.others.n }})</td><td class="n">0.00</td><td class="n">—</td><td class="n">—</td>
+        <td class="n">{{ d.others.cum }}</td><td class="n">—</td><td class="n">—</td><td class="n">{{ d.others.n }}</td>
+        <td class="small" colspan="2">earlier work: final figure, included in Disposed to date</td>
+      </tr>
+      {% endif %}
       </tbody>
     </table></div>
   </div>
@@ -136,25 +147,29 @@
       <input type="search" class="search" id="site-search" placeholder="Search site" aria-label="Search site">
     </div>
     <p class="muted small" id="site-note">Showing all {{ c.sites }} sites. Click a column to sort.</p>
+    <p class="muted small">{{ c.unique }} unique site{{ 's' if c.unique != 1 }}{% if c.sites != c.unique %} ({{ c.sites }} rows: some sites have more than one agency or award){% endif %}. The pencil edits a site; changes show in the gear panel and can be undone.</p>
     <div class="scroll-x"><table class="tbl tbl--sort" id="site-table">
       <thead><tr>
         <th data-sort="site">Site</th><th data-sort="agency">Agency</th><th>Status</th>
         <th class="n" data-sort="today">Today</th><th class="n" data-sort="pace">7-day pace</th>
         <th class="n" data-sort="cum">To date</th><th class="n" data-sort="bal">Left</th><th class="n" data-sort="pct">Done</th>
-        <th class="n" data-sort="last">Last sent</th><th class="n" data-sort="finish">Projected finish</th>
+        <th class="n" data-sort="last">Last sent</th><th class="n" data-sort="finish">Projected finish</th><th><span class="sr-only">Edit</span></th>
       </tr></thead>
       <tbody>
       {% for s in d.sites %}
       <tr data-f="{{ s.filters }}" data-site="{{ s.site | lower }}" data-v-site="{{ s.site | lower }}" data-v-agency="{{ s.agency | lower }}"
           data-v-today="{{ s.today_v }}" data-v-pace="{{ s.pace_v }}" data-v-cum="{{ s.cum_v }}" data-v-bal="{{ s.bal_v }}"
           data-v-pct="{{ s.pct_v }}" data-v-last="{{ s.last_v }}" data-v-finish="{{ s.finish_v }}">
-        <td class="c9">{{ s.site }}</td>
-        <td><i class="sq" style="background:{{ s.color }}"></i>{{ s.agency }}</td>
+        <td class="c9"><button type="button" class="link link--name" data-detail="site" data-key="{{ s.site_key }}" title="{{ s.site }} in every phase">{{ s.site }}</button></td>
+        <td><i class="sq" style="background:{{ s.color }}"></i><button type="button" class="link link--name" data-detail="agency" data-key="{{ s.agency_full }}" title="{{ s.agency_full }} in every phase">{{ s.agency }}</button></td>
         <td>{% for label, kind in s.tags %}<span class="tag tag--{{ kind }}">{{ label }}</span>{% endfor %}</td>
         <td class="n {{ 'good b' if s.today_v > 0 else 'muted' }}">{{ s.today }}</td>
         <td class="n">{{ s.pace }}</td><td class="n good">{{ s.cum }}</td><td class="n b">{{ s.bal }}</td><td class="n">{{ s.pct }}</td>
         <td class="n {{ 'bad' if s.last == 'never' else '' }}">{{ s.last }}</td>
-        <td class="n small {{ 'bad' if s.late else 'good' }}">{{ s.finish }}</td>
+        <td class="n small {{ 'bad' if s.late else ('muted' if not s.tracked else 'good') }}">{{ s.finish }}</td>
+        <td><button type="button" class="pencil" title="Edit {{ s.site }}" aria-label="Edit {{ s.site }}"
+          data-edit="{{ s.sid }}" data-e-site="{{ s.site_name }}" data-e-agency="{{ s.agency_full }}" data-e-phase="{{ s.phase }}"
+          data-e-today="{{ s.today_raw }}" data-e-cum="{{ s.cum_raw }}" data-e-bal="{{ s.bal_raw }}" data-e-tracked="{{ '1' if s.tracked else '' }}">✎</button></td>
       </tr>
       {% endfor %}
       </tbody>

@@ -55,6 +55,14 @@ class SiteDay:
     today: float       # "RDF disposed as on Dt" column
     cum: float         # "Cumulative RDF disposed as on Dt" column
     bal: float         # "Balance RDF to be disposed from site" column
+    awarded: float = 0.0   # "Total Qty awarded to ULB" column: how a row is matched to the phase sheet
+    # Set by data/rdf_master.py when a row is placed in a phase view:
+    sid: str = ""          # stable master-row id (edits and per-site series key on it)
+    phase: str = ""        # phase code: p3, p2, p1x, p1, old, un
+    tracked: bool = True   # False = phase-sheet-only row: fixed cumulative, no balance
+    src: str = ""          # site name as written in the tracker (WhatsApp summary uses it)
+    key: str = ""          # unique-site key for the Sites count
+    base: str = ""         # site name without the view's suffixes (" · P3", " (2)"): what the edit form shows
 
 
 @dataclass(frozen=True)
@@ -62,6 +70,7 @@ class Tracker:
     date: date             # "as on Dt" — the day the disposal happened (report day)
     sites: tuple[SiteDay, ...]
     sheet_date: date       # the sheet's own date (its title / file name), usually date + 1
+    kind: str = "tracker"  # "tracker" = the daily RDF tracker; "master" = the master-sheet format
 
 
 class TrackerError(ValueError):
@@ -101,12 +110,95 @@ def _is_number(s: str) -> bool:
         return False
 
 
+# Master-sheet format (from 19 Nov 2026; same columns as the dashboard's "Download master CSV"):
+#   Phase, Agency, Site, Awarded (MT), Disposed on 17 Nov (MT), Cumulative disposed (MT), Balance (MT)
+# The day comes from the "Disposed on <d> <Mon> [<yyyy>]" header. A blank Balance = not in the daily
+# tracker (final figure). Phase labels: Phase 3 / Phase 2 / Phase 1 – 15% / Phase 1 / Old.
+MASTER_PHASES = {"phase 3": "p3", "phase 3 - current": "p3", "phase 2": "p2", "phase 1 - 15%": "p1x",
+                 "phase 1 - 15% excess": "p1x", "phase 1 15%": "p1x", "phase 1": "p1", "old": "old"}
+_DISPOSED_ON = re.compile(r"disposed\s+on\s+(\d{1,2})[\s\-./]+([A-Za-z]{3,9})\.?(?:[\s\-./,]+(\d{4}))?", re.I)
+
+
+def _phase_code(label: str) -> str | None:
+    s = re.sub(r"[\u2013\u2014]", "-", _clean(label)).lower()
+    s = re.sub(r"\s*-\s*", " - ", s)
+    return MASTER_PHASES.get(s)
+
+
+def _col(head: list[str], *starts: str) -> int:
+    for i, h in enumerate(head):
+        if any(h.startswith(x) for x in starts):
+            return i
+    return -1
+
+
+def _parse_master(rows: list[list[str]], hi: int, filename: str) -> Tracker:
+    head = [_clean(c).lower() for c in rows[hi]]
+    ix = {"phase": _col(head, "phase"), "agency": _col(head, "agency"), "site": _col(head, "site"),
+          "awarded": _col(head, "awarded"), "today": _col(head, "disposed on", "disposed today"),
+          "cum": _col(head, "cumulative"), "bal": _col(head, "balance")}
+    missing = [k for k in ("phase", "agency", "site", "today", "cum", "bal") if ix[k] < 0]
+    if missing:
+        raise TrackerError("This looks like the master sheet, but these columns are missing: " + ", ".join(missing) +
+                           ". Expected: Phase, Agency, Site, Awarded (MT), Disposed on <date> (MT), "
+                           "Cumulative disposed (MT), Balance (MT).")
+    d = None
+    m = _DISPOSED_ON.search(_clean(rows[hi][ix["today"]]))
+    if m:
+        try:
+            mon = datetime.strptime(m.group(2)[:3].title(), "%b").month
+        except ValueError:
+            mon = None
+        if mon:
+            today = config.today_ist()
+            year = int(m.group(3)) if m.group(3) else today.year
+            try:
+                d = date(year, mon, int(m.group(1)))
+            except ValueError:
+                d = None
+            if d and not m.group(3) and d > today + timedelta(days=7):
+                d = d.replace(year=year - 1)          # "Disposed on 30 Dec" uploaded on 2 Jan
+    if d is None:
+        fm = _FNAME_DATE.search(filename or "")
+        if fm:
+            d = date(int(fm.group(3)), int(fm.group(2)), int(fm.group(1)))
+    if d is None:
+        raise TrackerError("Could not find the day: name the column 'Disposed on 18 Nov (MT)' (the report day).")
+    sites, bad = [], []
+    for r in rows[hi + 1:]:
+        r = r + [""] * (len(head) - len(r))
+        if not any(_clean(c) for c in r):
+            continue
+        site, agency = _clean(r[ix["site"]]), _clean(r[ix["agency"]])
+        if not site or not agency:
+            continue
+        code = _phase_code(r[ix["phase"]])
+        if not code:
+            bad.append(_clean(r[ix["phase"]]) or "(blank)")
+            continue
+        bal_cell = _clean(r[ix["bal"]])
+        sites.append(SiteDay(agency, site, _num(r[ix["today"]]), _num(r[ix["cum"]]), _num(bal_cell),
+                             awarded=_num(r[ix["awarded"]]) if ix["awarded"] >= 0 else 0.0,
+                             phase=code, tracked=bool(bal_cell), src=re.sub(r"\s*\(\d+\)$", "", site)))
+    if bad:
+        raise TrackerError("Unknown phase: " + ", ".join(sorted(set(bad))[:5]) +
+                           ". Use Phase 3, Phase 2, Phase 1 – 15%, Phase 1 or Old.")
+    if not sites:
+        raise TrackerError("The sheet has a header row but no site rows.")
+    return Tracker(d, tuple(sites), d + timedelta(days=1), kind="master")
+
+
 def parse(raw: bytes, filename: str = "") -> Tracker:
-    """Parse one daily tracker sheet. Raises TrackerError if it isn't one."""
+    """Parse one day's sheet: the daily RDF tracker, or the master-sheet format. Raises TrackerError."""
     rows = list(csv.reader(io.StringIO(_decode(raw))))
+    mi = next((i for i, r in enumerate(rows[:5]) if r and _clean(r[0]).lower() == "phase"
+               and any(_clean(c).lower().startswith("site") for c in r)), -1)
+    if mi >= 0:
+        return _parse_master(rows, mi, filename)
     hi = next((i for i, r in enumerate(rows) if r and _clean(r[0]).lower() == "agency"), -1)
     if hi < 0:
-        raise TrackerError("No header row starting with 'Agency' — is this the daily RDF tracker?")
+        raise TrackerError("Not a sheet this report reads: expected the master sheet (first column 'Phase') "
+                           "or the daily RDF tracker (header row starting with 'Agency').")
 
     title = _clean(rows[0][0]) if rows and rows[0] else ""
     tm, fm = _TITLE_DATE.search(title), _FNAME_DATE.search(filename or "")
@@ -142,7 +234,7 @@ def parse(raw: bytes, filename: str = "") -> Tracker:
     for r in body:
         site, sl = _clean(r[2]), _clean(r[1])
         name = f"{site} #{sl}" if seen[site.lower()] > 1 and sl else site
-        sites.append(SiteDay(_clean(r[0]), name, _num(r[6]), _num(r[7]), _num(r[9])))
+        sites.append(SiteDay(_clean(r[0]), name, _num(r[6]), _num(r[7]), _num(r[9]), awarded=_num(r[3])))
     return Tracker(d, tuple(sites), sheet)
 
 
@@ -193,6 +285,15 @@ def _delete(rel: str) -> None:
     path = os.path.join(TRACKER_DIR, rel)
     if os.path.exists(path):
         os.remove(path)
+
+
+def read_file(rel: str) -> bytes | None:
+    """Read RDF_TRACKER_DIR/<rel> (None if missing). Used for master/ files (edits, phase sheet)."""
+    return _read(rel)
+
+
+def write_file(rel: str, data: bytes, content_type: str = "text/csv") -> None:
+    _write(rel, data, content_type)
 
 
 def _list_trackers() -> list[tuple[str, str, datetime | None]]:
@@ -315,6 +416,17 @@ def store(raw: bytes, filename: str) -> tuple[Tracker, bool]:
     _write(f"{_UPLOADS}/{stamp}_{safe}", raw)
     _write(f"{_TRACKERS}/{name}", raw)
     return t, replaced
+
+
+def uploaded_at() -> dict[date, datetime]:
+    """When each uploaded day's sheet was last written (built-in days are absent)."""
+    out = {}
+    for name, _, upd in _list_trackers():
+        try:
+            out[date.fromisoformat(name[:-4])] = upd
+        except ValueError:
+            continue
+    return out
 
 
 def history_dates() -> set[date]:

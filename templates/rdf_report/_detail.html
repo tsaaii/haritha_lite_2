@@ -1,0 +1,51 @@
+{# Detail window: one site / agency / phase across every phase. x = rdf_master.detail(). #}
+{% set H = {"phase": "Phase", "agency": "Agency", "site": "Site"} %}
+{% macro pct(v) %}{{ '—' if v is none else '%.1f%%' | format(v) }}{% endmacro %}
+<p class="muted small">
+  {%- if x.kind == 'site' %}{{ x.agencies }} agenc{{ 'ies' if x.agencies != 1 else 'y' }} · {{ x.phases }} phase{{ 's' if x.phases != 1 }}
+  {%- elif x.kind == 'agency' %}{{ x.total.n }} site{{ 's' if x.total.n != 1 }} · {{ x.phases }} phase{{ 's' if x.phases != 1 }}
+  {%- else %}{{ x.total.n }} site{{ 's' if x.total.n != 1 }} · {{ x.agencies }} agenc{{ 'ies' if x.agencies != 1 else 'y' }}{% endif %}
+  · as on {{ x.day.day }} {{ x.day.strftime('%b %Y') }} · % = RDF disposed × 100 ÷ awarded
+</p>
+{% if x.groups | length > 1 %}
+<div class="scroll-x"><table class="tbl detail-tbl detail-sum">
+  <thead><tr><th>{{ H[x.group_by] }}</th><th class="n">Sites</th>
+    <th class="n">Awarded (MT)</th><th class="n">RDF disposed (MT)</th><th class="n">% of awarded</th></tr></thead>
+  <tbody>
+  {% for g in x.groups %}
+    <tr><td>{{ g.label }}</td><td class="n">{{ g.sub.n }}</td><td class="n">{{ fmt(g.sub.awarded) }}</td><td class="n good">{{ fmt(g.sub.cum) }}</td><td class="n">{{ pct(g.sub.pct) }}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr class="detail-total"><td>Total</td><td class="n">{{ x.total.n }}</td><td class="n">{{ fmt(x.total.awarded) }}</td><td class="n">{{ fmt(x.total.cum) }}</td><td class="n">{{ pct(x.total.pct) }}</td></tr></tfoot>
+</table></div>
+<h3 class="detail-h">Every site</h3>
+{% endif %}
+<div class="scroll-x"><table class="tbl detail-tbl">
+  <thead><tr>
+    {% for c in x.cols %}<th>{{ H[c] }}</th>{% endfor %}
+    <th class="n">Awarded (MT)</th><th class="n">RDF disposed (MT)</th><th class="n">% of awarded</th>
+  </tr></thead>
+  {% for g in x.groups %}
+  <tbody>
+    {% if g.label %}<tr class="detail-group"><th colspan="{{ x.cols | length + 3 }}">{{ g.label }}</th></tr>{% endif %}
+    {% for r in g.rows %}
+    <tr>
+      {% for c in x.cols %}
+      <td>{% if c == 'agency' %}<button type="button" class="link" data-detail="agency" data-key="{{ r.agency }}">{{ r.agency }}</button>
+          {%- elif c == 'site' %}<button type="button" class="link" data-detail="site" data-key="{{ r.key }}">{{ r.site }}</button>
+          {%- else %}{{ r.phase }}{% endif %}</td>
+      {% endfor %}
+      <td class="n">{{ fmt(r.awarded) }}</td><td class="n good">{{ fmt(r.cum) }}</td><td class="n">{{ pct(r.pct) }}</td>
+    </tr>
+    {% endfor %}
+    {% if g.sub and x.groups | length > 1 %}
+    <tr class="detail-sub"><td colspan="{{ x.cols | length }}">{{ g.label }} · {{ g.sub.n }} site{{ 's' if g.sub.n != 1 }}</td>
+      <td class="n">{{ fmt(g.sub.awarded) }}</td><td class="n">{{ fmt(g.sub.cum) }}</td><td class="n">{{ pct(g.sub.pct) }}</td></tr>
+    {% endif %}
+  </tbody>
+  {% endfor %}
+  <tfoot><tr class="detail-total">
+    <td colspan="{{ x.cols | length }}">Total{% if x.kind != 'site' %} · {{ x.total.n }} site{{ 's' if x.total.n != 1 }}{% endif %}</td>
+    <td class="n">{{ fmt(x.total.awarded) }}</td><td class="n">{{ fmt(x.total.cum) }}</td><td class="n">{{ pct(x.total.pct) }}</td>
+  </tr></tfoot>
+</table></div>

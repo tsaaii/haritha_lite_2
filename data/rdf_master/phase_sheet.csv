@@ -1,0 +1,292 @@
+location,site_name,phase,agency_name,cluster,target_mt,remediated_mt,rdf_disposed_mt
+Tirupati,Tirupati,Phase 3 - current,Card Box Company,Package18,"75,504.00","78,656.94","3,716.44"
+Kuppam,Kuppam,Phase 3 - current,Raghu Ram Hume Pipes,Package11,"15,000.00","15,000.00","1,172.80"
+Donthali,Donthali,Phase 3 - current,Raghu Ram Hume Pipes,Package20,"64,712.00","84,666.35","2,359.99"
+Tenali,Tenali,Phase 3 - current,Sudhakara Infra,Package5,"39,568.97","39,568.97","12,174.42"
+Gargeyapuram,Kurnool,Phase 3 - current,Saurashta Enviro,Package4,"3,68,318.40","3,68,318.00","5,516.49"
+Tadepalligudem,Tadepalligudem,Phase 3 - current,Iway Associates,Package6,"88,064.00","88,064.00",0.00
+Nidadavole,Nidadavole,Phase 3 - current,Iway Associates,Package6,"29,357.70","29,357.70",0.00
+Mandapeta,Mandapeta,Phase 3 - current,Iway Associates,Package6,"11,496.46","11,496.46",0.00
+Palacole1,Palacole,Phase 3 - current,Iway Associates,Package26,"39,840.00","39,840.00",0.00
+Palacole2,Palacole,Phase 3 - current,Iway Associates,Package26,"35,356.00","18,429.01",0.00
+Kandukur,Kandukur,Phase 3 - current,Geron Engineering,Package7,"46,210.02","24,943.64",0.00
+Kavali,Kavali,Phase 3 - current,Geron Engineering,Package7,"11,177.58",0.00,0.00
+Nandyal,Nandyal,Phase 3 - current,Geron Engineering,Package8,"18,126.00","11,167.36",0.00
+Dhone,Dhone,Phase 3 - current,Geron Engineering,Package8,"20,812.42",0.00,0.00
+Giddalur,Giddalur,Phase 3 - current,Geron Engineering,Package8,"19,994.40","17,259.97",0.00
+Gudivada,Gudivada,Phase 3 - current,Coastline Projects,Package9,"38,174.86","38,174.66",0.00
+Machilipatnam,Machilipatnam,Phase 3 - current,Coastline Projects,Package9,"5,466.72","54,666.72",0.00
+Eluru,Eluru,Phase 3 - current,Coastline Projects,Package13,"1,30,647.00","96,619.76",0.00
+Jangareddygudem, ,Phase 3 - current,Coastline Projects,Package13,"44,810.00","44,810.00",800.00
+Rayadurgam,Rayadurgam,Phase 3 - current,Zigma Global,Package10,"1,01,957.37","84,493.74",917.32
+Sullurpet,Sullurpet,Phase 3 - current,Zigma Global,Package16,"16,614.00","16,671.33","1,554.28"
+Srikalahasti,Srikalahasti,Phase 3 - current,Zigma Global,Package16,"71,324.00","52,900.81","6,958.01"
+Puttur,Puttur,Phase 3 - current,Zigma Global,Package16,"25,286.00","53,592.80","4,109.76"
+Chittoor,Chittoor,Phase 3 - current,Zigma Global,Package16,"66,166.00","66,648.45",902.09
+Guntakal,Guntakal,Phase 3 - current,Zigma Global,Package16,"61,269.00","47,814.20",13.19
+Tirupati,Tirupati,Phase 3 - current,Zigma Global,Package17,"1,70,768.00","1,16,091.35","19,885.95"
+GVMC,GVMC,Phase 3 - current,Zigma Global,Package22,"2,93,194.00","2,65,779.86",0.00
+Donthali,Donthali,Phase 3 - current,Zigma Global,Package23,"64,211.00","64,634.95",0.00
+Ananthapur,Ananthapur,Phase 3 - current,Tharuni Associates,Package19,"2,10,196.00","90,147.00","1,075.00"
+Narasaraopet,Narasaraopet,Phase 3 - current,Tharuni Associates,Package1,"92,089.42","92,089.42","6,622.52"
+Ponnuru,Ponnuru,Phase 3 - current,Tharuni Associates,Package1,"8,211.50","8,211.50",663.84
+Kadiri2,Kadiri,Phase 3 - current,Tharuni Associates,Package2,"11,679.27","11,679.27",351.67
+Hindupur,Hindupur,Phase 3 - current,Tharuni Associates,Package2,"72,120.84","72,120.84",0.00
+Joharapuram,Joharapuram,Phase 3 - current,Tharuni Associates,Package3,"68,075.50","68,075.50","1,056.29"
+Kadapa,Kadapa,Phase 3 - current,Tharuni Associates,Package3,"2,91,916.00","2,91,916.00","22,557.97"
+Kadiri1,Kadiri,Phase 3 - current,Tharuni Associates,Package12,"1,00,666.00","70,072.00",901.32
+Adoni,Adoni,Phase 3 - current,Tharuni Associates,Package12,"59,452.00","59,452.00","3,060.33"
+Yemmiganur,Yemmiganur,Phase 3 - current,Tharuni Associates,Package12,"26,758.00","26,758.00",0.00
+Proddatur1,Proddaturu,Phase 3 - current,Tharuni Associates,Package12,"1,13,914.00","1,13,914.00","5,099.20"
+Proddatur2,Proddaturu,Phase 3 - current,Tharuni Associates,Package12,"27,916.00","27,916.00","1,497.42"
+Narsipatnam,Narsipatnam,Phase 3 - current,Tharuni Associates,Package15,"9,226.00","9,226.00",756.80
+Srikakulam,Srikakulam,Phase 3 - current,Tharuni Associates,Package15,"1,51,016.00","1,51,016.00","3,914.46"
+Palasa-Kasibugga,Palasa-Kasibugga,Phase 3 - current,Tharuni Associates,Package15,"1,175.00","1,175.00",0.00
+Bapatla,Bapatla,Phase 3 - current,Tharuni Associates,Package23,"1,23,224.00","1,23,224.00","1,620.00"
+Guntur,Guntur,Phase 3 - current,Tharuni Associates,Package23,"1,03,848.00","1,03,848.00","4,124.72"
+Jaggaiahpet,Jaggaiahpet,Phase 3 - current,Tharuni Associates,Package23,"27,112.00","27,112.00","1,719.08"
+Vizianagaram,Vizianagaram,Phase 3 - current,Tharuni Associates,Package24,"1,17,480.00","1,17,480.00","5,443.71"
+Rajahmundry,Rajahmundry,Phase 3 - current,Tharuni Associates,Package24,"2,38,244.00","2,38,244.00","5,045.38"
+Kakinada,Kakinada,Phase 3 - current,Tharuni Associates,Package25,"2,24,377.00","1,86,247.04",680.85
+Ongole,Ongole,Phase 3 - current,Tharuni Associates,Package14,"56,213.00","56,213.00",0.00
+Markapuram,Markapuram,Phase 3 - current,Tharuni Associates,Package14,"9,107.00","8,828.09",688.21
+Donthali,Donthali,Phase 3 - current,PR Constructions,,"64,020.00","60,122.88",
+Narasaraopet,Narasaraopet,Phase 2,Tharuni Associates,,"54,000.00","54,000.00","4,362.80"
+Dharmavaram,Dharmavaram,Phase 2,Tharuni Associates,,"36,000.00","36,011.89",455.71
+Proddatur,Proddaturu,Phase 2,Tharuni Associates,,"50,000.00","50,000.00","3,662.85"
+Vizianagaram,Vizianagaram,Phase 2,Tharuni Associates,,"1,16,000.00","1,16,000.00","9,315.40"
+Guntur,Guntur,Phase 2,Tharuni Associates,,"30,000.00","30,000.00","2,439.74"
+Rajahmundry,Rajahmundry,Phase 2,Tharuni Associates,,"50,000.00","50,000.00","4,652.78"
+Hindupur,Hindupur,Phase 2,Tharuni Associates,,"20,000.00","20,000.00",0.00
+Srikakulam,Srikakulam,Phase 2,Tharuni Associates,,"1,34,000.00","1,35,179.75","10,864.79"
+Rajampet,Rajampet,Phase 2,Tharuni Associates,,"30,000.00","30,297.45","1,840.04"
+Gudivada,Gudivada,Phase 2,Coastline Projects,,"1,16,091.00","40,000.00",0.00
+Machilipatnam,Machilipatnam,Phase 2,Coastline Projects,,"24,000.00","24,000.00",333.00
+Ongole,Ongole,Phase 2,Tharuni Associates,,"75,000.00","75,000.00",73.07
+Srikalahasti,Srikalahasti,Phase 2,Zigma Global,,"35,000.00","35,012.47","3,233.37"
+Donthali,Nellore,Phase 2,Zigma Global,,"2,45,000.00","2,74,310.80",106.83
+Allipuram,Nellore,Phase 2,Zigma Global,,"55,000.00","42,007.27","3,927.38"
+GVMC,GVMC,Phase 2,Zigma Global,,"3,00,000.00","3,00,335.44","2,277.48"
+Tirupati,Tirupati,Phase 2,Zigma Global,,"65,000.00","65,062.75","10,254.77"
+Kavali,Kavali,Phase 2,Zigma Global,,"15,000.00","15,040.07","4,578.77"
+Gudur,Gudur,Phase 2,Zigma Global,,"30,000.00","30,011.99","3,830.29"
+Chittoor,Chittoor,Phase 2,Zigma Global,,"89,000.00","89,038.82","16,432.86"
+Tenali,Tenali,Phase 2,Sudhakara Infra,Tenali,"35,000.00","35,000.00","9,853.51"
+Gargeyapuram,Kurnool,Phase 2,Saurashta Enviro,Kurnool,"1,08,000.00","1,08,000.00","1,249.44"
+Kadapa,Kadapa,Phase 1,Tharuni Associates,Kadapa,"4,00,000.00","4,00,000.00","37,090.29"
+Srikakulam,Srikakulam,Phase 1,Tharuni Associates,Rajahmundry,"80,978.00","80,978.00","7,227.93"
+Vizianagaram,Vizianagaram,Phase 1,Tharuni Associates,Rajahmundry,"30,604.00","30,604.00","2,512.99"
+Rajahmundry,Rajahmundry,Phase 1,Tharuni Associates,Rajahmundry,"76,735.00","76,735.00","7,139.49"
+Kakinada,Kakinada,Phase 1,Tharuni Associates,Kakinada,"3,00,000.00","3,00,000.00","28,948.23"
+Amalapuram,Amalapuram,Phase 1,Tharuni Associates,Kakinada,"27,543.00","27,543.00","2,626.01"
+Chilakaluripet,Chilakaluripet,Phase 1,Tharuni Associates,Chilakaluripet,"1,66,278.00","1,39,097.00","12,263.36"
+Guntur,Guntur,Phase 1,Tharuni Associates,Chilakaluripet,"43,811.00","43,811.00","4,402.01"
+Ponnuru,Ponnuru,Phase 1,Tharuni Associates,Chilakaluripet,"8,376.00","8,376.00",978.40
+Narasaraopet,Narasaraopet,Phase 1,Tharuni Associates,Chilakaluripet,"30,609.00","30,609.00","2,574.48"
+Piduguralla,Piduguralla,Phase 1,Tharuni Associates,Chilakaluripet,"30,183.70","30,183.70","2,520.40"
+Vinukonda,Vinukonda,Phase 1,Tharuni Associates,Chilakaluripet,"26,932.71","26,932.71","2,445.77"
+Bapatla,Bapatla,Phase 1,Tharuni Associates,Chilakaluripet,"46,264.00","46,264.00","3,806.64"
+Repalle,Repalle,Phase 1,Tharuni Associates,Chilakaluripet,"22,412.65","22,412.85","2,218.32"
+Macherla,Macherla,Phase 1,Tharuni Associates,Chilakaluripet,"30,894.00","30,894.00","2,614.90"
+Dachepalli,Dachepalli,Phase 1,Tharuni Associates,Chilakaluripet,"6,194.00","6,194.00",813.30
+Gurazala,Gurazala,Phase 1,Tharuni Associates,Chilakaluripet,"1,675.00","1,675.00",260.57
+Sattenapalle,Sattenapalle,Phase 1,Tharuni Associates,Chilakaluripet,,,
+Mangalagiri-Tadepalli,Mangalagiri-Tadepalli,Phase 1,Tharuni Associates,Chilakaluripet,0.00,0.00,
+Dharmavaram,Dharmavaram,Phase 1,Tharuni Associates,Hindupur,"23,000.00","23,000.00","1,285.87"
+Kadiri,Kadiri,Phase 1,Tharuni Associates,Hindupur,"20,000.00","20,000.00",654.02
+Penukonda,Penukonda,Phase 1,Tharuni Associates,Hindupur,"13,578.00","13,578.00",
+Madakasira,Madakasira,Phase 1,Tharuni Associates,Hindupur,664.00,664.00,
+Hindupur,Hindupur,Phase 1,Tharuni Associates,Hindupur,"49,020.00","49,020.00",
+Puttaparthy,Puttaparthy,Phase 1,Tharuni Associates,Hindupur,"10,299.00","4,023.00",0.00
+Proddatur,Proddaturu,Phase 1,Tharuni Associates,Kadapa,"70,730.00","70,730.00","6,222.10"
+Jammalamadugu,Jammalamadugu,Phase 1,Tharuni Associates,Kadapa,"4,916.00","4,916.00",
+Yerraguntla,Yerraguntla,Phase 1,Tharuni Associates,Kadapa,"2,021.00","2,021.00",
+Rayachoti,Rayachoti,Phase 1,Tharuni Associates,Kadapa,"94,604.00","94,604.00",
+Badvel,Badvel,Phase 1,Tharuni Associates,Kadapa,"11,926.00","11,926.00","1,061.00"
+Rajampet,Rajampet,Phase 1,Tharuni Associates,Kadapa,"11,800.00","11,800.00",758.40
+Mydukur,Mydukur,Phase 1,Tharuni Associates,Kadapa,"11,244.00","11,244.00",
+Pulivendula,Pulivendula,Phase 1,Tharuni Associates,Kadapa,"10,000.00",,0.00
+Kamalapuram,Kamalapuram,Phase 1,Tharuni Associates,Kadapa,"1,763.00","1,763.00",
+Bhimavaram,Bhimavaram,Phase 1,Tharuni Associates,Eluru,"32,358.00","14,072.00",
+Tadepalligudem,Tadepalligudem,Phase 1,Tharuni Associates,Eluru,"30,258.00","30,258.00",
+Nuzvid,Nuzvid,Phase 1,Tharuni Associates,Eluru,"18,458.00","18,458.00",
+Palacole,Palacole,Phase 1,Tharuni Associates,Kakinada,"30,000.00","30,000.00","1,797.48"
+Eluru,Eluru,Phase 1,Tharuni Associates,Eluru,"53,348.00","53,348.00",
+Gudivada,Gudivada,Phase 1,Tharuni Associates,Eluru,"42,953.00","42,953.00",706.00
+Machilipatnam,Machilipatnam,Phase 1,Tharuni Associates,Eluru,"41,861.00","41,861.00",842.00
+Vijayawada,Vijayawada,Phase 1,Tharuni Associates,Eluru,,,
+Kovvur,Kovvur,Phase 1,Tharuni Associates,Eluru,915.00,965.95,110.56
+Jaggaiahpet,Jaggaiahpet,Phase 1,Tharuni Associates,Eluru,"12,987.00","12,987.00",784.44
+Kondapalli,Kondapalli,Phase 1,Tharuni Associates,Eluru,"5,000.00","5,000.00",220.64
+Nandigama,Nandigama,Phase 1,Tharuni Associates,Eluru,"1,398.00","1,398.00",94.26
+Ongole,Ongole,Phase 1,Tharuni Associates,Addanki,"61,929.00","61,929.00",
+Addanki,Addanki,Phase 1,Tharuni Associates,Addanki,"58,754.00","24,845.00",
+Markapuram,Markapuram,Phase 1,Tharuni Associates,Addanki,"33,877.00","33,877.00",
+Chirala,Chirala,Phase 1,Tharuni Associates,Addanki,"28,392.00","28,392.00",
+Kandukur,Kandukur,Phase 1,Tharuni Associates,Addanki,"26,160.00","26,160.00",
+Chimakurthy,Chimakurthy,Phase 1,Tharuni Associates,Addanki,"14,459.00","14,459.00",
+Kanigiri,Kanigiri,Phase 1,Tharuni Associates,Addanki,"11,662.00","11,662.00",441.54
+Darsi,Darsi,Phase 1,Tharuni Associates,Addanki,"1,602.00","1,602.00",
+Podili,Podili,Phase 1,Tharuni Associates,Addanki,"1,075.00","1,075.00",112.50
+Allipuram,Nellore,Phase 1,Zigma Global,Nellore Municipal Corporation,"34,037.00","80,189.67","5,743.34"
+Donthali,Nellore,Phase 1,Zigma Global,Nellore Municipal Corporation,"2,90,442.00","2,94,348.59","39,035.48"
+Alluru,Alluru,Phase 1,Zigma Global,Nellore,908.00,"2,099.52",162.73
+Buchireddypalem,Buchireddypalem,Phase 1,Zigma Global,Nellore,"6,030.00","6,031.75",630.04
+Kavali,Kavali,Phase 1,Zigma Global,Nellore,"18,536.00","18,537.96","4,723.32"
+Gudur(N),Gudur(N),Phase 1,Zigma Global,Nellore,"26,563.00","32,520.00","4,288.93"
+Naidupet,Naidupet,Phase 1,Zigma Global,Nellore,"4,186.00","4,329.06",768.44
+Atmakur(N),Atmakur(N),Phase 1,Zigma Global,Nellore,"12,784.00","16,013.61","1,677.04"
+GVMC,GVMC,Phase 1,Zigma Global,GVMC,"2,01,400.00","2,31,628.45",21.59
+Chittoor,Chittoor,Phase 1,Zigma Global,Chittoor,"1,46,232.00","1,71,523.00","13,007.09"
+Madanapalle,Madanapalle,Phase 1,Zigma Global,Chittoor,"27,532.00",36512.42,"5,687.20"
+Punganur,Punganur,Phase 1,Zigma Global,Chittoor,"22,945.00","45,623.82","8,525.55"
+B.Kothakota,B.Kothakota,Phase 1,Zigma Global,Chittoor,"25,772.00","3,817.00",392.37
+Kuppam,Kuppam,Phase 1,Zigma Global,Chittoor,"20,000.00","20,000.00","2,746.92"
+Palamaneru,Palamaneru,Phase 1,Zigma Global,Chittoor,"13,177.00","16,521.96","2,632.66"
+Tirupati,Tirupati,Phase 1,Zigma Global,Tirupati,"2,21,473.00","2,27,492.50","27,270.73"
+Srikalahasti,Srikalahasti,Phase 1,Zigma Global,Tirupati,"50,307.00","83,528.04","8,385.09"
+Sullurpet,Sullurpet,Phase 1,Zigma Global,Tirupati,"38,261.00","48,309.41","8,906.47"
+Puttur,Puttur,Phase 1,Zigma Global,Tirupati,"20,034.00","27,747.65","3,700.25"
+Nagari,Nagari,Phase 1,Zigma Global,Tirupati,"21,977.00","14,452.00","1,901.83"
+Venkatagiri,Venkatagiri,Phase 1,Zigma Global,Tirupati,"15,093.00",20846.13,"1,422.26"
+Ananthapur,Ananthapur,Phase 1,Zigma Global,Anantapur,"1,68,285.00","1,68,763.26","13,105.11"
+Tadipatri,Tadipatri,Phase 1,Zigma Global,Anantapur,"22,735.00",0.00,0.00
+Guntakal,Guntakal,Phase 1,Zigma Global,Anantapur,"20,000.00","20,157.34",785.63
+Gooty,Gooty,Phase 1,Zigma Global,Anantapur,"4,563.00",4641.185,319.65
+Kalyanadurgam,Kalyanadurgam,Phase 1,Zigma Global,Anantapur,"7,184.00",565.71,68.36
+Rayadurgam,Rayadurgam,Phase 1,Zigma Global,Anantapur,"6,919.00","6,923.47",507.25
+Gargeyapuram,Kurnool,Phase 1,Saurashta Enviro,Kurnool,"67,308.00","67,308.00","3,364.46"
+Gudur(K),Gudur(K),Phase 1,Saurashta Enviro,Kurnool,"2,666.00","2,666.00",155.69
+Dhone,Dhone,Phase 1,Saurashta Enviro,Kurnool,"50,000.00","50,000.00","1,326.24"
+Yemmiganur,Yemmiganur,Phase 1,Saurashta Enviro,Kurnool,"41,357.00","41,357.00",0.00
+Adoni,Adoni,Phase 1,Saurashta Enviro,Kurnool,"10,000.00","10,000.00",0.00
+Nandyal,Nandyal,Phase 1,Saurashta Enviro,Nandyal,"80,083.00","80,083.00","5,280.69"
+Bethamcherla,Bethamcherla,Phase 1,Saurashta Enviro,Nandyal,"24,189.00","24,189.00",495.79
+Nandikotkur,Nandikotkur,Phase 1,Saurashta Enviro,Nandyal,"19,700.00","19,700.00",689.33
+Atmakur (K),Atmakur (K),Phase 1,Saurashta Enviro,Nandyal,"3,596.00","2,847.00",0.00
+Giddalur,Giddalur,Phase 1,Saurashta Enviro,Nandyal,"9,773.00","9,773.00","1,006.95"
+Allagadda,Allagadda,Phase 1,Saurashta Enviro,Nandyal,"6,153.00","6,153.00",652.41
+Kadapa,Kadapa,Phase 1 - 15% Excess,Tharuni Associates,Kadapa,"60,000.00","60,000.00",0.00
+Vizianagaram,Vizianagaram,Phase 1 - 15% Excess,Tharuni Associates,Rajahmundry,"28,248.00","28,248.00","2,562.29"
+Kakinada,Kakinada,Phase 1 - 15% Excess,Tharuni Associates,Kakinada,"43,156.00","43,156.00",
+Amalapuram,Amalapuram,Phase 1 - 15% Excess,Tharuni Associates,Kakinada,"4,142.00","4,142.00",
+Guntur,Guntur,Phase 1 - 15% Excess,Tharuni Associates,Chilakaluripet,"6,579.00","6,579.00",691.32
+Ponnuru,Ponnuru,Phase 1 - 15% Excess,Tharuni Associates,Chilakaluripet,"1,272.00","1,272.00",
+Narasaraopet,Narasaraopet,Phase 1 - 15% Excess,Tharuni Associates,Chilakaluripet,"7,331.25","7,331.25",174.27
+Bapatla,Bapatla,Phase 1 - 15% Excess,Tharuni Associates,Chilakaluripet,"13,982.00","13,982.00","1,215.15"
+Macherla,Macherla,Phase 1 - 15% Excess,Tharuni Associates,Chilakaluripet,213.00,213.00,
+Dachepalli,Dachepalli,Phase 1 - 15% Excess,Tharuni Associates,Chilakaluripet,"3,410.00","3,410.00",
+Gurazala,Gurazala,Phase 1 - 15% Excess,Tharuni Associates,Chilakaluripet,"1,195.00","1,195.00",
+Dharmavaram,Dharmavaram,Phase 1 - 15% Excess,Tharuni Associates,Hindupur,"9,035.00","4,989.00",
+Kadiri,Kadiri,Phase 1 - 15% Excess,Tharuni Associates,Hindupur,"2,290.00","2,290.00",
+Hindupur,Hindupur,Phase 1 - 15% Excess,Tharuni Associates,Hindupur,"12,435.00","12,435.00",
+Jammalamadugu,Jammalamadugu,Phase 1 - 15% Excess,Tharuni Associates,Kadapa,"20,845.00","20,845.00","1,662.30"
+Yerraguntla,Yerraguntla,Phase 1 - 15% Excess,Tharuni Associates,Kadapa,"4,205.00","4,205.00",529.60
+Rayachoti,Rayachoti,Phase 1 - 15% Excess,Tharuni Associates,Kadapa,"8,202.00","8,202.00","8,330.00"
+Badvel,Badvel,Phase 1 - 15% Excess,Tharuni Associates,Kadapa,"3,202.00","3,202.00",251.40
+Mydukur,Mydukur,Phase 1 - 15% Excess,Tharuni Associates,Kadapa,"2,244.00","2,244.00","1,091.10"
+Kamalapuram,Kamalapuram,Phase 1 - 15% Excess,Tharuni Associates,Kadapa,"4,152.00","4,152.00",501.12
+Nuzvid,Nuzvid,Phase 1 - 15% Excess,Tharuni Associates,Eluru,"15,000.00","15,000.00",
+Palacole,Palacole,Phase 1 - 15% Excess,Tharuni Associates,Kakinada,"27,642.00","26,265.00",
+Machilipatnam,Machilipatnam,Phase 1 - 15% Excess,Tharuni Associates,Eluru,"27,216.00","27,216.00",
+Jaggaiahpet,Jaggaiahpet,Phase 1 - 15% Excess,Tharuni Associates,Eluru,"12,000.00","12,000.00",
+Markapuram,Markapuram,Phase 1 - 15% Excess,Tharuni Associates,Addanki,"14,687.00","14,693.71","1,204.60"
+Chirala,Chirala,Phase 1 - 15% Excess,Tharuni Associates,Addanki,"12,000.00",,
+Chimakurthy,Chimakurthy,Phase 1 - 15% Excess,Tharuni Associates,Addanki,"25,000.00","25,000.00",
+Kanigiri,Kanigiri,Phase 1 - 15% Excess,Tharuni Associates,Addanki,"13,909.00","13,909.00","1,235.26"
+Podili,Podili,Phase 1 - 15% Excess,Tharuni Associates,Addanki,"1,029.65","1,029.64",92.08
+Donthali,Donthali,Phase 1 - 15% Excess,Zigma Global,Nellore Municipal Corporation,"48,672.00","48,672.00",
+Alluru,Alluru,Phase 1 - 15% Excess,Zigma Global,Nellore,"1,192.00","1,192.00",
+Gudur(N),Gudur(N),Phase 1 - 15% Excess,Zigma Global,Nellore,"5,786.00","5,786.00",
+Naidupet,Naidupet,Phase 1 - 15% Excess,Zigma Global,Nellore,143.00,143.00,
+Atmakur(N),Atmakur(N),Phase 1 - 15% Excess,Zigma Global,Nellore,"3,230.00","3,230.00",
+GVMC,GVMC,Phase 1 - 15% Excess,Zigma Global,GVMC,"30,210.00","30,210.00",
+Chittoor,Chittoor,Phase 1 - 15% Excess,Zigma Global,Chittoor,"25,231.00","25,231.00",
+Madanapalle,Madanapalle,Phase 1 - 15% Excess,Zigma Global,Chittoor,"9,042.00","9,042.00",
+Punganur,Punganur,Phase 1 - 15% Excess,Zigma Global,Chittoor,"22,679.00","22,679.00",
+Palamaneru,Palamaneru,Phase 1 - 15% Excess,Zigma Global,Chittoor,"3,345.00","3,345.00",
+Tirupati,Tirupati,Phase 1 - 15% Excess,Zigma Global,Tirupati,"6,020.00","6,020.00",
+Srikalahasti,Srikalahasti,Phase 1 - 15% Excess,Zigma Global,Tirupati,"33,221.00","33,221.00",
+Sullurpet,Sullurpet,Phase 1 - 15% Excess,Zigma Global,Tirupati,"10,059.00","10,059.00",
+Puttur,Puttur,Phase 1 - 15% Excess,Zigma Global,Tirupati,"8,085.00","8,085.00",
+Venkatagiri,Venkatagiri,Phase 1 - 15% Excess,Zigma Global,Tirupati,"5,753.00","5,753.00",
+Kurnool,Kurnool,Phase 1 - 15% Excess,Saurashta Enviro,Kurnool,180.00,180.00,
+Dhone,Dhone,Phase 1 - 15% Excess,Saurashta Enviro,Kurnool,275.00,275.00,
+Yemmiganur,Yemmiganur,Phase 1 - 15% Excess,Saurashta Enviro,Kurnool,"25,245.00","25,245.00",
+Allagadda,Allagadda,Phase 1 - 15% Excess,Saurashta Enviro,Nandyal,"1,134.00","1,134.00",
+Yelamanchili,Yelamanchili,Old,Tharuni Associates,Cluster1,"8,719.00","8,719.00",300.46
+Pithapuram,Pithapuram,Old,Tharuni Associates,Cluster1,"24,910.00","24,910.00","1,601.02"
+Peddapuram,Peddapuram,Old,Tharuni Associates,Cluster1,"19,612.00","19,612.00","1,981.67"
+Rajam,Rajam,Old,Tharuni Associates,Cluster1,"12,849.00","12,849.00",868.89
+Tuni,Tuni,Old,Tharuni Associates,Cluster1,"22,098.00","22,098.00",785.09
+Samalkot,Samalkot,Old,Tharuni Associates,Cluster1,"37,786.00","37,786.00","2,096.60"
+Bobbili,Bobbili,Old,Tharuni Associates,Cluster1,"14,712.00","14,712.00","1,049.93"
+Gollaprolu NP,Gollaprolu NP,Old,Tharuni Associates,Cluster1,"13,135.00","13,135.00",922.98
+Amadalavalasa,Amadalavalasa,Old,Tharuni Associates,Cluster1,"6,679.00","6,802.49",699.18
+Ichapuram,Ichapuram,Old,Tharuni Associates,Cluster1,"6,260.00","6,354.38",692.83
+Palasa-Kasibugga,Palasa-Kasibugga,Old,Tharuni Associates,Cluster1,"9,626.00","9,720.37","1,040.24"
+Parvathipuram,Parvathipuram,Old,Tharuni Associates,Cluster1,"22,921.00","22,921.00","2,527.00"
+Salur,Salur,Old,Tharuni Associates,Cluster1,"18,495.00","13,166.00","1,598.92"
+Palakonda,Palakonda,Old,Tharuni Associates,Cluster1,"7,700.00","7,700.00",801.00
+Nellimarla,Nellimarla,Old,Tharuni Associates,Cluster1,"2,654.00","2,654.00",534.00
+Narsipatnam,Narsipatnam,Old,Tharuni Associates,Cluster1,"27,174.00","27,174.00","2,185.00"
+Nidadavole,Nidadavole,Old,Tharuni Associates,Cluster2,"37,207.00","37,207.00","2,758.34"
+Tanuku,Tanuku,Old,Tharuni Associates,Cluster2,"74,206.00","74,206.00","5,507.10"
+Kovvur,Kovvur,Old,Tharuni Associates,Cluster2,"8,775.00","8,775.00","1,177.29"
+Amalapuram,Amalapuram,Old,Tharuni Associates,Cluster2,"50,115.00","41,807.00","3,256.72"
+Ramachandrapuram,Ramachandrapuram,Old,Tharuni Associates,Cluster2,"22,413.00","22,413.00","1,437.60"
+Yeleswaram,Yeleswaram,Old,Tharuni Associates,Cluster2,"12,693.00","12,693.00",804.00
+Mandapeta,Mandapeta,Old,Tharuni Associates,Cluster2,"8,799.00","8,799.00","1,191.00"
+Mummidivaram,Mummidivaram,Old,Tharuni Associates,Cluster2,"11,099.00","10,624.00",611.78
+YSR Tadigadapa,YSR Tadigadapa,Old,Avinash Agencies,Cluster3,"50,000.00","50,000.00","5,094.64"
+Tiruvuru,Tiruvuru,Old,Avinash Agencies,Cluster3,"23,406.00","23,406.00","3,621.28"
+Nuzvid,Nuzvid,Old,Avinash Agencies,Cluster3,"15,955.00","15,955.00",859.84
+Kondapalli,Kondapalli,Old,Avinash Agencies,Cluster3,"4,925.00","4,925.00",361.16
+Palacole,Palacole,Old,Avinash Agencies,Cluster3,"25,181.00","25,181.00","2,980.35"
+Jangareddygudem,Jangareddygudem,Old,Avinash Agencies,Cluster3,"18,716.00","18,736.00","1,438.48"
+Narsapur,Narsapur,Old,Avinash Agencies,Cluster3,"51,312.00","51,312.00","2,999.00"
+Akiveedu,Akiveedu,Old,Avinash Agencies,Cluster3,"7,312.00","7,312.00",0.00
+Chintalapudi,Chintalapudi,Old,Avinash Agencies,Cluster3,"6,760.00","6,760.00",0.00
+Vuyyuru,Vuyyuru,Old,Avinash Agencies,Cluster3,"10,000.00",0.00,0.00
+Pedana,Pedana,Phase 3 - current,Avinash Agencies,Cluster3,"46,410.00","15,796.00",75.47
+Tenali,Tenali,Phase 1,Sudhakara Infra,Old,"73,083.00","73,083.00","13,561.00"
+Srikakulam,Srikakulam,Phase 1,Tharuni Associates,Cluster1,"76,165.00","76,165.00","4,620.00"
+Kakinada,Kakinada,Phase 2,Tharuni Associates,Cluster1,"92,823.00","92,823.00","7,827.00"
+Vijayawada,Vijayawada,Old,Zigma Global,,"6,48,000.00","6,48,000.00","2,19,009.00"
+Bhimavaram,Bhimavaram,Phase 2,Tharuni Associates,,"12,545.00","12,545.00","1,433.17"
+Tadepalligudem,Tadepalligudem,Old,Tharuni Associates,,"14,320.00","14,320.00","1,484.48"
+Eluru,Eluru,Old,Shrushti Contech,,"27,003.00","27,003.00","1,638.00"
+Tiruvuru,Tiruvuru,Old,Avinash Agencies,Cluster3,"2,564.18","2,564.18",
+Pedana,Pedana,Old,Avinash Agencies,Cluster3,"5,821.00","5,821.00",0.00
+Gudivada,Gudivada,Old,Tharuni Associates,,"50,921.00","50,921.00","2,520.43"
+Machilipatnam,Machilipatnam,Old,Tharuni Associates,,"52,267.00","52,267.00","5,138.59"
+Guntur,Guntur,Old,Tharuni Associates,,"4,80,000.00","4,80,000.00","51,146.78"
+Mangalagiri-Tadepalli,Mangalagiri-Tadepalli,Old,Jhaneswara Engineering,,"2,28,875.00","2,28,875.00","11,945.38"
+Ponnuru,Ponnuru,Old,Tharuni Associates,,"46,595.00","46,595.00","1,408.77"
+Bapatla,Bapatla,Old,Tharuni Associates,,"24,518.00","24,518.00",0.00
+Repalle,Repalle,Old,Kriti Engineering,,"22,180.00","22,180.00",0.00
+Chilakaluripet,Chilakaluripet,Old,Tharuni Associates,,"1,68,698.00","1,68,698.00","6,785.63"
+Narasaraopet,Narasaraopet,Old,Tharuni Associates,,"23,763.00","23,763.00",500.43
+Sattenapalle,Sattenapalle,Old,Kriti Engineering,,"21,046.00","21,046.00",0.00
+Ongole,Ongole,Old,Tharuni Associates,,"65,902.00","65,902.00","3,475.67"
+Chittoor,Chittoor,Old,Zigma Global,,"1,500.00","1,500.00",0.00
+Srikalahasti,Srikalahasti,Old,Zigma Global,,"13,379.00","13,379.00",0.00
+Tirupati,Tirupati,Old,Zigma Global,,"2,04,000.00","2,04,000.00",0.00
+Adoni,Adoni,Old,Sagar Motors,,"34,132.00","34,132.00","4,630.96"
+Kurnool,Kurnool,Old,Shrushti Contech,,"1,50,000.00","1,50,000.00","4,059.56"
+Dhone,Dhone,Old,Jhaneswara Engineering,,"27,936.00","27,936.00",156.00
+Nandyal,Nandyal,Old,Sagar Motors,,"66,475.00","66,475.00","8,783.73"
+Ananthapur,Ananthapur,Old,Novas Green,,"3,32,485.00","3,32,485.00","87,288.00"
+Gooty,Gooty,Old,Zigma Global,,"1,770.00","1,770.00",0.00
+Guntakal,Guntakal,Old,Zigma Global,,"1,56,000.00","1,56,000.00","11,364.00"
+Kalyanadurgam,Kalyanadurgam,Old,Jhaneswara Engineering,,"14,426.00","14,426.00",0.00
+Rayadurgam,Rayadurgam,Old,Jhaneswara Engineering,,"19,089.00","19,089.00",0.00
+Dharmavaram,Dharmavaram,Old,Novas Green,,"2,40,000.00","2,40,000.00",0.00
+Hindupur,Hindupur,Old,Jhaneswara Engineering,,"27,565.00","27,565.00",0.00
+Badvel,Badvel,Old,Jhaneswara Engineering,,"18,993.00","18,993.00",975.00
+Kadapa,Kadapa,Old,Kriti Engineering,,"90,023.00","90,023.00",0.00
+Mydukur,Mydukur,Old,Shrushti Contech,,"9,828.00","9,828.00",0.00
+Proddatur,Proddaturu,Old,Shrushti Contech,,"57,914.00","57,914.00","4,756.67"
+Pulivendula,Pulivendula,Old,Sree Bommu Industries,,"27,283.00","27,283.00",0.00
+Madanapalle,Madanapalle,Old,Zigma Global,,"30,084.00","30,084.00","1,383.23"
+Rayachoti,Rayachoti,Old,Jhaneswara Engineering,,"17,146.00","17,146.00",638.82
