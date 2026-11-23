@@ -664,16 +664,17 @@ class AgencyPhaseRows(Base):
 
     def test_phase_column_and_other_phase_disposals(self):
         r = self.report("p3")
-        th = next(a for a in r["ag_rows"] if a["name"] == "Tharuni Associates")
-        self.assertEqual(th["phase"], "Phase 3, Phase 1")
-        self.assertTrue(all(a["phase"].startswith("Phase 3") for a in r["ag_rows"]))
+        th = [a for a in r["ag_rows"] if a["name"] == "Tharuni Associates"]
+        self.assertEqual([a["phase"] for a in th], ["Phase 3", "Phase 1"])     # option A: a row per phase
+        self.assertEqual(th[1]["today"], "42.72")
+        self.assertTrue(th[1]["extra"])
         names = [o["name"] for o in r["other_today"]]
         self.assertIn("Disposals done today under Phase 1", names)
         p1 = next(o for o in r["other_today"] if o["name"].endswith("Phase 1"))
         mine = next(x for x in p1["sites"] if x["agency"] == "Tharuni Associates")
         self.assertEqual((mine["site"], mine["today"]), (self.p1_site, "42.72"))
         # this phase's figures don't include the other phases
-        p3_today = sum(float(a["today"].replace(",", "")) for a in r["ag_rows"])
+        p3_today = sum(float(a["today"].replace(",", "")) for a in r["ag_rows"] if not a.get("extra"))
         self.assertAlmostEqual(p3_today, float(r["k"]["today"].replace(",", "")), places=2)
         allr = self.report("all")
         self.assertEqual(allr["other_today"], [])
@@ -690,3 +691,32 @@ class AgencyPhaseRows(Base):
         self.assertEqual(pdf.status_code, 200)
         self.assertTrue(pdf.data.startswith(b"%PDF-"))
         self.assertIn(b"/Subtype /Image", pdf.data)                        # the logo is embedded
+
+
+class RealDay22Nov(Base):
+    """The user's 22 Nov master sheet (ALL_PHASE_RDF - 2311.csv): Zigma and Saurashtra sent RDF only from
+    earlier phases' sites; the Phase 3 report must show it under them (option A, 23 Nov 2026)."""
+
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+        with open(os.path.join(ROOT, "tests", "fixtures", "ALL_PHASE_RDF_-_2311.csv"), "rb") as f:
+            j = self.c.post("/rdf/api/upload", headers=XRW, content_type="multipart/form-data",
+                            data={"files": (io.BytesIO(f.read()), "ALL_PHASE_RDF_-_2311.csv")}).get_json()
+        self.assertTrue(j["ok"], j)
+        self.assertEqual(j["results"][0]["date"][5:], "11-22")
+
+    def test_phase3_by_agency_rows(self):
+        from views.rdf_report import _report
+        r = _report("p3")[0]
+        rows = [(a["name"], a["phase"], a["today"]) for a in r["ag_rows"]]
+        self.assertIn(("Zigma Global", "Phase 3", "0.00"), rows)
+        self.assertIn(("Zigma Global", "Phase 1", "406.43"), rows)                 # 365.95 + 40.48
+        self.assertIn(("Saurashtra Enviro", "Phase 2", "166.66"), rows)
+        self.assertIn(("Saurashtra Enviro", "Phase 1 – 15%", "38.50"), rows)
+        self.assertIn(("Tharuni Associates", "Phase 3", "1,170.90"), rows)
+        self.assertIn(("Tharuni Associates", "Phase 1", "104.58"), rows)          # 85.09 + 19.49
+        z = next(a for a in r["ag_rows"] if a["name"] == "Zigma Global" and a["phase"] == "Phase 3")
+        self.assertNotEqual(z["status"], "Nothing today")
+        self.assertEqual(r["k"]["today"], "1,260.16")         # Phase 3 only: 55.39 + 33.87 + 1,170.90
+        self.assertEqual(self.c.get("/rdf/report.pdf?phase=p3").status_code, 200)

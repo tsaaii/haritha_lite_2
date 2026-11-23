@@ -30,6 +30,7 @@ TOKENS = {
     "--green-700": "#0F7A3E", "--green-600": "#0FA14E", "--red-600": "#C2402F",
     "--ink-900": "#121A14", "--ink-700": "#33413A", "--ink-500": "#5C6B62", "--ink-300": "#9AA79F",
     "--ink-200": "#CBD4CE", "--ink-100": "#E8EDEA", "--ink-050": "#F0F3F1", "--white": "#FFFFFF",
+    "--green-050": "#F2FBF4",
 }
 LOGO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "rdf_report", "sac-logo.png")
 SERIF, SERIF_B = "Times-Roman", "Times-Bold"   # built-in; closest to Palatino without shipping font files
@@ -182,14 +183,17 @@ def _agency_table(r: dict, width: float):
     ws = _widths(width - 2 * PAD + GAP, [None, 92, 70, 76, 90, 84, 44])
     ws[0] += 2 * PAD - GAP
     head = [P("Agency", "th"), P("Phase", "th")] + [P(h, "thr") for h in ("Today (MT)", "Needed/day", "To date (MT)", "Left (MT)", "Done")]
-    rows = [head]
+    rows, extra = [head], []
     for a in r["ag_rows"]:
+        if a.get("extra"):
+            extra.append(len(rows))
         name = Paragraph(f'{escape(a["name"])} <font size="{11 * PX}" color="{hexof(a["status_color"])}">'
                          f'· {escape(a["status"])}</font>', S["td"])
         rows.append([name, P(a.get("phase", ""), "sd", "var(--ink-700)"), P(a["today"], "tdr", a["today_color"], bold=True),
                      P(a["need"], "tdr", "var(--ink-700)"), P(a["cum"], "tdr", "var(--green-700)"), P(a["bal"], "tdr"), P(a["pct"], "tdr")])
     k = r["k"]
-    rows.append([P("All agencies", "td", bold=True), ""] +
+    ph_only = r.get("phase_label") if r.get("phase_label") and r.get("phase_label") != "All phases" else ""
+    rows.append([P("All agencies", "td", bold=True), P(f"{ph_only} only" if ph_only else "", "sd", "var(--ink-500)")] +
                 [P(v, "tdr", bold=True) for v in (k["today"], k["need"], k["cum"], k["bal"], k["pct"])])
     n = len(rows)
     return _table(rows, ws, [
@@ -197,7 +201,7 @@ def _agency_table(r: dict, width: float):
         ("LINEBELOW", (0, 1), (-1, n - 2), 0.75, INK1),
         ("LINEABOVE", (0, n - 1), (-1, n - 1), 1.5, INK2),
         ("TOPPADDING", (0, n - 1), (-1, n - 1), 7.5), ("BOTTOMPADDING", (0, n - 1), (-1, n - 1), 7.5),
-    ], repeat=1)
+    ] + [("BACKGROUND", (0, i), (-1, i), col("var(--green-050)")) for i in extra], repeat=1)
 
 
 def _other_table(o: dict, width: float):

@@ -393,23 +393,45 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
     sent_today = [s for s in ((gist_tracker.sites if gist_tracker else ()) or S) if s.tracked and s.today > 0]
 
     def phases_of(name: str, sites) -> str:
+        """All phases report: the phases the agency sent RDF from today (else the phases it works in)."""
         sent = {s.phase for s in sent_today if s.agency == name and s.phase}
-        if phase and phase != "all":
-            codes = [phase] + [p for p in PHASE_ORDER if p in sent and p != phase]
-        else:
-            codes = [p for p in PHASE_ORDER if p in sent] or [p for p in PHASE_ORDER if p in {s.phase for s in sites}]
+        codes = [p for p in PHASE_ORDER if p in sent] or [p for p in PHASE_ORDER if p in {s.phase for s in sites}]
         return ", ".join(PHASE_LABEL.get(p, p) for p in codes)
+
+    single = bool(phase) and phase != "all"
+    all_sites = [s for s in ((gist_tracker.sites if gist_tracker else ()) or S) if s.tracked]
+
+    def other_phase_rows(name: str) -> list[dict]:
+        """Single-phase report, option A (user, 23 Nov 2026): one extra row for each other phase the
+        agency sent RDF from on the report day, with that phase's own figures. Not in this report's total."""
+        if not single:
+            return []
+        out = []
+        for p in PHASE_ORDER:
+            if p == phase or not any(x.phase == p and x.agency == name for x in sent_today):
+                continue
+            mine = [x for x in all_sites if x.phase == p and x.agency == name]
+            t, c, b = _sum(mine, "today"), _sum(mine, "cum"), _sum(mine, "bal")
+            st = ("Cleared", GREEN) if b <= 0 else ("On pace", GREEN) if t >= b / days else ("Behind", INK9)
+            out.append({"phase": PHASE_LABEL.get(p, p), "name": name, "status": st[0], "status_color": st[1],
+                        "today": fmt(t), "today_color": GREEN, "need": fmt(b / days), "cum": fmt(c), "bal": fmt(b),
+                        "pct": _pct_s(c, b), "extra": True})
+        return out
 
     ag_rows = []
     for a in ag_list:
         st, col = status(a)
+        extra = other_phase_rows(a["name"])
+        if extra and a["today"] <= 0:
+            st, col = "Nothing from " + PHASE_LABEL.get(phase, phase) + " today", INK5
         ag_rows.append({
-            "phase": phases_of(a["name"], a["sites"]),
+            "phase": PHASE_LABEL.get(phase, phase) if single else phases_of(a["name"], a["sites"]),
             "name": a["name"], "status": st, "status_color": col,
-            "today": fmt(a["today"]), "today_color": GREEN if a["today"] > 0 else RED,
+            "today": fmt(a["today"]), "today_color": GREEN if a["today"] > 0 else (INK3 if extra else RED),
             "need": fmt(a["bal"] / days) if a["tracked"] else "—",
             "cum": fmt(a["cum"]), "bal": fmt(a["bal"]) if a["tracked"] else "—", "pct": _pct_t(a["sites"]),
         })
+        ag_rows.extend(extra)
 
     if others:
         ag_rows.append({"name": f"Other sites ({others['n']})", "status": "earlier work, final figure", "status_color": INK5,

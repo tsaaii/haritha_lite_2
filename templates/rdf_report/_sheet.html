@@ -51,7 +51,7 @@
         <span>Agency</span><span>Phase</span><span class="n">Today (MT)</span><span class="n">Needed/day</span><span class="n">To date (MT)</span><span class="n">Left (MT)</span><span class="n">Done</span>
       </div>
       {% for a in r.ag_rows %}
-      <div class="tr g-ag">
+      <div class="tr g-ag{{ ' tr--extra' if a.extra }}">
         <span class="c9" style="min-width:0;">{{ a.name }} <span class="tag" style="color:{{ a.status_color }};">· {{ a.status }}</span></span>
         <span class="c7 small">{{ a.phase }}</span>
         <span class="n b" style="color:{{ a.today_color }};">{{ a.today }}</span>
@@ -62,7 +62,7 @@
       </div>
       {% endfor %}
       <div class="tr tr--total g-ag">
-        <span>All agencies</span><span></span><span class="n">{{ r.k.today }}</span><span class="n">{{ r.k.need }}</span><span class="n">{{ r.k.cum }}</span><span class="n">{{ r.k.bal }}</span><span class="n">{{ r.k.pct }}</span>
+        <span>All agencies</span><span>{% if r.phase_label and r.phase_label != 'All phases' %}{{ r.phase_label }} only{% endif %}</span><span class="n">{{ r.k.today }}</span><span class="n">{{ r.k.need }}</span><span class="n">{{ r.k.cum }}</span><span class="n">{{ r.k.bal }}</span><span class="n">{{ r.k.pct }}</span>
       </div>
     </div></div>
   </section>

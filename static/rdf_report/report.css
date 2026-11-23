@@ -348,3 +348,4 @@ dialog.panel--detail { width: min(920px, calc(100vw - 24px)); }
 .detail-tbl td .link--name { white-space: normal; }
 .foot { align-items: center; justify-content: flex-end; }
 .foot__logo { width: 44px; height: auto; }
+.tr--extra { background: var(--green-050); border-bottom-style: dotted; }
