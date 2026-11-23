@@ -635,3 +635,40 @@ class Details(Base):
         self.assertIn('data-detail="site" data-key="nellore donthali"', page)
         self.assertIn('data-detail="agency" data-key="Zigma Global"', page)
         self.assertIn('data-detail="phase" data-key="p3"', page)
+
+
+class AgencyPhaseRows(Base):
+    """All phases report: each agency's row is followed by one row per phase (23 Nov 2026)."""
+
+    def setUp(self):
+        super().setUp()
+        sign_in(self.c)
+        with open(NOV, "rb") as f:
+            self.post(f.read(), os.path.basename(NOV))
+
+    post = MasterFormatUpload.post
+    master = MasterFormatUpload.master
+
+    def test_old_phase_dispatch_shows_under_agency(self):
+        rows = list(csv.reader(io.StringIO(self.master())))
+        # Tharuni sends 42.72 MT from a Phase 1 site it still has a balance at
+        i = next(n for n, r in enumerate(rows) if r[0] == "Phase 1" and r[1] == "Tharuni Associates" and r[6])
+        rows[i][4], rows[i][5] = "42.72", f"{float(rows[i][5]) + 42.72:.2f}"
+        buf = io.StringIO()
+        csv.writer(buf).writerows(rows)
+        self.assertTrue(self.post(buf.getvalue().encode(), "RDF_master_18-11-2026.csv")["ok"])
+        r, _ = __import__("views.rdf_report", fromlist=["_report"])._report("all")
+        th = next(a for a in r["ag_rows"] if a["name"] == "Tharuni Associates")
+        names = [p["name"] for p in th["phases"]]
+        self.assertEqual(names[0], "Phase 3")
+        self.assertIn("Phase 1", names)
+        p1 = next(p for p in th["phases"] if p["name"] == "Phase 1")
+        self.assertEqual(p1["today"], "42.72")
+        # sub-rows add up to the agency row
+        tot = sum(float(p["today"].replace(",", "")) for p in th["phases"])
+        self.assertAlmostEqual(tot, float(th["today"].replace(",", "")), places=2)
+        r3, _ = __import__("views.rdf_report", fromlist=["_report"])._report("p3")
+        self.assertTrue(all(not a["phases"] for a in r3["ag_rows"]))        # single phase: no sub-rows
+        pdf = self.c.get("/rdf/report.pdf?phase=all")
+        self.assertEqual(pdf.status_code, 200)
+        self.assertIn("tr--phase", self.c.get("/rdf/?phase=all").data.decode())

@@ -386,10 +386,30 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
             return "Behind", INK9
         return "Nothing today", RED
 
+    # All phases: one row per phase under each agency, so RDF an agency sends from an earlier phase's
+    # sites shows up under it (user, 23 Nov 2026). Single-phase reports have no sub-rows.
+    from data.rdf_master import PHASE_LABEL, PHASE_ORDER
+    multi = len({s.phase for s in S if s.phase}) > 1
+
+    def phase_rows(sites):
+        if not multi:
+            return []
+        out = []
+        for ph in PHASE_ORDER:
+            mine = [s for s in sites if s.phase == ph]
+            if not mine:
+                continue
+            t, c, b = _sum(mine, "today"), _sum(mine, "cum"), _sum(mine, "bal")
+            out.append({"name": PHASE_LABEL.get(ph, ph), "today": fmt(t), "today_color": GREEN if t > 0 else INK3,
+                        "need": fmt(b / days), "cum": fmt(c), "bal": fmt(b), "pct": _pct_s(c, b),
+                        "sites": len({(s.key or s.site).lower() for s in mine})})
+        return out
+
     ag_rows = []
     for a in ag_list:
         st, col = status(a)
         ag_rows.append({
+            "phases": phase_rows(a["sites"]),
             "name": a["name"], "status": st, "status_color": col,
             "today": fmt(a["today"]), "today_color": GREEN if a["today"] > 0 else RED,
             "need": fmt(a["bal"] / days) if a["tracked"] else "—",
@@ -399,7 +419,7 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
     if others:
         ag_rows.append({"name": f"Other sites ({others['n']})", "status": "earlier work, final figure", "status_color": INK5,
                         "today": fmt(0), "today_color": INK3, "need": "—", "cum": fmt(others["cum"]), "bal": "—", "pct": "—",
-                        "other": True})
+                        "other": True, "phases": []})
 
     def site_row(s: SiteDay) -> dict:
         moved = s.today > 0

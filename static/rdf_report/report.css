@@ -345,3 +345,5 @@ dialog.panel--detail { width: min(920px, calc(100vw - 24px)); }
 .detail-h { margin: 6px 0 -6px; font-size: 15px; font-weight: 700; color: var(--ink-900); }
 .detail-sum { margin-bottom: 4px; }
 .detail-tbl td .link--name { white-space: normal; }
+.tr--phase { padding-top: 2px; padding-bottom: 2px; font-size: 13px; border-bottom-style: dotted; }
+.tr--phase > span:first-child { padding-left: 18px; }

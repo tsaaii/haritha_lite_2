@@ -68,6 +68,7 @@ S = {
     "td": _st("td", 14), "tdr": _st("tdr", 14, align=2),
     "sh": _st("sh", 11, INK5), "shr": _st("shr", 11, INK5, align=2),
     "sd": _st("sd", 13), "sdr": _st("sdr", 13, align=2),
+    "sub_ag": _st("sub_ag", 13, INK5, leftIndent=14),
     "band": _st("band", 15, bold=True), "bandr": _st("bandr", 13, bold=True, align=2),
     "foot": _st("foot", 12, INK5),
 }
@@ -180,12 +181,17 @@ def _agency_table(r: dict, width: float):
     ws = _widths(width - 2 * PAD + GAP, [None, 78, 88, 96, 96, 52])
     ws[0] += 2 * PAD - GAP
     head = [P("Agency", "th")] + [P(h, "thr") for h in ("Today (MT)", "Needed/day", "To date (MT)", "Left (MT)", "Done")]
-    rows = [head]
+    rows, subs = [head], []
     for a in r["ag_rows"]:
         name = Paragraph(f'{escape(a["name"])} <font size="{11 * PX}" color="{hexof(a["status_color"])}">'
                          f'· {escape(a["status"])}</font>', S["td"])
         rows.append([name, P(a["today"], "tdr", a["today_color"], bold=True), P(a["need"], "tdr", "var(--ink-700)"),
                      P(a["cum"], "tdr", "var(--green-700)"), P(a["bal"], "tdr"), P(a["pct"], "tdr")])
+        for p in a.get("phases") or []:          # All phases: one indented row per phase
+            subs.append(len(rows))
+            label = f'{escape(p["name"])} <font color="{hexof("var(--ink-500)")}">· {p["sites"]} site{"s" if p["sites"] != 1 else ""}</font>'
+            rows.append([Paragraph(label, S["sub_ag"]), P(p["today"], "sdr", p["today_color"]), P(p["need"], "sdr", "var(--ink-500)"),
+                         P(p["cum"], "sdr", "var(--ink-500)"), P(p["bal"], "sdr", "var(--ink-500)"), P(p["pct"], "sdr", "var(--ink-500)")])
     k = r["k"]
     rows.append([P("All agencies", "td", bold=True)] +
                 [P(v, "tdr", bold=True) for v in (k["today"], k["need"], k["cum"], k["bal"], k["pct"])])
@@ -195,7 +201,8 @@ def _agency_table(r: dict, width: float):
         ("LINEBELOW", (0, 1), (-1, n - 2), 0.75, INK1),
         ("LINEABOVE", (0, n - 1), (-1, n - 1), 1.5, INK2),
         ("TOPPADDING", (0, n - 1), (-1, n - 1), 7.5), ("BOTTOMPADDING", (0, n - 1), (-1, n - 1), 7.5),
-    ], repeat=1)
+    ] + [st for i in subs for st in (("TOPPADDING", (0, i), (-1, i), 1), ("BOTTOMPADDING", (0, i), (-1, i), 2),
+                                     ("LINEABOVE", (0, i), (-1, i), 0.75, colors.white))], repeat=1)
 
 
 def _least_table(r: dict, width: float):

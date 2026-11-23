@@ -59,6 +59,16 @@
         <span class="n c9">{{ a.bal }}</span>
         <span class="n c9">{{ a.pct }}</span>
       </div>
+      {% for p in a.phases %}
+      <div class="tr tr--phase g-ag">
+        <span class="c5">{{ p.name }} <span class="cnt">· {{ p.sites }} site{{ 's' if p.sites != 1 }}</span></span>
+        <span class="n" style="color:{{ p.today_color }};">{{ p.today }}</span>
+        <span class="n c5">{{ p.need }}</span>
+        <span class="n c5">{{ p.cum }}</span>
+        <span class="n c5">{{ p.bal }}</span>
+        <span class="n c5">{{ p.pct }}</span>
+      </div>
+      {% endfor %}
       {% endfor %}
       <div class="tr tr--total g-ag">
         <span>All agencies</span><span class="n">{{ r.k.today }}</span><span class="n">{{ r.k.need }}</span><span class="n">{{ r.k.cum }}</span><span class="n">{{ r.k.bal }}</span><span class="n">{{ r.k.pct }}</span>
