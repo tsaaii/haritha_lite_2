@@ -638,37 +638,55 @@ class Details(Base):
 
 
 class AgencyPhaseRows(Base):
-    """All phases report: each agency's row is followed by one row per phase (23 Nov 2026)."""
+    """Report/PDF layout of 23 Nov 2026: Phase column in By agency, other phases' disposals of the day
+    listed after By site, no text under By site, no Source line, logo in the footer."""
 
     def setUp(self):
         super().setUp()
         sign_in(self.c)
         with open(NOV, "rb") as f:
             self.post(f.read(), os.path.basename(NOV))
-
-    post = MasterFormatUpload.post
-    master = MasterFormatUpload.master
-
-    def test_old_phase_dispatch_shows_under_agency(self):
         rows = list(csv.reader(io.StringIO(self.master())))
-        # Tharuni sends 42.72 MT from a Phase 1 site it still has a balance at
+        # Tharuni also sends 42.72 MT from a Phase 1 site it still has a balance at
         i = next(n for n, r in enumerate(rows) if r[0] == "Phase 1" and r[1] == "Tharuni Associates" and r[6])
+        self.p1_site = rows[i][2]
         rows[i][4], rows[i][5] = "42.72", f"{float(rows[i][5]) + 42.72:.2f}"
         buf = io.StringIO()
         csv.writer(buf).writerows(rows)
         self.assertTrue(self.post(buf.getvalue().encode(), "RDF_master_18-11-2026.csv")["ok"])
-        r, _ = __import__("views.rdf_report", fromlist=["_report"])._report("all")
+
+    post = MasterFormatUpload.post
+    master = MasterFormatUpload.master
+
+    def report(self, phase):
+        from views.rdf_report import _report
+        return _report(phase)[0]
+
+    def test_phase_column_and_other_phase_disposals(self):
+        r = self.report("p3")
         th = next(a for a in r["ag_rows"] if a["name"] == "Tharuni Associates")
-        names = [p["name"] for p in th["phases"]]
-        self.assertEqual(names[0], "Phase 3")
-        self.assertIn("Phase 1", names)
-        p1 = next(p for p in th["phases"] if p["name"] == "Phase 1")
-        self.assertEqual(p1["today"], "42.72")
-        # sub-rows add up to the agency row
-        tot = sum(float(p["today"].replace(",", "")) for p in th["phases"])
-        self.assertAlmostEqual(tot, float(th["today"].replace(",", "")), places=2)
-        r3, _ = __import__("views.rdf_report", fromlist=["_report"])._report("p3")
-        self.assertTrue(all(not a["phases"] for a in r3["ag_rows"]))        # single phase: no sub-rows
-        pdf = self.c.get("/rdf/report.pdf?phase=all")
+        self.assertEqual(th["phase"], "Phase 3, Phase 1")
+        self.assertTrue(all(a["phase"].startswith("Phase 3") for a in r["ag_rows"]))
+        names = [o["name"] for o in r["other_today"]]
+        self.assertIn("Disposals done today under Phase 1", names)
+        p1 = next(o for o in r["other_today"] if o["name"].endswith("Phase 1"))
+        mine = next(x for x in p1["sites"] if x["agency"] == "Tharuni Associates")
+        self.assertEqual((mine["site"], mine["today"]), (self.p1_site, "42.72"))
+        # this phase's figures don't include the other phases
+        p3_today = sum(float(a["today"].replace(",", "")) for a in r["ag_rows"])
+        self.assertAlmostEqual(p3_today, float(r["k"]["today"].replace(",", "")), places=2)
+        allr = self.report("all")
+        self.assertEqual(allr["other_today"], [])
+        self.assertIn("Phase 1", next(a for a in allr["ag_rows"] if a["name"] == "Tharuni Associates")["phase"])
+
+    def test_sheet_and_pdf_layout(self):
+        page = self.c.get("/rdf/?phase=p3").data.decode()
+        self.assertIn("Disposals done today under Phase 1", page)
+        self.assertNotIn("Source: daily RDF tracker", page)
+        self.assertNotIn("grouped by agency. Today =", page)
+        self.assertIn("rdf_report/sac-logo.png", page)
+        self.assertEqual(self.c.get("/static/rdf_report/sac-logo.png").status_code, 200)
+        pdf = self.c.get("/rdf/report.pdf?phase=p3")
         self.assertEqual(pdf.status_code, 200)
-        self.assertIn("tr--phase", self.c.get("/rdf/?phase=all").data.decode())
+        self.assertTrue(pdf.data.startswith(b"%PDF-"))
+        self.assertIn(b"/Subtype /Image", pdf.data)                        # the logo is embedded

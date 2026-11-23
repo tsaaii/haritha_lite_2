@@ -11,6 +11,7 @@ Sizes are the design's CSS px x 0.75 (A4 at 96 dpi), so 14px text -> 10.5pt.
 from __future__ import annotations
 
 import io
+import os
 from html import escape
 
 from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, String
@@ -19,7 +20,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase.pdfmetrics import stringWidth
-from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 import config
 from data import rdf_report
@@ -30,6 +31,7 @@ TOKENS = {
     "--ink-900": "#121A14", "--ink-700": "#33413A", "--ink-500": "#5C6B62", "--ink-300": "#9AA79F",
     "--ink-200": "#CBD4CE", "--ink-100": "#E8EDEA", "--ink-050": "#F0F3F1", "--white": "#FFFFFF",
 }
+LOGO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "rdf_report", "sac-logo.png")
 SERIF, SERIF_B = "Times-Roman", "Times-Bold"   # built-in; closest to Palatino without shipping font files
 
 
@@ -68,7 +70,6 @@ S = {
     "td": _st("td", 14), "tdr": _st("tdr", 14, align=2),
     "sh": _st("sh", 11, INK5), "shr": _st("shr", 11, INK5, align=2),
     "sd": _st("sd", 13), "sdr": _st("sdr", 13, align=2),
-    "sub_ag": _st("sub_ag", 13, INK5, leftIndent=14),
     "band": _st("band", 15, bold=True), "bandr": _st("bandr", 13, bold=True, align=2),
     "foot": _st("foot", 12, INK5),
 }
@@ -178,22 +179,17 @@ def _table(rows, widths, styles, repeat=0):
 
 
 def _agency_table(r: dict, width: float):
-    ws = _widths(width - 2 * PAD + GAP, [None, 78, 88, 96, 96, 52])
+    ws = _widths(width - 2 * PAD + GAP, [None, 92, 70, 76, 90, 84, 44])
     ws[0] += 2 * PAD - GAP
-    head = [P("Agency", "th")] + [P(h, "thr") for h in ("Today (MT)", "Needed/day", "To date (MT)", "Left (MT)", "Done")]
-    rows, subs = [head], []
+    head = [P("Agency", "th"), P("Phase", "th")] + [P(h, "thr") for h in ("Today (MT)", "Needed/day", "To date (MT)", "Left (MT)", "Done")]
+    rows = [head]
     for a in r["ag_rows"]:
         name = Paragraph(f'{escape(a["name"])} <font size="{11 * PX}" color="{hexof(a["status_color"])}">'
                          f'· {escape(a["status"])}</font>', S["td"])
-        rows.append([name, P(a["today"], "tdr", a["today_color"], bold=True), P(a["need"], "tdr", "var(--ink-700)"),
-                     P(a["cum"], "tdr", "var(--green-700)"), P(a["bal"], "tdr"), P(a["pct"], "tdr")])
-        for p in a.get("phases") or []:          # All phases: one indented row per phase
-            subs.append(len(rows))
-            label = f'{escape(p["name"])} <font color="{hexof("var(--ink-500)")}">· {p["sites"]} site{"s" if p["sites"] != 1 else ""}</font>'
-            rows.append([Paragraph(label, S["sub_ag"]), P(p["today"], "sdr", p["today_color"]), P(p["need"], "sdr", "var(--ink-500)"),
-                         P(p["cum"], "sdr", "var(--ink-500)"), P(p["bal"], "sdr", "var(--ink-500)"), P(p["pct"], "sdr", "var(--ink-500)")])
+        rows.append([name, P(a.get("phase", ""), "sd", "var(--ink-700)"), P(a["today"], "tdr", a["today_color"], bold=True),
+                     P(a["need"], "tdr", "var(--ink-700)"), P(a["cum"], "tdr", "var(--green-700)"), P(a["bal"], "tdr"), P(a["pct"], "tdr")])
     k = r["k"]
-    rows.append([P("All agencies", "td", bold=True)] +
+    rows.append([P("All agencies", "td", bold=True), ""] +
                 [P(v, "tdr", bold=True) for v in (k["today"], k["need"], k["cum"], k["bal"], k["pct"])])
     n = len(rows)
     return _table(rows, ws, [
@@ -201,8 +197,19 @@ def _agency_table(r: dict, width: float):
         ("LINEBELOW", (0, 1), (-1, n - 2), 0.75, INK1),
         ("LINEABOVE", (0, n - 1), (-1, n - 1), 1.5, INK2),
         ("TOPPADDING", (0, n - 1), (-1, n - 1), 7.5), ("BOTTOMPADDING", (0, n - 1), (-1, n - 1), 7.5),
-    ] + [st for i in subs for st in (("TOPPADDING", (0, i), (-1, i), 1), ("BOTTOMPADDING", (0, i), (-1, i), 2),
-                                     ("LINEABOVE", (0, i), (-1, i), 0.75, colors.white))], repeat=1)
+    ], repeat=1)
+
+
+def _other_table(o: dict, width: float):
+    """Sites of another phase that sent RDF on the report day."""
+    ws = _widths(width - 2 * PAD + GAP, [None, None, 78, 96, 96, 52])
+    ws[0] += 2 * PAD - GAP
+    rows = [[P("Site", "th"), P("Agency", "th")] + [P(h, "thr") for h in ("Today (MT)", "To date (MT)", "Left (MT)", "Done")]]
+    for s in o["sites"]:
+        rows.append([P(s["site"], "sd"), P(s["agency"], "sd", "var(--ink-500)"), P(s["today"], "sdr", s["today_color"], bold=True),
+                     P(s["cum"], "sdr", "var(--green-700)"), P(s["bal"], "sdr"), P(s["pct"], "sdr")])
+    return _table(rows, ws, [("LINEBELOW", (0, 0), (-1, 0), 0.75, INK3), ("LINEBELOW", (0, 1), (-1, -1), 0.75, INK1),
+                             ("TOPPADDING", (0, 1), (-1, -1), 1.5), ("BOTTOMPADDING", (0, 1), (-1, -1), 1.5)], repeat=1)
 
 
 def _least_table(r: dict, width: float):
@@ -323,24 +330,23 @@ def build_pdf(r: dict) -> bytes:
     story.append(Spacer(1, gap))
 
     # By site
-    story += [P("By site", "h2"), Spacer(1, 3),
-              P(f"Every site{' of ' + r['phase_label'] if r.get('phase_label') else ''} in the daily upload, grouped by agency. "
-                f"Today = RDF disposed on {r['rep_day']}, as reported in the daily tracker."
-                + (f" The {r['others']['n']} other site{'s' if r['others']['n'] != 1 else ''} of this phase are not listed; "
-                   f"their {r['others']['cum']} MT is in Disposed to date and in By agency." if r.get("others") else ""), "sub"),
-              Spacer(1, 9)]
+    story += [P("By site", "h2"), Spacer(1, 9)]
     for g in r["groups"]:
         story += [_group_table(g, W), Spacer(1, 7.5)]
 
-    # Footer
+    # Other phases' sites that sent RDF on the report day (not in this phase's figures)
+    for o in r.get("other_today") or []:
+        story.append(KeepTogether([Spacer(1, gap - 7.5), P(o["name"], "h2"), Spacer(1, 7.5), _other_table(o, W)]))
+
+    # Footer: logo, then the organisation's name (no source line; user, 23 Nov 2026)
     story += _rule(W, INK2, before=gap - 7.5, after=9)
-    ft = Table([[P(f"Source: daily RDF tracker, {r['rep_label']}"
-                   + (", and the phase sheet" if r.get("others") else "") + ". Quantities in metric tonnes (MT).", "foot"),
-                 Paragraph("SWACHHA ANDHRA CORPORATION", ParagraphStyle("fr", parent=S["foot"], alignment=2))]],
-               colWidths=[W * 0.68, W * 0.32])
+    org = Paragraph("SWACHHA ANDHRA CORPORATION", ParagraphStyle("fr", parent=S["foot"], alignment=0))
+    logo = Image(LOGO, width=11 * mm, height=11 * mm * 235 / 240) if os.path.exists(LOGO) else ""
+    ft = Table([["", logo, org]], colWidths=[W - 13 * mm - 62 * mm, 13 * mm, 62 * mm])
     ft.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
-    story.append(ft)
+                            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                            ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story.append(KeepTogether([ft]))
 
     doc.build(story, onFirstPage=_page_number, onLaterPages=_page_number)
     return buf.getvalue()

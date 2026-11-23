@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from html import escape
 
@@ -335,7 +335,7 @@ def unique_sites(sites) -> int:
 
 
 def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] | None = None,
-          gist_tracker: Tracker | None = None, others: dict | None = None) -> dict | None:
+          gist_tracker: Tracker | None = None, others: dict | None = None, phase: str = "") -> dict | None:
     """Report for a history (a phase view from data/rdf_master.py, or the raw trackers).
 
     `others` = {"n": sites, "cum": MT}: RDF already disposed at the phase's sites that are not in the
@@ -386,30 +386,25 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
             return "Behind", INK9
         return "Nothing today", RED
 
-    # All phases: one row per phase under each agency, so RDF an agency sends from an earlier phase's
-    # sites shows up under it (user, 23 Nov 2026). Single-phase reports have no sub-rows.
+    # Phase column (user, 23 Nov 2026): this report's phase, then any other phase the agency sent RDF
+    # from on the report day. Figures stay this phase's; the other phases' sites are listed in
+    # `other_today` below By site. All phases report: the phases it sent from today.
     from data.rdf_master import PHASE_LABEL, PHASE_ORDER
-    multi = len({s.phase for s in S if s.phase}) > 1
+    sent_today = [s for s in ((gist_tracker.sites if gist_tracker else ()) or S) if s.tracked and s.today > 0]
 
-    def phase_rows(sites):
-        if not multi:
-            return []
-        out = []
-        for ph in PHASE_ORDER:
-            mine = [s for s in sites if s.phase == ph]
-            if not mine:
-                continue
-            t, c, b = _sum(mine, "today"), _sum(mine, "cum"), _sum(mine, "bal")
-            out.append({"name": PHASE_LABEL.get(ph, ph), "today": fmt(t), "today_color": GREEN if t > 0 else INK3,
-                        "need": fmt(b / days), "cum": fmt(c), "bal": fmt(b), "pct": _pct_s(c, b),
-                        "sites": len({(s.key or s.site).lower() for s in mine})})
-        return out
+    def phases_of(name: str, sites) -> str:
+        sent = {s.phase for s in sent_today if s.agency == name and s.phase}
+        if phase and phase != "all":
+            codes = [phase] + [p for p in PHASE_ORDER if p in sent and p != phase]
+        else:
+            codes = [p for p in PHASE_ORDER if p in sent] or [p for p in PHASE_ORDER if p in {s.phase for s in sites}]
+        return ", ".join(PHASE_LABEL.get(p, p) for p in codes)
 
     ag_rows = []
     for a in ag_list:
         st, col = status(a)
         ag_rows.append({
-            "phases": phase_rows(a["sites"]),
+            "phase": phases_of(a["name"], a["sites"]),
             "name": a["name"], "status": st, "status_color": col,
             "today": fmt(a["today"]), "today_color": GREEN if a["today"] > 0 else RED,
             "need": fmt(a["bal"] / days) if a["tracked"] else "—",
@@ -419,7 +414,7 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
     if others:
         ag_rows.append({"name": f"Other sites ({others['n']})", "status": "earlier work, final figure", "status_color": INK5,
                         "today": fmt(0), "today_color": INK3, "need": "—", "cum": fmt(others["cum"]), "bal": "—", "pct": "—",
-                        "other": True, "phases": []})
+                        "other": True, "phase": PHASE_LABEL.get(phase, "") if phase and phase != "all" else ""})
 
     def site_row(s: SiteDay) -> dict:
         moved = s.today > 0
@@ -429,6 +424,16 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
                 "pct": _pct_s(s.cum, s.bal) if s.tracked else "—"}
 
     least = sorted((s for s in T if s.bal > 0), key=lambda s: s.bal)[:RECLAIM_COUNT]
+
+    # Sites of other phases that sent RDF on the report day, one table per phase (not in this phase's totals).
+    other_today = []
+    if phase and phase != "all":
+        for p in PHASE_ORDER:
+            mine = sorted((x for x in sent_today if x.phase == p and p != phase), key=lambda x: (x.agency.lower(), -x.today))
+            if mine:
+                other_today.append({"name": f"Disposals done today under {PHASE_LABEL.get(p, p)}",
+                                    "today": fmt(_sum(mine, "today")),
+                                    "sites": [site_row(replace(x, site=x.base or x.site)) for x in mine]})
     least_rows = [dict(site_row(s), rank=i + 1) for i, s in enumerate(least)]
 
     groups = []
@@ -459,7 +464,7 @@ def build(hist: list[Tracker], phase_label: str = "", extra_agencies: list[str] 
         "range_label": f"{day(series[0].d)} to {day(rep)}",
         "k": {"today": fmt(today), "need": fmt(need), "cum": fmt(cum + (others["cum"] if others else 0)), "bal": fmt(bal),
               "pct": _pct_t(S), "sites": unique_sites(S), "verdict": verdict, "status_color": status_color},
-        "phase_label": phase_label,
+        "phase_label": phase_label, "other_today": other_today,
         "others": {"n": others["n"], "cum": fmt(others["cum"])} if others else None,
         "chart": chart_svg(series, dl), "chart_marks": chart_marks(series, dl), "proj_text": proj_text,
         "rep_iso": rep.isoformat(), "sheet_date": rep_t.sheet_date, "gist": gist(gist_tracker or rep_t),

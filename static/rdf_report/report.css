@@ -98,7 +98,8 @@ a:hover { color: var(--green-900); }
 .tr > .n { text-align: right; }
 .tr--h { font-size: 12px; color: var(--ink-500); border-bottom: 1px solid var(--ink-300); align-items: end; }
 .tr--total { padding: 10px; font-weight: 700; color: var(--ink-900); border-top: 2px solid var(--ink-200); border-bottom: 0; }
-.g-ag { grid-template-columns: minmax(0, 1fr) 78px 88px 96px 96px 52px; }
+.g-ag { grid-template-columns: minmax(0, 1fr) minmax(70px, .55fr) 78px 88px 96px 96px 52px; }
+.g-other { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 78px 96px 96px 52px; }
 .g-least { grid-template-columns: 28px minmax(0, 1.4fr) minmax(0, 1fr) 96px 52px; padding: 3px 10px; }
 .g-site { grid-template-columns: minmax(0, 1fr) 78px 96px 96px 52px; }
 .tr--site { padding: 2px 10px; font-size: 13px; }
@@ -345,5 +346,5 @@ dialog.panel--detail { width: min(920px, calc(100vw - 24px)); }
 .detail-h { margin: 6px 0 -6px; font-size: 15px; font-weight: 700; color: var(--ink-900); }
 .detail-sum { margin-bottom: 4px; }
 .detail-tbl td .link--name { white-space: normal; }
-.tr--phase { padding-top: 2px; padding-bottom: 2px; font-size: 13px; border-bottom-style: dotted; }
-.tr--phase > span:first-child { padding-left: 18px; }
+.foot { align-items: center; justify-content: flex-end; }
+.foot__logo { width: 44px; height: auto; }

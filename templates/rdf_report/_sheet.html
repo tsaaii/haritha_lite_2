@@ -48,30 +48,21 @@
     <h2 data-head>By agency</h2>
     <div class="scroll-x"><div>
       <div class="tr tr--h g-ag" data-head>
-        <span>Agency</span><span class="n">Today (MT)</span><span class="n">Needed/day</span><span class="n">To date (MT)</span><span class="n">Left (MT)</span><span class="n">Done</span>
+        <span>Agency</span><span>Phase</span><span class="n">Today (MT)</span><span class="n">Needed/day</span><span class="n">To date (MT)</span><span class="n">Left (MT)</span><span class="n">Done</span>
       </div>
       {% for a in r.ag_rows %}
       <div class="tr g-ag">
         <span class="c9" style="min-width:0;">{{ a.name }} <span class="tag" style="color:{{ a.status_color }};">· {{ a.status }}</span></span>
+        <span class="c7 small">{{ a.phase }}</span>
         <span class="n b" style="color:{{ a.today_color }};">{{ a.today }}</span>
         <span class="n c7">{{ a.need }}</span>
         <span class="n cg">{{ a.cum }}</span>
         <span class="n c9">{{ a.bal }}</span>
         <span class="n c9">{{ a.pct }}</span>
       </div>
-      {% for p in a.phases %}
-      <div class="tr tr--phase g-ag">
-        <span class="c5">{{ p.name }} <span class="cnt">· {{ p.sites }} site{{ 's' if p.sites != 1 }}</span></span>
-        <span class="n" style="color:{{ p.today_color }};">{{ p.today }}</span>
-        <span class="n c5">{{ p.need }}</span>
-        <span class="n c5">{{ p.cum }}</span>
-        <span class="n c5">{{ p.bal }}</span>
-        <span class="n c5">{{ p.pct }}</span>
-      </div>
-      {% endfor %}
       {% endfor %}
       <div class="tr tr--total g-ag">
-        <span>All agencies</span><span class="n">{{ r.k.today }}</span><span class="n">{{ r.k.need }}</span><span class="n">{{ r.k.cum }}</span><span class="n">{{ r.k.bal }}</span><span class="n">{{ r.k.pct }}</span>
+        <span>All agencies</span><span></span><span class="n">{{ r.k.today }}</span><span class="n">{{ r.k.need }}</span><span class="n">{{ r.k.cum }}</span><span class="n">{{ r.k.bal }}</span><span class="n">{{ r.k.pct }}</span>
       </div>
     </div></div>
   </section>
@@ -96,8 +87,7 @@
   </section>
 
   <section class="sec">
-    <h2 data-head style="margin-bottom:4px;">By site</h2>
-    <span data-head class="sub" style="margin:0 0 12px;">Every site{% if r.phase_label %} of {{ r.phase_label }}{% endif %} in the daily upload, grouped by agency. Today = RDF disposed on {{ r.rep_day }}, as reported in the daily tracker.{% if r.others %} The {{ r.others.n }} other site{{ 's' if r.others.n != 1 }} of this phase are not listed; their {{ r.others.cum }} MT is in Disposed to date and in By agency.{% endif %}</span>
+    <h2 data-head style="margin-bottom:12px;">By site</h2>
     <div class="scroll-x"><div>
     {% for g in r.groups %}
       <div class="group">
@@ -124,10 +114,31 @@
     {% endfor %}
     </div></div>
   </section>
+
+  {% for o in r.other_today %}
+  <section data-keep class="sec">
+    <h2 data-head style="margin-bottom:12px;">{{ o.name }}</h2>
+    <div class="scroll-x"><div>
+      <div class="tr tr--h g-other" data-head>
+        <span>Site</span><span>Agency</span><span class="n">Today (MT)</span><span class="n">To date (MT)</span><span class="n">Left (MT)</span><span class="n">Done</span>
+      </div>
+      {% for s in o.sites %}
+      <div class="tr tr--site g-other">
+        <span class="c9">{{ s.site }}</span>
+        <span class="c5">{{ s.agency }}</span>
+        <span class="n b" style="color:{{ s.today_color }};">{{ s.today }}</span>
+        <span class="n cg">{{ s.cum }}</span>
+        <span class="n c9">{{ s.bal }}</span>
+        <span class="n c9">{{ s.pct }}</span>
+      </div>
+      {% endfor %}
+    </div></div>
+  </section>
+  {% endfor %}
   {% endif %}
 
   <footer class="foot">
-    <span>Source: daily RDF tracker{% if r %}, {{ r.rep_label }}{% if r.others %}, and the phase sheet{% endif %}{% endif %}. Quantities in metric tonnes (MT).</span>
+    <img class="foot__logo" src="{{ url_for('static', filename='rdf_report/sac-logo.png') }}" alt="Swachha Andhra Corporation logo" width="44" height="43">
     <span>Swachha Andhra Corporation</span>
   </footer>
 </div>

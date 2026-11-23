@@ -129,7 +129,7 @@ def _phase_view(hist, phase: str, b=None):
     b = b or _book(hist)
     v, others = rdf_master.split_tracked(rdf_master.view(hist, phase, b))
     all_last = rdf_master.view(hist[-1:], "all", b)[0] if hist else None
-    r = rdf_report.build(v, rdf_master.PHASE_LABEL.get(phase, ""), _extras(phase), all_last, others) if v else None
+    r = rdf_report.build(v, rdf_master.PHASE_LABEL.get(phase, ""), _extras(phase), all_last, others, phase) if v else None
     return v, r, b, others
 
 
